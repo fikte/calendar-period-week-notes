@@ -2,7 +2,7 @@
 
 An Obsidian plugin that shows a calendar grid with period week numbering and a visual of when notes are created / modified. A ScratchPad note area which is saved in your vault and a notes list area to click to open recent files. Lots of configuration settings to adjust and make it your own. This plugin workds across desktop and mobile / tablet devices. 
 
-Note: this is version 1.0 of this plugin. Whilst it's been tested, there might be some bugs which haven't been discovered. Apprecaite all feedback and improvements to this plugin code.  
+Note: this is version 1.0 of this plugin. Whilst it's been tested, there might be some bugs which haven't been discovered. Appreciate all feedback and improvements to this plugin code.  
 
 ## Calendar view with ScratchPad and Notes tabbed views
 
