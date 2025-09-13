@@ -46,7 +46,14 @@ Hovering over the dot next to the title displays a tooltip with the note details
 
 ### Note Tab Search 
 
-Use the search recent notes text box to filter the recent notes listed. 
+Use the search recent notes text box to filter the recent notes listed. The number of days of created, modified notes to include in the list is configurable in the plugin settings. 
 
 <img width="50%" height="50%" alt="image" src="https://github.com/user-attachments/assets/248148b7-2879-4866-8429-1db1c5162d52" />
+
+## Plugin Settings 
+
+As of version 1.0 of this plugin, here's what's configurable in the settings
+
+<img width="50%" height="50%" alt="image" src="https://github.com/user-attachments/assets/1e8520d8-866b-4cb9-b528-abae2137b48d" />
+
 
