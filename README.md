@@ -4,7 +4,10 @@ Obsidian plugin that shows a calendar grid with period week numbering and a visu
 
 ## Calendar view with ScratchPad and Notes tabbed options
 
-<img width="846" height="1714" alt="image" src="https://github.com/user-attachments/assets/4ff590d2-bb64-43b5-82cd-0336274630a6" />
+The calendar grid displays a month view with days and coloured dots indicating files have either been created, (green), modified, (amber), or Daily Notes have been created, (blue). The dots colours are configurable in the plugin settings.
+The month title colour and format are also configurable in the settings. 
+
+<img width="40%" height="40%" alt="image" src="https://github.com/user-attachments/assets/4ff590d2-bb64-43b5-82cd-0336274630a6" />
 
 
 
