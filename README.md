@@ -20,15 +20,33 @@ For those who don't need a period / week column, just toggle it off in the setti
 
 ### Hovering over a day with notes 
 
-With your mouse hovered over a day with notes, a tooltip display is presented of the notes. The dots next to the note titles show if they have been created, (green), modified, (amber), or the note is a Daily Note, (blue). These colours are configurable in the plugin settgings. The exmaple below shows one file, a Daily Note, that was created for that day. 
+With your mouse hovered over a day with notes, a tooltip display is presented listing the notes. The dots next to the note title show if they have been created, (green), modified, (amber), or the note is a Daily Note, (blue) on that day. These colours are configurable in the plugin settgings. The exmaple below shows one file, a Daily Note, that was created for that day. 
 Clicking the note title will load that note in the main view for reading or editing. 
 
 <img width="40%" height="40%" alt="image" src="https://github.com/user-attachments/assets/57afe5b6-3dbe-45ea-81aa-f2cd806f0ac4" />
 
-## ScratchPad 
+## ScratchPad Tab
 
 The ScratchPad textarea allows for quick taking of notes which are also saved to a ScratchPad note file in your vault, meaning what you add here will be saved and sync'd across your devices. The screenshot shows the ScratchPad notes and the note in the main view with hhe rendered markdown. The location of where the ScratchPad note is saved in your vault is configuratble in the plugin settings. 
 Tip: if the ScratchPad note is selected and not loaded in the main view, click the tab again and it will be loaded for viewing. 
  
 <img width="40%" height="40%" alt="image" src="https://github.com/user-attachments/assets/c664917e-50ae-47b7-8a81-01bef22c16d9" />
+
+## Notes Tab
+
+The Notes tab displays a list of recently created, (green), modified, (amber), or Daily Note, (blue). These colours are configurable in the plugin settgings.
+
+<img width="428" height="500" alt="image" src="https://github.com/user-attachments/assets/f4e5b0a7-b71b-4671-8742-5945e4554dda" />
+
+## Tooltip 
+
+Hovering over the dot next to the title displays a tooltip with the note details, e.g. created / modified date, size, path and tags within the note
+
+<img width="50%" height="50%" alt="image" src="https://github.com/user-attachments/assets/b89a50a7-a83d-4690-a704-c13e95b9b840" />
+
+### Note Tab Search 
+
+Use the search recent notes text box to filter the recent notes listed. 
+
+<img width="50%" height="50%" alt="image" src="https://github.com/user-attachments/assets/248148b7-2879-4866-8429-1db1c5162d52" />
 
