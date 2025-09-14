@@ -140,17 +140,23 @@ const PLUGIN_STYLES = `
   min-height: 0;
 }
 .note-tab-header {
-  display: flex;
-  flex-shrink: 0;
-  width: 100%;
-  border-bottom: 1px solid var(--background-modifier-border);
+    display: flex;
+    flex-shrink: 0;
+    width: 100%;
+    align-items: center;
+    border-bottom: 1px solid var(--background-modifier-border);
 }
+
 .note-tab {
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  font-size: var(--tab-title-font-size);
-  font-weight: var(--tab-title-bold);
+    flex: 1 1 0; /* Default state: grow and share space equally */
+    text-align: center;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    font-size: var(--tab-title-font-size);
+    font-weight: var(--tab-title-bold);
+    transition: flex 0.2s ease-out; /* Adds a smooth animation to the resize */
+    white-space: nowrap;
 }
 .note-tab:hover {
   background-color: var(--background-modifier-hover);
@@ -339,11 +345,15 @@ body.period-month-tooltip-active .tooltip {
   align-items: center; /* Vertically align tabs and search box */
 }
 /*  Search container needs to be a positioning context */
+.note-tab.shrunken {
+    flex: 0 1 auto; /* Shrunken state: don't grow, just take up necessary space */
+}
+
 .notes-search-container-header {
-  position: relative;
-  flex-grow: 1;
-  display: flex;
-  align-items: center;
+    flex-grow: 1; /* Let the search box take all available space when visible */
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
 }
 /*  Added right-padding to make space for the clear button */
 .notes-search-input {
@@ -357,14 +367,13 @@ body.period-month-tooltip-active .tooltip {
 }
 /*  Styles for the search clear button */
 .notes-search-clear-btn {
-  position: absolute;
-  right: 8px;
-  top: 50%;
+  position: relative;
+  right: 15px;
   transform: translateY(-50%);
   cursor: pointer;
   color: var(--text-muted);
   font-size: var(--font-ui-small);
-  line-height: 1;
+  line-height: 0.1;
   visibility: hidden; /* Hidden by default, shown via JS */
 }
 .notes-search-clear-btn:hover {
