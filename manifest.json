@@ -1,7 +1,7 @@
 {
   "id": "calendar-period-week-notes",
   "name": "Calendar Period Week Notes",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "minAppVersion": "0.15.0",
   "description": "Calendar grid together with period week numbering and visual of when notes are created / modified. A ScratchPad note area which is saved in your vault and a notes list area to click to open recent files. Lots of configuration settings to adjust and make your own style.",
   "author": "Tim Williams",
