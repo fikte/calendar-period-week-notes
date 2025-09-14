@@ -1586,7 +1586,7 @@ class PeriodSettingsTab extends PluginSettingTab {
         
         new Setting(containerEl)
             .setName("Popup gap")
-            .setDesc("The distance in pixels between the calendar date and the popup. A negative or smaller number makes it easier to move the mouse into the popup. DEfault is -2.")
+            .setDesc("The distance in pixels between the calendar date and the popup. A negative or smaller number makes it easier to move the mouse into the popup. Default is -2.")
             .addText(text => text
                 .setValue(String(this.plugin.settings.popupGap))
                 .onChange(async (value) => {
