@@ -4,7 +4,8 @@ const VIEW_TYPE_PERIOD = "calendar-period-week";
 
 const DEFAULT_SETTINGS = {
     fontSize: "13px", 
-    dayNumberFontSize: "15px", 
+    dayNumberFontSize: "15px",
+    navButtonHeight: "28px", 
     headerRowBold: false, 
     pwColumnBold: false, 
     monthColor: "#ffffff",
@@ -392,6 +393,14 @@ body.period-month-tooltip-active .tooltip {
 /*  This rule now uses a variable instead of being hardcoded */
 .period-calendar-table .pw-label-cell {
     font-weight: var(--pw-column-font-weight);
+}
+.month-header-nav button {
+    height: var(--nav-button-height);
+    min-height: var(--nav-button-height);
+    padding: 0 0.75em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 `;
 
@@ -1254,7 +1263,8 @@ class PeriodMonthPlugin extends Plugin {
             '--other-note-dot-color': this.settings.otherNoteDotColor,
             '--calendar-modified-dot-color': this.settings.calendarModifiedDotColor, 
             '--other-note-popup-font-size': this.settings.otherNotePopupFontSize,
-            '--calendar-dot-size': this.settings.calendarDotSize + 'px'
+            '--calendar-dot-size': this.settings.calendarDotSize + 'px',
+            '--nav-button-height': this.settings.navButtonHeight
         };
         for (const key in styleProps) {
             document.documentElement.style.setProperty(key, styleProps[key]);
@@ -1409,6 +1419,15 @@ class PeriodSettingsTab extends PluginSettingTab {
                 this.plugin.settings.monthTitleFormat = value;
                 await this.saveAndUpdate();
             }));
+
+        new Setting(containerEl)
+            .setName("Calendar nav buttons height")
+            .setDesc("Set the height of the 'Previous', 'Today', and 'Next' month buttons. Default is 28px. (e.g., 28px or 1.75em).")
+            .addText(text => text.setValue(this.plugin.settings.navButtonHeight)
+                .onChange(async value => {
+                    this.plugin.settings.navButtonHeight = value;
+                    await this.saveAndUpdate();
+                }));
 
         new Setting(containerEl)
             .setName("Bold toggle for calendar header row")
