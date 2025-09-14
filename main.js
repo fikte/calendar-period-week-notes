@@ -22,6 +22,7 @@ const DEFAULT_SETTINGS = {
     scratchFontSize: "14px",
     scratchBold: false,
     scratchFontFamily: "",
+    scratchpadOpenAction: "new-tab",
     tabTitleFontSize: "14px",
     tabTitleBold: false,
     notesLineHeight: 1.2, 
@@ -778,12 +779,10 @@ class PeriodMonthView extends ItemView {
             this.populateNotes();
         });
 
-        // --- MODIFIED --- This click handler now checks if the file is already open
         scratchTab.addEventListener("click", async () => {
             if (this.activeTab === "scratch") {
                 const path = this.plugin.settings.fixedNoteFile;
                 let file = this.app.vault.getAbstractFileByPath(path);
-
                 if (!file) {
                     try {
                         file = await this.app.vault.create(path, "");
@@ -792,29 +791,28 @@ class PeriodMonthView extends ItemView {
                         return;
                     }
                 }
-
+    
                 if (file instanceof TFile) {
-                    // --- NEW CHECK ---
-                    // Check if the file is already open in any tab.
                     let isAlreadyOpen = false;
                     this.app.workspace.getLeavesOfType("markdown").forEach(leaf => {
                         if (leaf.view.file?.path === file.path) {
                             isAlreadyOpen = true;
                         }
                     });
-
-                    // Only open the file if it's not already open.
+    
                     if (!isAlreadyOpen) {
-                        this.app.workspace.getLeaf(true).openFile(file);
+                        // Check the setting to decide how to open the file
+                        if (this.plugin.settings.scratchpadOpenAction === 'new-tab') {
+                            this.app.workspace.getLeaf(true).openFile(file);
+                        } else {
+                            this.app.workspace.getLeaf().openFile(file); // Opens in the current tab
+                        }
                     }
-                    // --- END NEW CHECK ---
                 }
             } else {
-                // Otherwise, just switch to the tab
                 switchTabs("scratch");
             }
         });
-        // --- END MODIFICATION ---
 
         notesTab.addEventListener("click", () => switchTabs("notes"));
         switchTabs(this.activeTab);
@@ -1481,6 +1479,18 @@ class PeriodSettingsTab extends PluginSettingTab {
                 .onChange(async value => { this.plugin.settings.tabTitleBold = value; await this.saveAndUpdate(); }));
 
         containerEl.createEl("h1", { text: "ScratchPad Settings" });
+
+        new Setting(containerEl)
+            .setName("Second-click behavior")
+            .setDesc("When clicking the already-active 'ScratchPad' tab, choose how to open the note.")
+            .addDropdown(dropdown => dropdown
+                .addOption('new-tab', 'Open in a new tab')
+                .addOption('current-tab', 'Open in the current tab')
+                .setValue(this.plugin.settings.scratchpadOpenAction)
+                .onChange(async (value) => {
+                    this.plugin.settings.scratchpadOpenAction = value;
+                    await this.saveAndUpdate();
+                }));
 
         new Setting(containerEl)
             .setName("ScratchPad note location")
