@@ -36,7 +36,7 @@ Tip: if the ScratchPad note is selected and not loaded in the main view, click t
 
 The Notes tab displays a list of recently created, (green), modified, (amber), or Daily Note, (blue). These colours are configurable in the plugin settgings.
 
-<img width="428" height="500" alt="image" src="https://github.com/user-attachments/assets/f4e5b0a7-b71b-4671-8742-5945e4554dda" />
+<img width="40%" height="40%" alt="image" src="https://github.com/user-attachments/assets/f4e5b0a7-b71b-4671-8742-5945e4554dda" />
 
 ## Tooltip 
 
