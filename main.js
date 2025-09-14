@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS = {
     monthTitleFormat: "MMM YYYY",
     dailyNotesFolder: "Daily Notes", 
     dailyNoteDateFormat: "YYYY-MM-DD",
+    dailyNoteOpenAction: "new-tab",
     fixedNoteFile: "ScratchPad.md", 
     showPWColumn: true,
     autoReloadInterval: 5000, 
@@ -480,19 +481,26 @@ class TemplateFileSuggest extends AbstractInputSuggest {
 
 
 function getPeriodWeek(date = new Date(), startOfPeriodsOverride) {
-    const startOfPeriods = startOfPeriodsOverride ? new Date(startOfPeriodsOverride) : new Date("2025-03-03");
+    const startOfPeriods = startOfPeriodsOverride ? new Date(startOfPeriodsOverride) : new Date("2025-03-02");
 
-    // Calculate the difference in days from the start date (can be negative).
-    const daysSinceStart = Math.floor((date - startOfPeriods) / (1000 * 60 * 60 * 24));
+    // --- MODIFIED: Use UTC to make the calculation immune to Daylight Saving Time ---
+    const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+    // Get the timestamp for midnight UTC for the start of the period
+    const utcStart = Date.UTC(startOfPeriods.getFullYear(), startOfPeriods.getMonth(), startOfPeriods.getDate());
     
-    // The week number relative to the start date (can be negative).
+    // Get the timestamp for midnight UTC for the target date
+    const utcDate = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+
+    // Calculate the difference in days using the consistent UTC timestamps
+    const daysSinceStart = Math.floor((utcDate - utcStart) / MS_PER_DAY);
+    // --- END MODIFICATION ---
+
     const weekNumber = Math.floor(daysSinceStart / 7);
 
-    // Calculate the period number (1-13) using a formula that handles negative numbers correctly.
     const periodIndex = Math.floor(weekNumber / 4);
     const period = ((periodIndex % 13) + 13) % 13 + 1;
 
-    // Calculate the week number (1-4) using a formula that handles negative numbers correctly.
     const week = ((weekNumber % 4) + 4) % 4 + 1;
 
     return { period, week, weekSinceStart: weekNumber + 1 };
@@ -845,7 +853,8 @@ class PeriodMonthView extends ItemView {
         );
 
         let currentDay = new Date(firstDayOfMonth);
-        currentDay.setDate(1 - (firstDayOfMonth.getDay() || 7)); // Adjust for weeks starting on Monday
+        currentDay.setDate(1 - firstDayOfMonth.getDay());
+        //currentDay.setDate(1 - (firstDayOfMonth.getDay() || 7)); // Adjust for weeks starting on Monday
 
         while (currentDay <= lastDayOfMonth || tbody.children.length < 6) {
             const row = tbody.createEl("tr");
@@ -1155,9 +1164,16 @@ class PeriodMonthView extends ItemView {
 
         const file = this.app.vault.getAbstractFileByPath(path);
 
+        const openFile = (fileToOpen) => {
+            if (this.plugin.settings.dailyNoteOpenAction === 'new-tab') {
+                this.app.workspace.getLeaf(true).openFile(fileToOpen);
+            } else {
+                this.app.workspace.getLeaf().openFile(fileToOpen);
+            }
+        };
+
         if (file) {
-            const newLeaf = this.app.workspace.getLeaf(true);
-            await newLeaf.openFile(file);
+            openFile(file);
         } else {
             const friendlyDate = date.toLocaleDateString(undefined, { 
                 weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
@@ -1201,8 +1217,7 @@ class PeriodMonthView extends ItemView {
                         
                         const newFile = await this.app.vault.create(path, fileContent);
                         
-                        const newLeaf = this.app.workspace.getLeaf(true);
-                        await newLeaf.openFile(newFile);
+                        openFile(newFile);
 
                     } catch (e) {
                         console.error("Failed to create daily note:", e);
@@ -1639,7 +1654,7 @@ class PeriodSettingsTab extends PluginSettingTab {
             'otherNoteIgnoreFolders'
         );
 
-        containerEl.createEl("h1", { text: "Functional Settings" });
+        containerEl.createEl("h1", { text: "Calendar Functional Settings" });
         new Setting(containerEl)
             .setName("Start of Period 1 Week 1 date")
             .setDesc("The date when period 1, week 1 begins. NOTE: must be a Sunday date.")
@@ -1660,6 +1675,18 @@ class PeriodSettingsTab extends PluginSettingTab {
                 text.setValue(this.plugin.settings.dailyNotesFolder)
                     .onChange(async value => { this.plugin.settings.dailyNotesFolder = value; await this.saveAndUpdate(); });
             });
+        
+        new Setting(containerEl)
+            .setName("Daily Note click behavior")
+            .setDesc("When clicking a date on the calendar, choose how to open the daily note.")
+            .addDropdown(dropdown => dropdown
+                .addOption('new-tab', 'Open in a new tab')
+                .addOption('current-tab', 'Open in the current tab')
+                .setValue(this.plugin.settings.dailyNoteOpenAction)
+                .onChange(async (value) => {
+                    this.plugin.settings.dailyNoteOpenAction = value;
+                    await this.saveAndUpdate();
+                }));
         
         new Setting(containerEl)
             .setName("Daily note template")
