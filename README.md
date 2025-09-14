@@ -12,7 +12,7 @@ The period week column is for all those who work for companies that use 13 perio
 
 <img width="40%" height="40%" alt="image" src="https://github.com/user-attachments/assets/4ff590d2-bb64-43b5-82cd-0336274630a6" />
 
-### oggle off the period / week column in the calendar view
+### Toggle off the period / week column in the calendar view
 
 For those who don't need a period / week column, just toggle it off in the settings: 
 
