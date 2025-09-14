@@ -1,4 +1,4 @@
-# calendar-period-week-notes
+# Obsidian Plugin - Calendar Period Week Notes
 
 An Obsidian plugin that shows a calendar grid with period week numbering and a visual of when notes are created / modified. A ScratchPad note area which is saved in your vault and a notes list area to click to open recent files. Lots of configuration settings to adjust and make it your own. This plugin workds across desktop and mobile / tablet devices. 
 
@@ -36,24 +36,24 @@ Tip: if the ScratchPad note is selected and not loaded in the main view, click t
 
 The Notes tab displays a list of recently created, (green), modified, (amber), or Daily Note, (blue). These colours are configurable in the plugin settgings.
 
-<img width="428" height="500" alt="image" src="https://github.com/user-attachments/assets/f4e5b0a7-b71b-4671-8742-5945e4554dda" />
+<img width="40%" height="40%" alt="image" src="https://github.com/user-attachments/assets/f4e5b0a7-b71b-4671-8742-5945e4554dda" />
 
 ## Tooltip 
 
 Hovering over the dot next to the title displays a tooltip with the note details, e.g. created / modified date, size, path and tags within the note
 
-<img width="50%" height="50%" alt="image" src="https://github.com/user-attachments/assets/b89a50a7-a83d-4690-a704-c13e95b9b840" />
+<img width="40%" height="40%" alt="image" src="https://github.com/user-attachments/assets/b89a50a7-a83d-4690-a704-c13e95b9b840" />
 
 ### Note Tab Search 
 
 Use the search recent notes text box to filter the recent notes listed. The number of days of created, modified notes to include in the list is configurable in the plugin settings. 
 
-<img width="50%" height="50%" alt="image" src="https://github.com/user-attachments/assets/248148b7-2879-4866-8429-1db1c5162d52" />
+<img width="40%" height="40%" alt="image" src="https://github.com/user-attachments/assets/248148b7-2879-4866-8429-1db1c5162d52" />
 
 ## Plugin Settings 
 
 As of version 1.0 of this plugin, here's what's configurable in the settings
 
-<img width="50%" height="50%" alt="image" src="https://github.com/user-attachments/assets/1e8520d8-866b-4cb9-b528-abae2137b48d" />
+<img width="40%" height="40%" alt="image" src="https://github.com/user-attachments/assets/1e8520d8-866b-4cb9-b528-abae2137b48d" />
 
 
