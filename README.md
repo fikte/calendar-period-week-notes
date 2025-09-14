@@ -1,4 +1,4 @@
-# calendar-period-week-notes
+# Obsidian Plugin - Calendar Period Week Notes
 
 An Obsidian plugin that shows a calendar grid with period week numbering and a visual of when notes are created / modified. A ScratchPad note area which is saved in your vault and a notes list area to click to open recent files. Lots of configuration settings to adjust and make it your own. This plugin workds across desktop and mobile / tablet devices. 
 
