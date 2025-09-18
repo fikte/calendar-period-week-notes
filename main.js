@@ -94,14 +94,14 @@ const DEFAULT_SETTINGS = {
     dailyNoteOpenAction: "new-tab",
 
     //period / week numbers 
-    showWeekNumbers: false,
-    weekNumberType: "period", // 'period' or 'calendar'
+    showWeekNumbers: true,
+    weekNumberType: "calendar", // 'period' or 'calendar'
     weekNumberColumnLabel: "Wk",
 
     // Functional
     autoReloadInterval: 5000,
     startOfPeriod1Date: "2025-03-02",
-    showPWColumn: true,
+    showPWColumn: false,
     pwFormat: "P#W#",
     enableRowHighlight: true,
     enableColumnHighlight: true,
@@ -2639,7 +2639,20 @@ class PeriodMonthView extends ItemView {
                     mondayOfWeek.setDate(weekDate.getDate() + 1);
                     weekNum = moment(mondayOfWeek).isoWeek();
                 }
-                row.createEl("td", { text: weekNum, cls: "week-number-cell" });
+                const weekCell = row.createEl("td", { text: weekNum, cls: "week-number-cell" });
+ 
+               // Add the row highlight event listeners
+               weekCell.addEventListener('mouseenter', () => {
+                   if (this.plugin.settings.enableRowHighlight) {
+                       const highlightColor = document.body.classList.contains('theme-dark')
+                           ? this.plugin.settings.rowHighlightColorDark
+                           : this.plugin.settings.rowHighlightColorLight;
+                       row.style.backgroundColor = highlightColor;
+                   }
+               });
+               weekCell.addEventListener('mouseleave', () => {
+                  row.style.backgroundColor = '';
+                });
             }
 
             // --- Day Cells ---
