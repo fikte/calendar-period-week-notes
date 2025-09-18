@@ -2378,7 +2378,11 @@ class PeriodMonthView extends ItemView {
         // Determine the first visible tab to be the default active tab.
         const finalTabOrder = this.getFinalTabOrder();
         const visibleTabs = finalTabOrder.filter(key => this.plugin.settings.tabVisibility[key]);
-        this.activeTab = visibleTabs[0] || null;
+
+        // Only reset the active tab if it's not set or has become invisible
+        if (!this.activeTab || !visibleTabs.includes(this.activeTab)) {
+            this.activeTab = visibleTabs[0] || null;
+        }
 
         this.containerEl.empty();
         const container = this.containerEl.createDiv("period-month-container");
