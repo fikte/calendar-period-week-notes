@@ -5,12 +5,15 @@ A powerhouse daily and weekly planning dashboard for Obsidian. This plugin combi
 Move beyond simple daily notes with a unique **Period/Week** numbering system, interactive **popups**, and a deeply integrated **task manager**.
 
 <img width="524" height="983" alt="image" src="https://github.com/user-attachments/assets/875cbed1-d3ef-4732-be15-a1254bf18662" />
-_The main interface showing the calendar, dot indicators, and the integrated tabs for ScratchPad, Notes, Tasks, and Assets._
-<img width="522" height="971" alt="image" src="https://github.com/user-attachments/assets/46a9a9b1-f096-499b-8946-078fb8fcffee" />
+
 _The main interface showing the calendar, dot indicators, and the integrated tabs for ScratchPad, Notes, Tasks, and Assets._
 
+<img width="522" height="971" alt="image" src="https://github.com/user-attachments/assets/46a9a9b1-f096-499b-8946-078fb8fcffee" />
+
+_The main interface showing the calendar, dot indicators, and the integrated tabs for ScratchPad, Notes, Tasks, and Assets._
 
 <img width="1307" height="1014" alt="image" src="https://github.com/user-attachments/assets/9ec24c67-df3d-4c38-897a-09eb2c19c062" />
+
 _The main interface showing the calendar, dot indicators, and the integrated tabs for ScratchPad, Notes, Tasks, and Assets. The main Obsidian window showing the preview markup from the ScratchPad textarea_
 
 
