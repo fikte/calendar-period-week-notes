@@ -1,59 +1,261 @@
-# Obsidian Plugin - Calendar Period Week Notes
+# 📅 Obsidian Calendar Period Week Notes
 
-An Obsidian plugin that shows a calendar grid with period week numbering and a visual of when notes are created / modified. A ScratchPad note area which is saved in your vault and a notes list area to click to open recent files. Lots of configuration settings to adjust and make it your own. This plugin workds across desktop and mobile / tablet devices. 
+A powerhouse daily and weekly planning dashboard for Obsidian. This plugin combines a highly customizable calendar with an integrated tabbed interface for your scratchpad, recent notes, tasks, and assets, giving you a complete overview of your vault at a glance.
 
-Note: this is version 1.0 of this plugin. Whilst it's been tested, there might be some bugs which haven't been discovered. Appreciate all feedback and improvements to this plugin code.  
+Move beyond simple daily notes with a unique **Period/Week** numbering system, interactive **popups**, and a deeply integrated **task manager**.
 
-## Calendar view with ScratchPad and Notes tabbed views
+<img width="524" height="983" alt="image" src="https://github.com/user-attachments/assets/875cbed1-d3ef-4732-be15-a1254bf18662" /><img width="522" height="971" alt="image" src="https://github.com/user-attachments/assets/46a9a9b1-f096-499b-8946-078fb8fcffee" />
 
-The calendar grid displays a month view with days and coloured dots indicating files have either been created, (green), modified, (amber), or Daily Notes created, (blue). The dot colours are configurable in the plugin settings and can be turned off if needed.
-The month title font size, colour and format are also configurable in the settings.
-The period week column is for all those who work for companies that use 13 periods, with 4 weeks in each period, across their financial year. The start date is configurable and rolls over for previous or next years. 
 
-<img width="40%" height="40%" alt="image" src="https://github.com/user-attachments/assets/4ff590d2-bb64-43b5-82cd-0336274630a6" />
+_The main interface showing the calendar, dot indicators, and the integrated tabs for Notes, Tasks, and Assets._
 
-### Toggle off the period / week column in the calendar view
+---
 
-For those who don't need a period / week column, just toggle it off in the settings: 
+## ✨ Features
 
-<img width="40%" height="40%" alt="image" src="https://github.com/user-attachments/assets/f222d296-a559-42a4-a50c-a4758e9e282f" />
+### 🗓️ Dynamic Calendar View
 
-### Hovering over a day with notes 
+- **Custom Period/Week System**: Track your year in 13 periods of 4 weeks, perfect for structured planning cycles.
+    
+- **Multiple Views**: Toggle between a traditional **monthly calendar** and a continuous **vertical scroll** view by clicking the month title.
+    
+- **Dot Indicators**: See which days have activity at a glance:
+    
+    - 🔵 Daily Notes
+        
+    - 🟢 New Notes
+        
+    - 🟠 Modified Notes
+        
+    - 🔴 New Assets (images, PDFs, etc.)
+        
+    - 🔢 A badge showing the number of open tasks due on that day.
+        
+- **Interactive Popups**: Hover over any day with a dot to see a popup listing the specific notes, tasks, and assets for that day, with clickable links.
+    
+- **Smart Highlighting**: Customize how you highlight dates, with options to highlight the current week, day column, or a complex grid up to the hovered date.
+    
+- **Week Numbers**: Optionally display standard ISO week numbers or weeks based on your Period/Week system.
+    
 
-With your mouse hovered over a day with notes, a tooltip display is presented listing the notes. The dots next to the note title show if they have been created, (green), modified, (amber), or the note is a Daily Note, (blue) on that day. These colours are configurable in the plugin settgings. The exmaple below shows one file, a Daily Note, that was created for that day. 
-Clicking the note title will load that note in the main view for reading or editing. 
+### 🧩 Integrated Tabbed Dashboard
 
-<img width="40%" height="40%" alt="image" src="https://github.com/user-attachments/assets/57afe5b6-3dbe-45ea-81aa-f2cd806f0ac4" />
+A fully functional panel right below your calendar, with draggable tabs to organize your workflow.
 
-## ScratchPad Tab
+- 📝 **Scratchpad Tab**: A persistent note file for quick thoughts and fleeting ideas.
+    
+    - Toggle between **edit** and **Markdown preview** mode.
+        
+    - **Find-as-you-type search** with result highlighting.
+        
+    - A quick-add button to insert new tasks using a customizable format with date placeholders (`{today}`, `{monday}`, `|` for cursor position, etc.).
+        
+- 📂 **Notes & Pinned Tab**:
+    
+    - View a sorted list of recently created or modified notes.
+        
+    - Double-click the tab to switch to **"Pinned" mode**, showing only notes with a specific tag (e.g., `#pin`).
+        
+    - Detailed tooltips on hover show file path, dates, size, and tags.
+        
+- ✔️ **Tasks Tab**: A complete task management system that scans your entire vault.
+    
+    - **Group tasks** by due date (`Overdue`, `Today`, `Tomorrow`, etc.) or by `#tag`.
+        
+    - Toggle grouping by double-clicking the Tasks tab.
+        
+    - Check off tasks directly from the list, and the underlying Markdown file is updated instantly.
+        
+    - Click any task to jump directly to its line in the source file.
+        
+- 🖼️ **Assets Tab**: Keep track of non-Markdown files.
+    
+    - View recently added images, PDFs, audio files, and more.
+        
+    - See image **thumbnails** directly in the list.
+        
+    - **Unused Asset Indicator**: An icon appears next to any asset not linked from any note, helping you clean up your vault.
+        
+    - **Delete Unused Assets**: Securely delete unlinked assets directly from the asset list after a confirmation.
+        
+    - **Backlinks Popup**: Hover over an asset's icon to see a popup of all notes that link to it.
+        
 
-The ScratchPad textarea allows for quick taking of notes which are also saved to a ScratchPad note file in your vault, meaning what you add here will be saved and sync'd across your devices. The screenshot shows the ScratchPad notes and the note in the main view with hhe rendered markdown. The location of where the ScratchPad note is saved in your vault is configuratble in the plugin settings. 
-Tip: if the ScratchPad note is selected and not loaded in the main view, click the tab again and it will be loaded for viewing. 
- 
-<img width="40%" height="40%" alt="image" src="https://github.com/user-attachments/assets/c664917e-50ae-47b7-8a81-01bef22c16d9" />
+### ⚙️ Deep Customization
 
-## Notes Tab
+Almost every visual and functional element can be tailored to your liking. See the detailed settings section below for a full list.
 
-The Notes tab displays a list of recently created, (green), modified, (amber), or Daily Note, (blue). These colours are configurable in the plugin settgings.
+---
 
-<img width="40%" height="40%" alt="image" src="https://github.com/user-attachments/assets/f4e5b0a7-b71b-4671-8742-5945e4554dda" />
+## 🚀 Installation
 
-## Tooltip 
+### From Community Plugins
 
-Hovering over the dot next to the title displays a tooltip with the note details, e.g. created / modified date, size, path and tags within the note
+1. Open **Settings** > **Community Plugins**.
+    
+2. Make sure "Restricted mode" is **off**.
+    
+3. Click **Browse** community plugins and search for "Calendar Period Week Notes".
+    
+4. Click **Install**, then **Enable**.
+    
 
-<img width="40%" height="40%" alt="image" src="https://github.com/user-attachments/assets/b89a50a7-a83d-4690-a704-c13e95b9b840" />
+### Manual Installation
 
-### Note Tab Search 
+1. Download the latest release from the [GitHub releases page](https://github.com/fikte/calendar-period-week-notes/releases/).
+    
+2. Unzip the downloaded file.
+    
+3. Copy the `calendar-period-week-notes` folder into your vault's plugin folder: `<VaultFolder>/.obsidian/plugins/`.
+    
+4. Reload Obsidian, then go to **Settings** > **Community Plugins** and enable it.
+    
 
-Use the search recent notes text box to filter the recent notes listed. The number of days of created, modified notes to include in the list is configurable in the plugin settings. 
+---
 
-<img width="40%" height="40%" alt="image" src="https://github.com/user-attachments/assets/248148b7-2879-4866-8429-1db1c5162d52" />
+## 💡 How to Use
 
-## Plugin Settings 
+1. **Open the View**: Click the `📅` icon in the left ribbon or use the command palette (`Ctrl/Cmd + P`) and search for "Open Calendar Period Week Notes".
+    
+2. **Navigate the Calendar**:
+    
+    - Click on any date to open (or create) the daily note for that day.
+        
+    - Hover over a date with dots to see the details popup.
+        
+    - Use the `←` and `→` arrows to change the month.
+        
+    - Click the month title (e.g., "September 2025") to switch to the vertical scroll view.
+        
+3. **Use the Tabs**:
+    
+    - Click a tab to switch panels.
+        
+    - Drag and drop tabs to reorder them.
+        
+    - **Double-click** special tabs for alternate functions:
+        
+        - **Notes Tab**: Toggles between "Recent" and "Pinned" views.
+            
+        - **Tasks Tab**: Toggles grouping between "Date" and "Tag".
+            
+        - **Scratchpad Tab**: Opens the scratchpad note file in a full editor tab.
+            
 
-As of version 1.0 of this plugin, here's what's configurable in the settings
+---
 
-<img width="40%" height="40%" alt="image" src="https://github.com/user-attachments/assets/1e8520d8-866b-4cb9-b528-abae2137b48d" />
+## 🔧 Settings
+
+The plugin offers extensive options to tailor its appearance and functionality.
+
+### General Display & Tabs
+
+|Setting|Description|Default Value|
+|---|---|---|
+|**Month title format**|Sets the display format for the main month title using [moment.js](https://momentjs.com/docs/#/displaying/format/) tokens.|`MMM YYYY`|
+|**Month title font size**|The font size of the main "Month Year" title.|`20px`|
+|**Bold month title**|Toggles bold font weight for the main title.|`false`|
+|**Month Title Color**|The color of the main title. Includes an opacity slider.|`rgba(255, 255, 255, 1)`|
+|**Navigation buttons height**|The height of the `←`, `Today`, and `→` buttons.|`28px`|
+|**Bold calendar header**|Toggles bold font weight for the day names row (Mon, Tue, etc.).|`false`|
+|**Show calendar grid lines**|Toggles the visibility of borders between calendar days.|`false`|
+|**Tab title font size**|Font size for the tab titles (ScratchPad, Notes, etc.).|`14px`|
+|**Bold tab titles**|Toggles bold font weight for tab titles.|`false`|
+|**Active Tab Indicator**|The color of the underline for the currently active tab.|`rgba(102, 102, 102, 1)`|
+|**Tab Order**|A comma-separated list to define the order of tabs. Can also be set by dragging.|`scratch,notes,tasks,assets`|
+|**Tab Visibility**|Individual toggles to show or hide the Scratch, Notes, Tasks, and Assets tabs.|All `true`|
+|**Desktop/Mobile tab display**|Choose between `Icon Only`, `Text Only`, or `Icon and Text` for tabs on different screen sizes.|`iconOnly`|
+|**Tab Icons**|Customize the Lucide icon name for each tab (Scratch, Notes, Tasks, Pinned, Assets).|Various|
+
+Export to Sheets
+
+### Calendar Functional Settings
+
+|Setting|Description|Default Value|
+|---|---|---|
+|**Start of Period 1 Week 1**|The Sunday date that anchors the entire Period/Week calculation system.|`2025-03-02`|
+|**Period/Week format**|The display format for the P/W column (e.g., `P#W#`, `p# w#`, `#-#`).|`P#W#`|
+|**Show Period/Week column**|Toggles the visibility of the P/W column.|`true`|
+|**Show week number column**|Toggles the visibility of a separate week number column.|`false`|
+|**Week number type**|Choose between `Period System Week` or `Calendar Year Week (ISO)`.|`period`|
+|**Daily Notes folder**|The vault path where daily notes are stored.|`Daily Notes`|
+|**Daily Note open behavior**|Open daily notes in a `new-tab` or the `current-tab`.|`new-tab`|
+|**Daily note template**|Path to a template file to use when creating new daily notes.|`""`|
+|**Enable row/column/grid highlight**|Toggles for different calendar grid highlighting behaviors on hover.|All `true`|
+|**Grid Highlight Color**|The color used for the row/column/grid hover effects.|`rgba(51, 51, 51, 1)`|
+
+Export to Sheets
+
+### Calendar Dot Indicators & Popups
+
+|Setting|Description|Default Value|
+|---|---|---|
+|**Show dot for created notes**|Show a dot on days a non-daily note was created.|`true`|
+|**Show dot for modified notes**|Show a dot on days a non-daily note was modified.|`true`|
+|**Show dot for new assets**|Show a dot on days an asset was added to the vault.|`true`|
+|**Calendar dot size**|The size of the dots in pixels.|`4`|
+|**Dot Colors**|Individual RGBA color pickers for Daily Note, Created Note, Modified Note, and Asset dots.|Various|
+|**Popup hover/hide delay**|The delay in milliseconds before showing or hiding the details popup.|`100`|
+|**Popup font size**|The font size of text inside the hover popup.|`13px`|
+|**Ignore folders for dots**|Define folder paths to exclude from creating created/modified/asset dots.|`[]`|
+
+Export to Sheets
+
+### ScratchPad Tab Settings
+
+|Setting|Description|Default Value|
+|---|---|---|
+|**ScratchPad note path**|The full vault path to the note file used by the scratchpad.|`ScratchPad.md`|
+|**Show preview/edit button**|Shows the button to toggle between plain text and Markdown preview.|`false`|
+|**Show '+ Task' button**|Shows the button to quickly add a new task.|`true`|
+|**Task Creation Format**|The template string for the '+ Task' button, with placeholder support.|`- [ ]`|
+|**ScratchPad font size/family**|Customize the font used in the scratchpad editor.|`14px` / `""`|
+|**Bold ScratchPad text**|Toggles bold font weight for scratchpad text.|`false`|
+|**Search highlight color**|The background color for highlighted search terms.|`rgba(255, 165, 0, 0.4)`|
+
+### Notes & Assets Tab Settings
+
+|Setting|Description|Default Value|
+|---|---|---|
+|**Pinned notes tag**|The tag (without '#') used to identify notes for the "Pinned" view.|`pin`|
+|**Notes lookback days**|How many days back to look for recent notes.|`7`|
+|**Show note status dots**|Shows a colored dot (created/modified) next to each note in the list.|`true`|
+|**Show note tooltips**|Show a detailed tooltip on hover with file metadata.|`true`|
+|**Assets lookback days**|How many days back to look for recent assets.|`7`|
+|**Hidden asset file types**|Comma-separated list of file extensions to hide from the Assets tab.|`base,canvas`|
+|**Show indicator for unused assets**|Shows an icon next to assets that are not linked from any note.|`true`|
+|**Note/Task Hover Color**|The background color when hovering over an item in the Notes, Tasks, or Assets list.|`rgba(51, 51, 51, 1)`|
+|**Ignore folders in Notes tab**|Define folder paths to exclude from the "Recent Notes" list.|`[]`|
+
+### Tasks Tab Settings
+
+|Setting|Description|Default Value|
+|---|---|---|
+|**Task heading/text font size**|Font size for group headings and individual task items.|`13px` / `14px`|
+|**Truncate long task text**|If enabled, long task text is shortened with `...`.|`true`|
+|**Show completed tasks for Today**|If enabled, completed tasks due today will still appear in the list.|`true`|
+|**Task sort order**|Default sorting for tasks within each group (`By Due Date`, `A-Z`, `Z-A`).|`dueDate`|
+|**Group tasks by**|The default grouping method (`Date` or `Tag`).|`date`|
+|**Date Groups to Show**|Toggles to show/hide specific date groups (Overdue, Today, Tomorrow, etc.).|All enabled|
+|**Task Group Icons**|Customize the Lucide icon name for each task group header.|Various|
+|**Task Group Backgrounds**|Individual RGBA color pickers for the background of each task group.|Various|
+|**Exclude folders from Task search**|Define folder paths to exclude from the task search.|`[]`|
+
+
+---
+
+## ❤️ Contributing
+
+Contributions, issues, and feature requests are welcome! Feel free to check  [GitHub issues page](https://github.com/fikte/calendar-period-week-notes/issues)
+
+
+[Buy me a coffee](https://buymeacoffee.com/fikte)
+
+<img width="100" height="100" alt="image" src="https://github.com/user-attachments/assets/ff04322a-0e76-4095-a5ce-93853723617e" />
+
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE.md file for details.
 
 

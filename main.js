@@ -16,6 +16,7 @@ const DEFAULT_SETTINGS = {
     monthColorLight: "rgba(51, 51, 51, 1)", // Dark Grey for light mode
     monthColorDark: "rgba(255, 255, 255, 1)", // White for dark mode
     monthTitleFormat: "MMM YYYY",
+<<<<<<< HEAD
     mainMonthYearTitleFontSize:"20px",
     mainMonthYearTitleBold: false,
     tabTitleFontSize: "14px",
@@ -40,6 +41,18 @@ const DEFAULT_SETTINGS = {
 
     // Scratchpad
     fixedNoteFile: "ScratchPad.md",
+=======
+    dailyNotesFolder: "Daily Notes", 
+    dailyNoteDateFormat: "YYYY-MM-DD",
+    dailyNoteOpenAction: "new-tab",
+    fixedNoteFile: "ScratchPad.md", 
+    showPWColumn: true,
+    autoReloadInterval: 5000, 
+    startOfPeriod1Date: "2025-03-02",
+    ignoreFolders: [], 
+    notesFontSize: "14px", 
+    notesBold: false, 
+>>>>>>> 5b067a9d4102dc09c96fdcd53dd545f9e6168c5b
     scratchFontSize: "14px",
     scratchBold: false,
     scratchFontFamily: "",
@@ -1031,6 +1044,7 @@ class TemplateFileSuggest extends AbstractInputSuggest {
  * @returns {{period: number, week: number, weekSinceStart: number}} An object with the period, week, and total weeks since start.
  */
 function getPeriodWeek(date = new Date(), startOfPeriodsOverride) {
+<<<<<<< HEAD
     const startString = startOfPeriodsOverride || "2025-03-02";
     const [startYear, startMonth, startDay] = startString.split('-').map(Number);
 
@@ -1042,10 +1056,33 @@ function getPeriodWeek(date = new Date(), startOfPeriodsOverride) {
     const daysSinceStart = Math.floor((currentAsUTC - startOfPeriodsUTC) / msPerDay);
 
     const weekNumber = Math.floor(daysSinceStart / 7);
+=======
+    const startOfPeriods = startOfPeriodsOverride ? new Date(startOfPeriodsOverride) : new Date("2025-03-02");
+
+    // --- MODIFIED: Use UTC to make the calculation immune to Daylight Saving Time ---
+    const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+    // Get the timestamp for midnight UTC for the start of the period
+    const utcStart = Date.UTC(startOfPeriods.getFullYear(), startOfPeriods.getMonth(), startOfPeriods.getDate());
+    
+    // Get the timestamp for midnight UTC for the target date
+    const utcDate = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+
+    // Calculate the difference in days using the consistent UTC timestamps
+    const daysSinceStart = Math.floor((utcDate - utcStart) / MS_PER_DAY);
+    // --- END MODIFICATION ---
+
+    const weekNumber = Math.floor(daysSinceStart / 7);
+
+>>>>>>> 5b067a9d4102dc09c96fdcd53dd545f9e6168c5b
     const periodIndex = Math.floor(weekNumber / 4);
     
     // Use modulo to cycle through periods (1-13) and weeks (1-4).
     const period = ((periodIndex % 13) + 13) % 13 + 1;
+<<<<<<< HEAD
+=======
+
+>>>>>>> 5b067a9d4102dc09c96fdcd53dd545f9e6168c5b
     const week = ((weekNumber % 4) + 4) % 4 + 1;
 
     return { period, week, weekSinceStart: weekNumber + 1 };
@@ -2063,12 +2100,18 @@ class PeriodMonthView extends ItemView {
         }
     }
 
+<<<<<<< HEAD
     /**
      * Removes a non-Markdown file from the `assetCreationMap` by its path.
      * @param {string} filePath The path of the asset file to remove.
      */
     removeFileFromAssetMap(filePath) {
         if (filePath.toLowerCase().endsWith('.md')) return;
+=======
+        let currentDay = new Date(firstDayOfMonth);
+        currentDay.setDate(1 - firstDayOfMonth.getDay());
+        //currentDay.setDate(1 - (firstDayOfMonth.getDay() || 7)); // Adjust for weeks starting on Monday
+>>>>>>> 5b067a9d4102dc09c96fdcd53dd545f9e6168c5b
 
         for (const [key, files] of this.assetCreationMap.entries()) {
             const updatedFiles = files.filter(f => f.path !== filePath);
@@ -3264,9 +3307,23 @@ class PeriodMonthView extends ItemView {
         }
         
         const file = this.app.vault.getAbstractFileByPath(path);
+<<<<<<< HEAD
         if (file) {
             const openInNewTab = this.plugin.settings.dailyNoteOpenAction === 'new-tab';
             await this.app.workspace.getLeaf(openInNewTab).openFile(file);
+=======
+
+        const openFile = (fileToOpen) => {
+            if (this.plugin.settings.dailyNoteOpenAction === 'new-tab') {
+                this.app.workspace.getLeaf(true).openFile(fileToOpen);
+            } else {
+                this.app.workspace.getLeaf().openFile(fileToOpen);
+            }
+        };
+
+        if (file) {
+            openFile(file);
+>>>>>>> 5b067a9d4102dc09c96fdcd53dd545f9e6168c5b
         } else {
             // If the file doesn't exist, prompt the user to create it.
             const friendlyDate = date.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -3282,8 +3339,14 @@ class PeriodMonthView extends ItemView {
                             new Notice(`Template not found: ${customTemplatePath}`);
                         }
                         const newFile = await this.app.vault.create(path, fileContent);
+<<<<<<< HEAD
                         const openInNewTab = this.plugin.settings.dailyNoteOpenAction === 'new-tab';
                         await this.app.workspace.getLeaf(openInNewTab).openFile(newFile);
+=======
+                        
+                        openFile(newFile);
+
+>>>>>>> 5b067a9d4102dc09c96fdcd53dd545f9e6168c5b
                     } catch (e) {
                         new Notice("Failed to create daily note.");
                     }
@@ -3948,6 +4011,17 @@ class PeriodSettingsTab extends PluginSettingTab {
                     await this.saveAndUpdate();
                 }));
 
+<<<<<<< HEAD
+=======
+        this.createIgnoredFolderList(
+            containerEl,
+            "Ignore folders for calendar grid dots",
+            "Files from these folders will not create 'created' or 'modified' dots on the calendar.",
+            'otherNoteIgnoreFolders'
+        );
+
+        containerEl.createEl("h1", { text: "Calendar Functional Settings" });
+>>>>>>> 5b067a9d4102dc09c96fdcd53dd545f9e6168c5b
         new Setting(containerEl)
             .setName("Hidden asset file types")
             .setDesc("A comma-separated list of file extensions to hide from the Assets tab and calendar dots (e.g., jpg,pdf,zip). Default is base,canvas.")
@@ -3959,7 +4033,32 @@ class PeriodSettingsTab extends PluginSettingTab {
                     await this.saveAndUpdate();
                 }));
         
+<<<<<<< HEAD
         new Setting(containerEl).setName("Show indicator for unused assets").setDesc("An icon will appear next to assets that are not linked or embedded in any note, allowing for deletion.").addToggle(toggle => toggle.setValue(this.plugin.settings.showUnusedAssetsIndicator).onChange(async (value) => {this.plugin.settings.showUnusedAssetsIndicator = value;await this.saveAndUpdate();}));
+=======
+        new Setting(containerEl)
+            .setName("Daily Note click behavior")
+            .setDesc("When clicking a date on the calendar, choose how to open the daily note.")
+            .addDropdown(dropdown => dropdown
+                .addOption('new-tab', 'Open in a new tab')
+                .addOption('current-tab', 'Open in the current tab')
+                .setValue(this.plugin.settings.dailyNoteOpenAction)
+                .onChange(async (value) => {
+                    this.plugin.settings.dailyNoteOpenAction = value;
+                    await this.saveAndUpdate();
+                }));
+        
+        new Setting(containerEl)
+            .setName("Daily note template")
+            .setDesc("Optional: Set a specific template to use when creating a Daily Note. Start typing to see autocomplete suggestions.")
+            .addText(text => {
+                const getMarkdownFiles = (query) => {
+                    return this.app.vault.getMarkdownFiles()
+                        .filter(f => !query || f.path.toLowerCase().includes(query))
+                        .map(f => f.path);
+                };
+                this.createPathSuggester(text.inputEl, getMarkdownFiles);
+>>>>>>> 5b067a9d4102dc09c96fdcd53dd545f9e6168c5b
 
         // --- Tasks Tab Settings Section ---
         containerEl.createEl("h1", { text: "Tasks Tab Settings" });
