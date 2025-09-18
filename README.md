@@ -4,7 +4,8 @@ A powerhouse daily and weekly planning dashboard for Obsidian. This plugin combi
 
 Move beyond simple daily notes with a unique **Period/Week** numbering system, interactive **popups**, and a deeply integrated **task manager**.
 
-<img width="524" height="983" alt="image" src="https://github.com/user-attachments/assets/875cbed1-d3ef-4732-be15-a1254bf18662" />
+<img width="524" height="983" alt="image" src="https://github.com/user-attachments/assets/875cbed1-d3ef-4732-be15-a1254bf18662" /><img width="522" height="971" alt="image" src="https://github.com/user-attachments/assets/46a9a9b1-f096-499b-8946-078fb8fcffee" />
+
 
 _The main interface showing the calendar, dot indicators, and the integrated tabs for Notes, Tasks, and Assets._
 
