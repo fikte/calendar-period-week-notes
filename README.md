@@ -7,6 +7,9 @@ Move beyond simple daily notes with a unique **Period/Week** numbering system, i
 <img width="524" height="983" alt="image" src="https://github.com/user-attachments/assets/875cbed1-d3ef-4732-be15-a1254bf18662" /><img width="522" height="971" alt="image" src="https://github.com/user-attachments/assets/46a9a9b1-f096-499b-8946-078fb8fcffee" />
 
 
+<img width="1307" height="1014" alt="image" src="https://github.com/user-attachments/assets/9ec24c67-df3d-4c38-897a-09eb2c19c062" />
+
+
 _The main interface showing the calendar, dot indicators, and the integrated tabs for Notes, Tasks, and Assets._
 
 ---
@@ -175,13 +178,15 @@ Export to Sheets
 |---|---|---|
 |**Start of Period 1 Week 1**|The Sunday date that anchors the entire Period/Week calculation system.|`2025-03-02`|
 |**Period/Week format**|The display format for the P/W column (e.g., `P#W#`, `p# w#`, `#-#`).|`P#W#`|
-|**Show Period/Week column**|Toggles the visibility of the P/W column.|`true`|
-|**Show week number column**|Toggles the visibility of a separate week number column.|`false`|
-|**Week number type**|Choose between `Period System Week` or `Calendar Year Week (ISO)`.|`period`|
+|**Show Period/Week column**|Toggles the visibility of the P/W column.|`false`|
+|**Show week number column**|Toggles the visibility of a separate week number column.|`true`|
+|**Week number type**|Choose between `Period System Week` or `Calendar Year Week (ISO)`.|`calendar`|
 |**Daily Notes folder**|The vault path where daily notes are stored.|`Daily Notes`|
 |**Daily Note open behavior**|Open daily notes in a `new-tab` or the `current-tab`.|`new-tab`|
 |**Daily note template**|Path to a template file to use when creating new daily notes.|`""`|
-|**Enable row/column/grid highlight**|Toggles for different calendar grid highlighting behaviors on hover.|All `true`|
+|**Enable row highlight**|Highlights the entire week's row when hovering over the P/W label.|`true`|
+|**Enable column highlight**|Highlights the entire day column when hovering over the day name label, (e.g. Mon).|`true`|
+|**Enable complex grid highlight**|When hovering over a date, highlights all the cells in it's row and column up to that date.|`false`|
 |**Grid Highlight Color**|The color used for the row/column/grid hover effects.|`rgba(51, 51, 51, 1)`|
 
 Export to Sheets
@@ -208,7 +213,7 @@ Export to Sheets
 |**ScratchPad note path**|The full vault path to the note file used by the scratchpad.|`ScratchPad.md`|
 |**Show preview/edit button**|Shows the button to toggle between plain text and Markdown preview.|`false`|
 |**Show '+ Task' button**|Shows the button to quickly add a new task.|`true`|
-|**Task Creation Format**|The template string for the '+ Task' button, with placeholder support.|`- [ ]`|
+|**Task Creation Format**|The template string for the '+ Task' button, with placeholder support.|`- [ ] #Tag | 📅 {friday}`|
 |**ScratchPad font size/family**|Customize the font used in the scratchpad editor.|`14px` / `""`|
 |**Bold ScratchPad text**|Toggles bold font weight for scratchpad text.|`false`|
 |**Search highlight color**|The background color for highlighted search terms.|`rgba(255, 165, 0, 0.4)`|
