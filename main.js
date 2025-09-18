@@ -200,6 +200,12 @@ body.theme-dark {
   justify-content: center;
   cursor: pointer;
 }
+body.is-mobile .month-header-nav button .svg-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--icon-color); /* Explicitly set the color */
+  flex-shrink: 0; /* Prevents the icon from being shrunk by the flex container */
+}
 
 /* --- Calendar Collapse Animation --- */
 .calendar-table-wrapper {
