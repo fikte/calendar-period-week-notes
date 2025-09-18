@@ -248,13 +248,14 @@ Export to Sheets
 
 Contributions, issues, and feature requests are welcome! Feel free to check  [GitHub issues page](https://github.com/fikte/calendar-period-week-notes/issues)
 
+
+[Buy me a coffee](https://buymeacoffee.com/fikte)
+
+<img width="100" height="100" alt="image" src="https://github.com/user-attachments/assets/ff04322a-0e76-4095-a5ce-93853723617e" />
+
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE.md file for details.
-
-
-(Buy me a coffee](https://buymeacoffee.com/fikte)
-<img width="700" height="700" alt="image" src="https://github.com/user-attachments/assets/ff04322a-0e76-4095-a5ce-93853723617e" />
-
 
 
