@@ -1,5 +1,5 @@
 // Import necessary components from the Obsidian API.
-const { Plugin, ItemView, PluginSettingTab, Notice, TFile, TFolder, Setting, Modal, AbstractInputSuggest, moment, MarkdownRenderer, setIcon } = require("obsidian");
+const { Plugin, ItemView, PluginSettingTab, Notice, TFile, TFolder, Setting, Modal, Menu, AbstractInputSuggest, moment, MarkdownRenderer, setIcon } = require("obsidian");
 
 // Define a unique type for this plugin's view.
 const VIEW_TYPE_PERIOD = "calendar-period-week";
@@ -82,10 +82,15 @@ const DEFAULT_SETTINGS = {
     assetIgnoreFolders: [],
 
     // Task Count Badge
-    showTaskCountBadge: true,
+    taskIndicatorStyle: "heatmap", // 'none', 'badge', or 'heatmap'
     taskBadgeFontSize: "9px",
     taskBadgeColor: "rgba(100, 149, 237, 0.6)", // Cornflower Blue
     taskBadgeFontColor: "rgba(255, 255, 255, 1)", // White
+    taskHeatmapStartColor: "rgba(100, 149, 237, 0.3)", // Cornflower Blue
+    taskHeatmapMidColor: "rgba(255, 127, 80, 0.45)",    // Coral
+    taskHeatmapEndColor: "rgba(255, 71, 71, 0.6)",     // Red
+    taskHeatmapMidpoint: 5,
+    taskHeatmapMaxpoint: 10,
 
     // Daily Notes
     dailyNotesFolder: "Daily Notes",
@@ -96,7 +101,7 @@ const DEFAULT_SETTINGS = {
     //period / week numbers 
     showWeekNumbers: true,
     weekNumberType: "calendar", // 'period' or 'calendar'
-    weekNumberColumnLabel: "Wk",
+    weekNumberColumnLabel: "CW",
 
     // Functional
     autoReloadInterval: 5000,
@@ -122,6 +127,8 @@ const DEFAULT_SETTINGS = {
     dateCellHoverColorLight: "rgba(0, 0, 0, 0.075)",     // Light Grey
     dateCellHoverColorDark: "rgba(51, 51, 51, 1)", 
     assetDotColor: "rgba(255, 0, 0, 1)",
+    todayHighlightStyle: "circle", // 'cell' or 'circle'
+    todayCircleColor: "rgba(100, 149, 237, 0.9)", // Cornflower Blue
     
     // Tasks Tab Settings
     taskIgnoreFolders: [],
@@ -251,12 +258,32 @@ body.is-mobile .month-header-nav button .svg-icon {
 .period-calendar-table td:not(.pw-label-cell):hover {
   background-color: var(--date-cell-hover-color-themed);
 }
-.period-calendar-table .today-cell {
-  background-color: var(--today-highlight-color-themed);
-  border-radius: 6px;
-  width: 2.8em;
-  height: 2.8em;
-  margin: auto; /* This centers the highlight in the cell */
+/* Style for Cell Highlight */
+.period-month-container.today-style-cell .today-cell {
+    background-color: var(--today-highlight-color-themed);
+    border-radius: 6px;
+}
+
+/* Style for Circle around Date Number */
+.period-month-container.today-style-circle .today-cell {
+    /* Ensure the cell itself has position relative for absolute positioning of the oval */
+    position: relative; 
+}
+
+.period-month-container.today-style-circle .today-cell .day-number {
+    background-color: var(--today-circle-color); 
+    color: var(--text-on-accent); 
+    border-radius: 5px;      /* This makes a rounded rectangle */
+    width: 2.4em;            /* Smaller width */
+    height: 1.6em;           /* Smaller height */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: auto;
+    
+    /* NEW: Position the dots over this oval */
+    z-index: 2; 
+    position: relative;
 }
 .period-calendar-table .pw-label-cell,
 .period-calendar-table .week-number-cell {
@@ -274,12 +301,14 @@ body.is-mobile .month-header-nav button .svg-icon {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  border-radius: 6px; /* To round the heatmap color */
+  transition: background-color 0.2s ease-in-out; /* For smooth transitions */
 }
 .day-number {
   font-size: var(--day-number-font-size);
 }
 .day-number-other-month {
-  color: var(--text-faint);
+  opacity: 0.6;
 }
 .dots-container {
   position: absolute;
@@ -519,19 +548,32 @@ body.is-mobile .month-header-nav button .svg-icon {
   flex: 1 1 auto;
   min-height: 0;
   padding: 4px;
+  padding-bottom: 50px;
 }
 .note-row, .task-row {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
   gap: 1em;
-  padding: 4px;
+  padding: 8px;
   margin-bottom: 2px;
   border-radius: var(--radius-s);
   cursor: pointer;
   outline: none;
   width: 100%;
   box-sizing: border-box;
+}
+
+/* Add this new rule to fix task row alignment */
+.task-row {
+    display: flex;
+    grid-template-columns: none; /* Unset the inherited grid layout */
+    gap: 0.5em; /* Use a smaller gap suitable for a checkbox */
+}
+/* Add this to remove default paragraph margins inside task text */
+.task-row .task-text > p {
+    margin: 0;
+    padding: 0;
 }
 
 .note-row:hover, .task-row:hover, .note-row:focus, .task-row:focus {
@@ -547,7 +589,7 @@ body.is-mobile .month-header-nav button .svg-icon {
 .note-status-dot-modified { background-color: var(--note-modified-color); }
 .note-row .note-title-wrapper { 
   display: flex; 
-  align-items: center; 
+  align-items: flex-start;
   gap: 6px; 
   flex: 1; 
   min-width: 0; 
@@ -648,7 +690,7 @@ body.is-mobile .month-header-nav button .svg-icon {
   display: flex; 
   align-items: flex-start; 
   gap: 8px; 
-  padding: 4px 8px; 
+  padding: 8px; 
   border-radius: 4px; 
   cursor: pointer; 
   white-space: normal; /* Allow text to wrap */
@@ -663,6 +705,14 @@ body.is-mobile .month-header-nav button .svg-icon {
 }
 .other-notes-popup-item:hover { 
   background-color: var(--background-modifier-hover); 
+}
+.note-row .note-status-dot,
+.other-notes-popup-item .popup-file-dot,
+.other-notes-popup-item .popup-asset-thumbnail {
+    margin-top: 5px; 
+}
+.other-notes-popup-item p {
+    margin: 0;
 }
 .popup-file-dot { 
   width: 8px; 
@@ -962,9 +1012,123 @@ body:has(.task-text:hover) .tooltip {
 .asset-delete-btn:hover .svg-icon {
   color: var(--text-error);
 }
+/* --- Settings Tabs --- */
+.period-settings-container {
+display: flex;
+height: 100%;
+}
+.period-settings-nav {
+display: flex;
+flex-direction: column;
+padding-right: 1.5rem;
+border-right: 1px solid var(--background-modifier-border);
+ width: 170px; /* Fixed width for the nav bar */
+     flex-shrink: 0;
+}
+.period-settings-nav-button {
+     background: none;
+     border: none;
+     text-align: left;
+     padding: 0.75rem 0.5rem;
+     margin-bottom: 0.25rem;
+     cursor: pointer;
+     border-radius: var(--radius-m);
+     color: var(--text-muted);
+     font-size: var(--font-ui-small);
+}
+.period-settings-nav-button:hover {
+     background-color: var(--background-modifier-hover);
+     color: var(--text-normal);
+}
+.period-settings-nav-button.is-active {
+     background-color: var(--interactive-accent);
+     color: var(--text-on-accent);
+     font-weight: bold;
+}
+.period-settings-content {
+     flex-grow: 1;
+     padding-left: 1.5rem;
+     overflow-y: auto;
+}
+.popup-section-header {
+    font-size: 0.8em;
+    font-weight: bold;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 10px 8px 4px;
+    padding: 0;
+}
+
+.popup-separator {
+    border-bottom: 1px solid var(--background-modifier-border);
+    margin: 6px 8px;
+}
+
+/* Tweak to remove extra margin at the very top of the popup */
+.other-notes-popup .popup-section-header:first-child {
+    margin-top: 4px;
+}
+.note-group-header {
+    font-size: 0.85em;
+    font-weight: bold;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 12px 4px 4px;
+}
+.note-title-path-wrapper,
+.other-notes-popup-item .note-title-path-wrapper {
+    display: flex;
+    flex-direction: column;
+    min-width: 0; 
+}
+
+
+.note-row .note-path,
+.other-notes-popup-item .note-path {
+    font-size: 0.8em;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+}
+
 `;
 
 // === Helper Functions and Classes ===
+/**
+ * Parses an "rgba(r, g, b, a)" string into an object.
+ * @param {string} rgbaString The input string.
+ * @returns {{r: number, g: number, b: number, a: number} | null}
+ */
+function parseRgbaString(rgbaString) {
+if (!rgbaString) return null;
+    const match = rgbaString.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+    if (!match) return null;
+    return {
+        r: parseInt(match[1], 10),
+        g: parseInt(match[2], 10),
+        b: parseInt(match[3], 10),
+        a: match[4] !== undefined ? parseFloat(match[4]) : 1,
+    };
+}
+
+/**
+ * Blends two RGBA color objects based on a mix factor.
+ * @param {{r,g,b,a}} color1 The start color object.
+ * @param {{r,g,b,a}} color2 The end color object.
+ * @param {number} factor A value from 0 (100% color1) to 1 (100% color2).
+ * @returns {string} The resulting "rgba(...)" string.
+ */
+function blendRgbaColors(color1, color2, factor) {
+    const r = Math.round(color1.r * (1 - factor) + color2.r * factor);
+    const g = Math.round(color1.g * (1 - factor) + color2.g * factor);
+    const b = Math.round(color1.b * (1 - factor) + color2.b * factor);
+    const a = (color1.a * (1 - factor) + color2.a * factor).toFixed(2);
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
 
 /**
  * A reusable confirmation modal dialog.
@@ -1113,6 +1277,7 @@ class PeriodMonthView extends ItemView {
         this.hideTimeout = null;
         this.popupEl = null;
         this.taskRefreshDebounceTimer = null;
+        this.calendarRefreshDebounceTimer = null;
         this.titleUpdateTimeout = null;
     }
 
@@ -1144,6 +1309,104 @@ class PeriodMonthView extends ItemView {
             }
         }
         return backlinks;
+    }
+
+    /**
+      * Adds a right-click context menu to a file row for deletion.
+      * @param {HTMLElement} element The row element to attach the listener to.
+      * @param {TFile} file The file associated with the row.
+      * @param {() => void} refreshCallback The function to call to refresh the list after deletion.
+      */
+     addFileContextMenu(element, file, refreshCallback) {
+        element.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+            const menu = new Menu();
+
+            menu.addItem((item) =>
+                item
+                .setTitle("Delete file")
+                .setIcon("trash")
+                .onClick(() => {
+                        new ConfirmationModal(
+                            this.app,
+                            "Confirm Deletion",
+                            `Are you sure you want to permanently delete "${file.name}"? This action cannot be undone.`,
+                            async () => {
+                                try {
+                                    await this.app.vault.trash(file, true); // true for permanent system trash
+                                    new Notice(`Deleted: ${file.name}`);
+                                    refreshCallback(); // Refresh the specific list
+                                } catch (err) {
+                                    new Notice(`Error deleting file: ${err.message}`);
+                                    console.error(err);
+                                }
+                            },
+                            "Yes, delete it"
+                        ).open();
+                })
+            );
+
+            menu.showAtMouseEvent(event);
+        });
+     }
+
+     /**
+    * Attaches touch event listeners for mobile swipe gestures.
+    * @param {HTMLElement} calendarEl The element to listen for 'swipe up' on.
+    * @param {HTMLElement} headerEl The element to listen for 'swipe down' on.
+    */
+    attachMobileSwipeListeners(calendarEl, headerEl) {
+          let touchStartY = 0;
+          let touchStartX = 0;
+            const swipeThreshold = 50; // Min pixels to be considered a swipe
+    
+          // --- Listener to SWIPE UP and HIDE the calendar ---
+          calendarEl.addEventListener('touchstart', (e) => {
+             touchStartY = e.touches[0].clientY;
+             touchStartX = e.touches[0].clientX;
+          });
+    
+          calendarEl.addEventListener('touchend', (e) => {
+             // Don't do anything if the calendar is already collapsed
+             if (this.isCalendarCollapsed) return;
+    
+             const touchEndY = e.changedTouches[0].clientY;
+             const touchEndX = e.changedTouches[0].clientX;
+             const deltaY = touchStartY - touchEndY;
+             const deltaX = touchStartX - touchEndX;
+    
+             // Ensure it's a vertical swipe and meets the threshold
+             if (Math.abs(deltaY) > swipeThreshold && Math.abs(deltaY) > Math.abs(deltaX)) {
+                if (deltaY > 0) { // Positive deltaY means swiped up
+                   this.isCalendarCollapsed = true;
+                   this.render();
+                }
+             }
+          });
+    
+          // --- Listener to SWIPE DOWN and SHOW the calendar ---
+          headerEl.addEventListener('touchstart', (e) => {
+             touchStartY = e.touches[0].clientY;
+             touchStartX = e.touches[0].clientX;
+          });
+    
+          headerEl.addEventListener('touchend', (e) => {
+             // Don't do anything if the calendar is already expanded
+             if (!this.isCalendarCollapsed) return;
+    
+             const touchEndY = e.changedTouches[0].clientY;
+             const touchEndX = e.changedTouches[0].clientX;
+             const deltaY = touchStartY - touchEndY;
+             const deltaX = touchStartX - touchEndX;
+    
+             // Ensure it's a vertical swipe and meets the threshold
+             if (Math.abs(deltaY) > swipeThreshold && Math.abs(deltaY) > Math.abs(deltaX)) {
+                if (deltaY < 0) { // Negative deltaY means swiped down
+                   this.isCalendarCollapsed = false;
+                   this.render();
+                }
+             }
+          });
     }
 
     /**
@@ -1375,6 +1638,7 @@ class PeriodMonthView extends ItemView {
             }
 
             const content = await this.app.vault.cachedRead(file);
+            //const content = await this.app.vault.read(file);
             const lines = content.split('\n');
 
             lines.forEach((line, index) => {
@@ -1649,8 +1913,12 @@ class PeriodMonthView extends ItemView {
         }
 
         // Always rebuild the task map and re-render the calendar, as any file change could affect them.
-        await this.buildTasksByDateMap();
-        this.renderCalendar();
+        // Debounce the calendar refresh to avoid race conditions with file system writes
+        clearTimeout(this.calendarRefreshDebounceTimer);
+        this.calendarRefreshDebounceTimer = setTimeout(async () => {
+            await this.buildTasksByDateMap();
+            this.renderCalendar();
+        }, 400); // A 400ms delay is enough to ensure file is saved
     }
 
     /**
@@ -2016,21 +2284,12 @@ class PeriodMonthView extends ItemView {
             metaContainer.createSpan({ text: formatDateTime(new Date(file.stat.mtime)), cls: "note-mod-date" });
             
             row.addEventListener("click", () => {
-                let existingLeaf = null;
-                this.app.workspace.iterateAllLeaves(leaf => {
-                    if (leaf.view.file?.path === file.path) {
-                        existingLeaf = leaf;
-                    }
-                });
-    
-                if (existingLeaf) {
-                    this.app.workspace.revealLeaf(existingLeaf);
-                } else {
-                    const openInNewTab = this.plugin.settings.assetsOpenAction === 'new-tab';
-                    this.app.workspace.openLinkText(file.path, "", openInNewTab);
-                }
+                const openInNewTab = this.plugin.settings.notesOpenAction === 'new-tab';
+                this.app.workspace.getLeaf(openInNewTab).openFile(file);
             });
             this.addKeydownListeners(row, searchInputEl);
+            this.addKeydownListeners(row, searchInputEl);
+            this.addFileContextMenu(row, file, () => this.populateAssets());
         });
     }
 
@@ -2386,6 +2645,7 @@ class PeriodMonthView extends ItemView {
 
         this.containerEl.empty();
         const container = this.containerEl.createDiv("period-month-container");
+        container.addClass(`today-style-${this.plugin.settings.todayHighlightStyle}`);
         container.toggleClass("hide-grid", !this.plugin.settings.showCalendarGridLines);
         container.classList.toggle("calendar-collapsed", this.isCalendarCollapsed);
         container.toggleClass("vertical-view-active", this.isVerticalView);
@@ -2429,6 +2689,10 @@ class PeriodMonthView extends ItemView {
         } else {
             const tableWrapper = container.createDiv({ cls: "calendar-table-wrapper" });
             const table = tableWrapper.createEl("table", { cls: "period-calendar-table" });
+            // Attach swipe gestures only on mobile devices
+            if (document.body.classList.contains('is-mobile')) {
+               this.attachMobileSwipeListeners(tableWrapper, headerDiv);
+            }
             const headerRow = table.createEl("thead").createEl("tr");
             if (this.plugin.settings.showPWColumn) headerRow.createEl("th", { text: " " });
             if (this.plugin.settings.showWeekNumbers) headerRow.createEl("th", { text: this.plugin.settings.weekNumberColumnLabel });
@@ -2679,11 +2943,39 @@ class PeriodMonthView extends ItemView {
                 const tasksForDay = this.tasksByDate.get(dateKey) || [];
 
                 // --- Task Count Badge ---
-                if (settings.showTaskCountBadge && tasksForDay.length > 0) {
-                    contentDiv.createDiv({
-                        cls: 'task-count-badge',
-                        text: tasksForDay.length.toString()
-                    });
+                const taskCount = tasksForDay.length;
+
+                if (taskCount > 0) {
+                    if (settings.taskIndicatorStyle === 'badge') {
+                        contentDiv.createDiv({
+                            cls: 'task-count-badge',
+                            text: taskCount.toString()
+                        });
+                    } else if (settings.taskIndicatorStyle === 'heatmap') {
+                        const startColor = parseRgbaString(settings.taskHeatmapStartColor);
+                        const midColor = parseRgbaString(settings.taskHeatmapMidColor);
+                        const endColor = parseRgbaString(settings.taskHeatmapEndColor);
+                        const midPoint = settings.taskHeatmapMidpoint;
+                        const maxPoint = settings.taskHeatmapMaxpoint;
+
+                        if (!startColor || !midColor || !endColor) return; // Exit if colors are invalid
+
+                        let finalColor;
+
+                        if (taskCount >= maxPoint) {
+                            finalColor = settings.taskHeatmapEndColor;
+                        } else if (taskCount >= midPoint) {
+                            const factor = (taskCount - midPoint) / (maxPoint - midPoint);
+                            finalColor = blendRgbaColors(midColor, endColor, factor);
+                        } else { // taskCount < midPoint
+                            const divisor = midPoint - 1;
+                            // Handle case where midpoint is 1 to avoid division by zero
+                            const factor = divisor > 0 ? (taskCount - 1) / divisor : 1;
+                            finalColor = blendRgbaColors(startColor, midColor, factor);
+                        }
+
+                        contentDiv.style.backgroundColor = finalColor;
+                    }
                 }
                 
                 if (isOtherMonth) dayNumber.addClass("day-number-other-month");
@@ -2779,80 +3071,125 @@ class PeriodMonthView extends ItemView {
      * @param {HTMLElement} targetEl The calendar day element to position the popup near.
      * @param {object} dataByType An object containing arrays of items to display, keyed by type.
      */
-    showFilePopup(targetEl, dataByType) {
-        this.hideFilePopup();
-        this.popupEl = createDiv({ cls: 'other-notes-popup' });
-        const { settings } = this.plugin;
+     showFilePopup(targetEl, dataByType) {
+      this.hideFilePopup();
+      this.popupEl = createDiv({ cls: 'other-notes-popup' });
+      const { settings } = this.plugin;
 
-        const addFileToList = (file, type) => {
+      // --- Helper function for rendering file/asset items ---
+      const addFileToList = (file, type) => {
             const itemEl = this.popupEl.createDiv({ cls: 'other-notes-popup-item' });
 
-            // If it's an image asset, show a thumbnail; otherwise, show a colored dot.
+            // This part for the dot/thumbnail stays the same
             if (type === 'asset' && this.isImageAsset(file)) {
-                const thumbnail = itemEl.createEl('img', { cls: 'popup-asset-thumbnail' });
-                thumbnail.src = this.app.vault.getResourcePath(file);
+            const thumbnail = itemEl.createEl('img', { cls: 'popup-asset-thumbnail' });
+            thumbnail.src = this.app.vault.getResourcePath(file);
             } else {
-                const dot = itemEl.createDiv({ cls: 'popup-file-dot' });
-                if (type === 'daily') dot.style.backgroundColor = settings.dailyNoteDotColor;
-                else if (type === 'created') dot.style.backgroundColor = settings.otherNoteDotColor;
-                else if (type === 'modified') dot.style.backgroundColor = settings.calendarModifiedDotColor;
-                else if (type === 'asset') dot.style.backgroundColor = settings.assetDotColor;
+            const dot = itemEl.createDiv({ cls: 'popup-file-dot' });
+            if (type === 'daily') dot.style.backgroundColor = settings.dailyNoteDotColor;
+            else if (type === 'created') dot.style.backgroundColor = settings.otherNoteDotColor;
+            else if (type === 'modified') dot.style.backgroundColor = settings.calendarModifiedDotColor;
+            else if (type === 'asset') dot.style.backgroundColor = settings.assetDotColor;
             }
-            
+        
+            // NEW: Create a wrapper for the title and path
+            const titlePathWrapper = itemEl.createDiv({ cls: 'note-title-path-wrapper' });
             const displayName = file.path.toLowerCase().endsWith('.md') ? file.basename : file.name;
-            itemEl.createSpan({ text: displayName });
+            titlePathWrapper.createDiv({ text: displayName, cls: "note-title" });
+            
+            // Add the parent folder path
+            if (file.parent && file.parent.path !== '/') {
+                titlePathWrapper.createDiv({ text: file.parent.path, cls: 'note-path' });
+            }
 
             itemEl.addEventListener('click', () => {
-                this.app.workspace.openLinkText(file.path, "", settings.notesOpenAction === 'new-tab');
-                this.hideFilePopup();
-            });
-        };
-        
-        const addTaskToList = (task) => {
-            const itemEl = this.popupEl.createDiv({ cls: 'other-notes-popup-item' });
-            setIcon(itemEl, 'check-circle');
-            itemEl.createSpan({ text: task.text });
-
-            itemEl.addEventListener('click', () => {
-                // Open the file and navigate to the specific line of the task.
-                this.app.workspace.openLinkText(task.file.path, '', false, { eState: { line: task.lineNumber } });
-                this.hideFilePopup();
-            });
-        };
-
-        (dataByType.tasks || []).forEach(task => addTaskToList(task));
-        (dataByType.daily || []).forEach(file => addFileToList(file, 'daily'));
-        (dataByType.created || []).forEach(file => addFileToList(file, 'created'));
-        (dataByType.modified || []).forEach(file => addFileToList(file, 'modified'));
-        (dataByType.assets || []).forEach(file => addFileToList(file, 'asset'));
-
-        if (!this.popupEl.hasChildNodes()) {
+            this.app.workspace.openLinkText(file.path, "", settings.notesOpenAction === 'new-tab');
             this.hideFilePopup();
-            return;
+            });
+        };
+    
+      // --- Helper function for rendering interactive task items ---
+      const addTaskToList = (task) => {
+         const itemEl = this.popupEl.createDiv({ cls: 'other-notes-popup-item' });
+         
+          const checkbox = itemEl.createEl('input', { type: 'checkbox', cls: 'task-checkbox' });
+          checkbox.checked = task.completed;
+
+          checkbox.addEventListener('click', async (e) => {
+             e.stopPropagation(); 
+             await this.toggleTaskCompletion(task);
+             task.completed = !task.completed; 
+             textSpan.toggleClass('completed', task.completed); 
+             
+             await this.buildTasksByDateMap();
+             this.renderCalendar();
+          });
+
+          const textSpan = itemEl.createSpan();
+          textSpan.toggleClass('completed', task.completed);
+          MarkdownRenderer.render(this.app, task.text, textSpan, task.file.path, this);
+
+          itemEl.addEventListener('click', () => {
+             this.app.workspace.openLinkText(task.file.path, '', false, { eState: { line: task.lineNumber } });
+             this.hideFilePopup();
+          });
+      };
+        
+        // --- NEW Structured Rendering Logic ---
+        const allFiles = [
+            ...(dataByType.daily || []),
+            ...(dataByType.created || []),
+            ...(dataByType.modified || []),
+            ...(dataByType.assets || [])
+        ];
+        const hasTasks = dataByType.tasks && dataByType.tasks.length > 0;
+        const hasFiles = allFiles.length > 0;
+
+        if (hasTasks) {
+            this.popupEl.createEl('h6', { text: 'Tasks', cls: 'popup-section-header' });
+            dataByType.tasks.forEach(task => addTaskToList(task));
         }
-        
-        this.popupEl.addEventListener('mouseenter', () => clearTimeout(this.hideTimeout));
-        this.popupEl.addEventListener('mouseleave', () => {
-            this.hideTimeout = setTimeout(() => this.hideFilePopup(), this.plugin.settings.popupHideDelay);
-        });
-        
-        document.body.appendChild(this.popupEl);
-        // --- Smart Positioning Logic ---
-        const popupRect = this.popupEl.getBoundingClientRect();
-        const targetRect = targetEl.getBoundingClientRect();
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-        const margin = this.plugin.settings.popupGap;
-        let finalTop = targetRect.bottom + margin;
-        if (finalTop + popupRect.height > viewportHeight) finalTop = targetRect.top - popupRect.height - margin;
-        if (finalTop < margin) finalTop = margin;
-        let finalLeft = targetRect.left;
-        if (finalLeft + popupRect.width > viewportWidth - margin) finalLeft = targetRect.right - popupRect.width;
-        if (finalLeft < margin) finalLeft = margin;
-        this.popupEl.style.top = `${finalTop}px`;
-        this.popupEl.style.left = `${finalLeft}px`;
-        this.popupEl.style.visibility = 'visible';
-    }
+
+        if (hasTasks && hasFiles) {
+            this.popupEl.createDiv({ cls: 'popup-separator' });
+        }
+
+        if (hasFiles) {
+            this.popupEl.createEl('h6', { text: 'Notes & Assets', cls: 'popup-section-header' });
+            (dataByType.daily || []).forEach(file => addFileToList(file, 'daily'));
+          (dataByType.created || []).forEach(file => addFileToList(file, 'created'));
+          (dataByType.modified || []).forEach(file => addFileToList(file, 'modified'));
+          (dataByType.assets || []).forEach(file => addFileToList(file, 'asset'));
+        }
+
+      if (!this.popupEl.hasChildNodes()) {
+         this.hideFilePopup();
+         return;
+      }
+    
+      this.popupEl.addEventListener('mouseenter', () => clearTimeout(this.hideTimeout));
+      this.popupEl.addEventListener('mouseleave', () => {
+         this.hideTimeout = setTimeout(() => this.hideFilePopup(), this.plugin.settings.popupHideDelay);
+      });
+    
+      document.body.appendChild(this.popupEl);
+
+      // --- Smart Positioning Logic ---
+      const popupRect = this.popupEl.getBoundingClientRect();
+      const targetRect = targetEl.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const margin = this.plugin.settings.popupGap;
+      let finalTop = targetRect.bottom + margin;
+      if (finalTop + popupRect.height > viewportHeight) finalTop = targetRect.top - popupRect.height - margin;
+      if (finalTop < margin) finalTop = margin;
+      let finalLeft = targetRect.left;
+      if (finalLeft + popupRect.width > viewportWidth - margin) finalLeft = targetRect.right - popupRect.width;
+      if (finalLeft < margin) finalLeft = margin;
+      this.popupEl.style.top = `${finalTop}px`;
+      this.popupEl.style.left = `${finalLeft}px`;
+      this.popupEl.style.visibility = 'visible';
+   }
 
     /**
      * Hides and destroys the file popup element.
@@ -2910,88 +3247,150 @@ class PeriodMonthView extends ItemView {
      * Populates the "Notes" tab with either recent or pinned notes.
      */
     async populateNotes() {
-        if (!this.notesContentEl) return;
-        this.notesContentEl.empty();
+              if (!this.notesContentEl) return;
+              this.notesContentEl.empty();
+             
+              const settings = this.plugin.settings;
+              let notesToShow = [];
         
-        const settings = this.plugin.settings;
-        let notesToShow = [];
+              // --- 1. Get and sort all notes as before ---
+              if (this.notesViewMode === 'pinned') {
+                 const pinTag = `#${settings.pinTag.toLowerCase()}`;
+                 notesToShow = this.app.vault.getMarkdownFiles().filter(file => {
+                    const cache = this.app.metadataCache.getFileCache(file);
+                    return cache?.tags?.some(tag => tag.tag.toLowerCase() === pinTag);
+                 }).sort((a, b) => a.basename.localeCompare(b.basename));
+              } else {
+                 const cutoff = moment().subtract(settings.notesLookbackDays, 'days').valueOf();
+                 notesToShow = this.app.vault.getMarkdownFiles()
+                    .filter(file => !settings.ignoreFolders.some(f => file.path.startsWith(f)) && (file.stat.mtime >= cutoff || file.stat.ctime >= cutoff))
+                    .sort((a,b) => b.stat.mtime - a.stat.mtime);
+              }
+             
+              const searchTerm = this.notesSearchTerm.toLowerCase();
+              const filteredNotes = searchTerm ? notesToShow.filter(file => file.basename.toLowerCase().includes(searchTerm)) : notesToShow;
+             
+              const searchInputEl = this.notesSearchInputEl;
 
-        if (this.notesViewMode === 'pinned') {
-            // --- PINNED NOTES LOGIC ---
-            const pinTag = `#${settings.pinTag.toLowerCase()}`;
-            notesToShow = this.app.vault.getMarkdownFiles().filter(file => {
-                const cache = this.app.metadataCache.getFileCache(file);
-                return cache?.tags?.some(tag => tag.tag.toLowerCase() === pinTag);
-            }).sort((a, b) => a.basename.localeCompare(b.basename));
-
-        } else {
-            // --- RECENT NOTES LOGIC ---
-            const cutoff = moment().subtract(settings.notesLookbackDays, 'days').valueOf();
-            notesToShow = this.app.vault.getMarkdownFiles()
-                .filter(file => !settings.ignoreFolders.some(f => file.path.startsWith(f)) && (file.stat.mtime >= cutoff || file.stat.ctime >= cutoff))
-                .sort((a,b) => b.stat.mtime - a.stat.mtime);
-        }
+              const createTooltipText = (file) => {
+                         const ctime = new Date(file.stat.ctime).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
+                         const mtime = new Date(file.stat.mtime).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
+                         const size = (file.stat.size / 1024).toFixed(2) + ' KB';
+                         const path = file.path;
+                         const tagsCache = this.app.metadataCache.getFileCache(file)?.tags;
+                         let tags = "No tags";
+                         if (tagsCache && tagsCache.length > 0) {
+                            tags = [...new Set(tagsCache.map(t => t.tag))].join(' ');
+                         }
+                         return `Created: ${ctime}\nModified: ${mtime}\nSize: ${size}\nPath: ${path}\nTags: ${tags}`;
+                      };
+                
+                      const addTooltip = (element, file) => {
+                         if (this.plugin.settings.showNoteTooltips) {
+                            element.setAttribute('aria-label', createTooltipText(file));
+                         }
+                      };
         
-        const searchTerm = this.notesSearchTerm.toLowerCase();
-        const filteredNotes = searchTerm ? notesToShow.filter(file => file.basename.toLowerCase().includes(searchTerm)) : notesToShow;
+                // --- 2. Create buckets for date grouping ---
+                const groups = {
+                    today: [],
+                    yesterday: [],
+                    thisWeek: [],
+                    lastWeek: [],
+                    thisMonth: [],
+                    older: []
+                };
+                const now = moment();
         
-        const searchInputEl = this.notesSearchInputEl;
-
-        const createTooltipText = (file) => {
-            const ctime = new Date(file.stat.ctime).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
-            const mtime = new Date(file.stat.mtime).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
-            const size = (file.stat.size / 1024).toFixed(2) + ' KB';
-            const path = file.path;
-            const tagsCache = this.app.metadataCache.getFileCache(file)?.tags;
-            let tags = "No tags";
-            if (tagsCache && tagsCache.length > 0) {
-                tags = [...new Set(tagsCache.map(t => t.tag))].join(' ');
-            }
-            return `Created: ${ctime}\nModified: ${mtime}\nSize: ${size}\nPath: ${path}\nTags: ${tags}`;
-        };
-
-        const addTooltip = (element, file) => {
-            if (this.plugin.settings.showNoteTooltips) {
-                element.setAttribute('aria-label', createTooltipText(file));
-            }
-        };
-
-        filteredNotes.forEach(file => {
-            const row = this.notesContentEl.createDiv("note-row");
-            const titleWrapper = row.createDiv({ cls: 'note-title-wrapper' });
-            addTooltip(titleWrapper, file);
-            if (settings.showNoteStatusDots) {
-                const dot = titleWrapper.createDiv({ cls: `note-status-dot` });
-            
-                // Use a special color for daily notes.
-                if (this.isDailyNote(file)) {
-                    dot.style.backgroundColor = settings.dailyNoteDotColor;
-                } else {
-                    // Otherwise, use the standard created/modified colors.
-                    dot.addClass(isSameDay(new Date(file.stat.ctime), new Date(file.stat.mtime)) ? "note-status-dot-created" : "note-status-dot-modified");
-                }
-            }
-            titleWrapper.createDiv({ text: file.basename, cls: "note-title" });
-            row.createDiv({ text: formatDateTime(new Date(file.stat.mtime)), cls: "note-mod-date" });
-            
-            row.addEventListener("click", () => {
-                let existingLeaf = null;
-                this.app.workspace.iterateAllLeaves(leaf => {
-                    if (leaf.view.file?.path === file.path) {
-                        existingLeaf = leaf;
+                // --- 3. Iterate through notes and place them in the correct bucket ---
+                filteredNotes.forEach(file => {
+                    const modTime = moment(file.stat.mtime);
+                    if (modTime.isSame(now, 'day')) {
+                        groups.today.push(file);
+                    } else if (modTime.isSame(now.clone().subtract(1, 'day'), 'day')) {
+                        groups.yesterday.push(file);
+                    } else if (modTime.isSame(now, 'week')) {
+                        groups.thisWeek.push(file);
+                    } else if (modTime.isSame(now.clone().subtract(1, 'week'), 'week')) {
+                        groups.lastWeek.push(file);
+                    } else if (modTime.isSame(now, 'month')) {
+                        groups.thisMonth.push(file);
+                    } else {
+                        groups.older.push(file);
                     }
                 });
-    
-                if (existingLeaf) {
-                    this.app.workspace.revealLeaf(existingLeaf);
-                } else {
-                    const openInNewTab = this.plugin.settings.notesOpenAction === 'new-tab';
-                    this.app.workspace.openLinkText(file.path, "", openInNewTab);
+        
+                // --- 4. Define the order and labels for our groups ---
+                const groupOrder = [
+                    { key: 'today', label: 'Today' },
+                    { key: 'yesterday', label: 'Yesterday' },
+                    { key: 'thisWeek', label: 'This Week' },
+                    { key: 'lastWeek', label: 'Last Week' },
+                    { key: 'thisMonth', label: 'This Month' },
+                    { key: 'older', label: 'Older' },
+                ];
+        
+                // --- 5. Render each group that has notes in it ---
+                groupOrder.forEach(groupInfo => {
+                    const notesInGroup = groups[groupInfo.key];
+                    if (notesInGroup.length > 0) {
+                        // Add the group header
+                        this.notesContentEl.createDiv({ cls: 'note-group-header', text: groupInfo.label });
+        
+                        // Add the notes for that group
+                        notesInGroup.forEach(file => {
+                            const row = this.notesContentEl.createDiv("note-row");
+                            addTooltip(row, file);
+                       const titleWrapper = row.createDiv({ cls: 'note-title-wrapper' });
+        
+                       if (settings.showNoteStatusDots) {
+                          const dot = titleWrapper.createDiv({ cls: `note-status-dot` });
+                          if (this.isDailyNote(file)) {
+                             dot.style.backgroundColor = settings.dailyNoteDotColor;
+                          } else {
+                             dot.addClass(isSameDay(new Date(file.stat.ctime), new Date(file.stat.mtime)) ? "note-status-dot-created" : "note-status-dot-modified");
+                          }
+                       }
+                            
+                            // NEW: Wrapper for Title and Path
+                            const titlePathWrapper = titleWrapper.createDiv({ cls: 'note-title-path-wrapper' });
+                       titlePathWrapper.createDiv({ text: file.basename, cls: "note-title" });
+                            // Add parent folder path
+                            if (file.parent && file.parent.path !== '/') {
+                                titlePathWrapper.createDiv({ text: file.parent.path, cls: 'note-path' });
+                            }
+                            
+                       row.createDiv({ text: formatDateTime(new Date(file.stat.mtime)), cls: "note-mod-date" });
+                      
+                        this.registerDomEvent(row, "click", () => {
+                             // First, check if the file is already open in a tab
+                             let existingLeaf = null;
+                             this.app.workspace.iterateAllLeaves(leaf => {
+                                 if (leaf.view.file?.path === file.path) {
+                                     existingLeaf = leaf;
+                                 }
+                             });
+                        
+                             // If it is open, just focus on that tab
+                             if (existingLeaf) {
+                                 this.app.workspace.revealLeaf(existingLeaf);
+                             } else {
+                                 // Otherwise, open it according to the setting
+                                 const openInNewTab = this.plugin.settings.notesOpenAction === 'new-tab';
+                                 this.app.workspace.getLeaf(openInNewTab).openFile(file);
+                             }
+                         });
+                       this.addKeydownListeners(row, searchInputEl);
+                            this.addFileContextMenu(row, file, () => this.populateNotes());
+                        });
+                    }
+                });
+        
+                // Handle case where no notes are found
+                if (filteredNotes.length === 0) {
+                    this.notesContentEl.createDiv({ text: 'No notes found.', cls: 'task-group-empty-message' });
                 }
-            });
-            this.addKeydownListeners(row, searchInputEl);
-        });
-    }
+           }
 
 
     /**
@@ -3021,6 +3420,7 @@ class PeriodMonthView extends ItemView {
         // Regex captures the completion status ('x' or ' ') and the task text.
         const taskRegex = /^\s*(?:-|\d+\.)\s*\[(.)\]\s*(.*)/;
         const dueDateRegex = /📅\s*(\d{4}-\d{2}-\d{2})/;
+        const completionDateRegex = /✅\s*(\d{4}-\d{2}-\d{2})/;
         const tagRegex = /#([a-zA-Z0-9_\-\/]+)/g;
         
         for (const file of files) {
@@ -3038,7 +3438,13 @@ class PeriodMonthView extends ItemView {
                     const dueDateMatch = text.match(dueDateRegex);
                     const dueDate = dueDateMatch ? moment(dueDateMatch[1], "YYYY-MM-DD").toDate() : null;
                     const tags = Array.from(text.matchAll(tagRegex)).map(m => m[1]);
-                    allTasks.push({ text: text.trim(), file, lineNumber: index, dueDate, tags, completed });
+                    const completionDateMatch = text.match(completionDateRegex);
+                    const completionDate = completionDateMatch ? moment(completionDateMatch[1], "YYYY-MM-DD").toDate() : null;
+
+                    // Clean the text for display by removing the completion date part
+                    const displayText = text.replace(completionDateRegex, '').trim();
+
+                    allTasks.push({ text: displayText, file, lineNumber: index, dueDate, tags, completed, completionDate });
                 }
             });
         }
@@ -3071,11 +3477,9 @@ class PeriodMonthView extends ItemView {
 
         // Filter out completed tasks, unless they are due today and the setting is enabled.
         tasks = tasks.filter(task => {
-            if (!task.completed) {
-                return true;
-            }
-            if (settings.showCompletedTasksToday && task.dueDate && isSameDay(task.dueDate, new Date())) {
-                return true;
+        if (!task.completed) return true; // Always show open tasks
+            if (settings.showCompletedTasksToday && task.completionDate && isSameDay(task.completionDate, new Date())) {
+                   return true; // Show tasks completed today
             }
             return false;
         });
@@ -3138,8 +3542,15 @@ class PeriodMonthView extends ItemView {
         groups.future = groups.future.filter(task => !task.completed);
         groups.noDate = groups.noDate.filter(task => !task.completed);
 
-        if (!settings.showCompletedTasksToday) {
-            groups.today = groups.today.filter(task => !task.completed);
+        // Filter all groups to either show only open tasks, or open + tasks completed today
+        for (const groupKey in groups) {
+            groups[groupKey] = groups[groupKey].filter(task => {
+                if (!task.completed) return true; // Always show open tasks
+                if (settings.showCompletedTasksToday && task.completionDate && isSameDay(task.completionDate, new Date())) {
+                    return true; // Show tasks completed today
+                }
+                return false;
+            });
         }
 
         const icons = this.plugin.settings.taskGroupIcons || DEFAULT_SETTINGS.taskGroupIcons;
@@ -3191,7 +3602,8 @@ class PeriodMonthView extends ItemView {
             await this.toggleTaskCompletion(task);
         });
         
-        const textEl = taskRow.createSpan({ text: task.text, cls: 'task-text' });
+        const textEl = taskRow.createSpan({ cls: 'task-text' });
+        MarkdownRenderer.render(this.app, task.text, textEl, task.file.path, this);
         if (task.completed) {
             textEl.addClass('completed');
         }
@@ -3217,12 +3629,20 @@ class PeriodMonthView extends ItemView {
         const content = await this.app.vault.read(task.file);
         const lines = content.split('\n');
         const line = lines[task.lineNumber];
+        const completionDateRegex = /\s*✅\s*\d{4}-\d{2}-\d{2}/;
+        const today = moment().format("YYYY-MM-DD");
 
         if (line.includes('[ ]')) {
-            lines[task.lineNumber] = line.replace('[ ]', '[x]');
+            // Mark as complete and add today's date
+            let newLine = line.replace('[ ]', '[x]');
+            // Remove any old completion markers before adding a new one
+            newLine = newLine.replace(completionDateRegex, '');
+            lines[task.lineNumber] = `${newLine} ✅ ${today}`;
         } else if (line.includes('[x]')) {
-            lines[task.lineNumber] = line.replace('[x]', '[ ]');
-        }        
+            // Mark as incomplete and remove the date
+            let newLine = line.replace('[x]', '[ ]');
+            lines[task.lineNumber] = newLine.replace(completionDateRegex, '').trim();
+        }
         await this.app.vault.modify(task.file, lines.join('\n'));
     }
     
@@ -3384,6 +3804,7 @@ class PeriodMonthPlugin extends Plugin {
             '--task-badge-color': this.settings.taskBadgeColor, 
             '--task-badge-font-color': this.settings.taskBadgeFontColor, 
             '--task-badge-font-size': this.settings.taskBadgeFontSize,
+            '--today-circle-color': this.settings.todayCircleColor,
         };
 
         for (const key in styleProps) {
@@ -3416,8 +3837,14 @@ class PeriodMonthPlugin extends Plugin {
 /**
  * The settings tab class for the plugin, responsible for building the settings UI.
  */
+
+
 class PeriodSettingsTab extends PluginSettingTab {
-    constructor(app, plugin) { super(app, plugin); this.plugin = plugin; }
+    constructor(app, plugin) {
+        super(app, plugin);
+        this.plugin = plugin;
+        this.activeTab = 'general'; // Default tab
+    }
 
     /**
      * A helper function to save settings and trigger a full UI refresh in any open views.
@@ -3466,8 +3893,8 @@ class PeriodSettingsTab extends PluginSettingTab {
      * @param {string} desc The setting description.
      * @param {string} settingKey The key in the settings object to modify.
      */
-    createRgbaColorSetting(name, desc, settingKey) {
-        const setting = new Setting(this.containerEl).setName(name).setDesc(desc);
+    createRgbaColorSetting(containerEl,name, desc, settingKey) {
+        const setting = new Setting(containerEl).setName(name).setDesc(desc);
         let colorPicker;
         
         const setupComponents = () => {
@@ -3590,13 +4017,92 @@ class PeriodSettingsTab extends PluginSettingTab {
         });
     }
 
-    /**
-     * Builds and renders the entire settings tab UI.
-     */
     display() {
         const { containerEl } = this;
         containerEl.empty();
+
+        // Main container for the tabbed layout
+        const settingsContainer = containerEl.createDiv({ cls: "period-settings-container" });
+        const navEl = settingsContainer.createDiv({ cls: "period-settings-nav" });
+        this.contentEl = settingsContainer.createDiv({ cls: "period-settings-content" });
+
+        const tabs = {
+            general: "General Display",
+            functional: "Calendar Functional",
+            dots: "Calendar Dots",
+            tasksIndicator: "Task Indicators",
+            tabs: "General Tab",
+            scratchpad: "ScratchPad Tab",
+            notes: "Notes Tab",
+            assets: "Assets Tab",
+            tasks: "Tasks Tab",
+            startHere: "Help",
+            about: "About"
+        };
+
+        // Create navigation buttons
+        for (const [key, name] of Object.entries(tabs)) {
+            const navButton = navEl.createEl('button', {
+                text: name,
+                cls: 'period-settings-nav-button'
+            });
+            if (this.activeTab === key) {
+                navButton.addClass('is-active');
+            }
+            navButton.addEventListener('click', () => {
+                this.activeTab = key;
+                // Re-render the entire display to update active state and content
+                this.display();
+            });
+        }
         
+        // Render the content for the active tab
+        this.renderContentForActiveTab();
+    }
+
+    renderContentForActiveTab() {
+        this.contentEl.empty();
+        switch (this.activeTab) {
+            case 'general':
+                this.renderGeneralSettings();
+                break;
+            case 'functional':
+                this.renderFunctionalSettings();
+                break;
+            case 'dots':
+                this.renderDotsSettings();
+                break;
+            case 'tasksIndicator':
+                this.renderTaskIndicatorSettings();
+                break;
+            case 'tabs':
+                this.renderTabsSettings();
+                break;    
+            case 'scratchpad':
+                this.renderScratchpadSettings();
+                break;
+            case 'notes':
+                this.renderNotesSettings();
+                break;
+            case 'assets':
+                this.renderAssetsSettings();
+                break;
+            case 'tasks':
+                this.renderTasksSettings();
+                break;
+            case 'startHere':
+                this.renderStartHereTab();
+                break;
+            case 'about':
+                this.renderAboutTab();
+                break;
+        }
+    }
+
+    // --- RENDER METHODS FOR EACH TAB ---
+
+    renderGeneralSettings() {
+        const containerEl = this.contentEl;
         containerEl.createEl("h1", { text: "General Display Settings" });
 
         // --- Titles & Headers Section ---
@@ -3616,8 +4122,8 @@ class PeriodSettingsTab extends PluginSettingTab {
         monthTitleSetting.addText(text => text.setPlaceholder("MMMM YYYY").setValue(this.plugin.settings.monthTitleFormat).onChange(async (value) => { this.plugin.settings.monthTitleFormat = value; await this.saveAndUpdate(); }));
         new Setting(containerEl).setName("Month title font size").setDesc("Font size for the main 'Month Year' title at the top of the calendar. Default is 20px.").addText(text => text.setValue(this.plugin.settings.mainMonthYearTitleFontSize).onChange(async value => { this.plugin.settings.mainMonthYearTitleFontSize = value; await this.saveAndUpdate(); }));
         new Setting(containerEl).setName("Bold month title").setDesc("Toggles bold font weight for the main 'Month Year' title.").addToggle(toggle => toggle.setValue(this.plugin.settings.mainMonthYearTitleBold).onChange(async value => { this.plugin.settings.mainMonthYearTitleBold = value; await this.saveAndUpdate(); }));
-        this.createRgbaColorSetting("Month Title Color (Light Mode)", "Color for the main 'Month Year' title in light mode.", "monthColorLight");
-        this.createRgbaColorSetting("Month Title Color (Dark Mode)", "Color for the main 'Month Year' title in dark mode.", "monthColorDark");       
+        this.createRgbaColorSetting(containerEl,"Month Title Color (Light Mode)", "Color for the main 'Month Year' title in light mode.", "monthColorLight");
+        this.createRgbaColorSetting(containerEl,"Month Title Color (Dark Mode)", "Color for the main 'Month Year' title in dark mode.", "monthColorDark");       
         new Setting(containerEl).setName("Navigation buttons height").setDesc("The height of the navigation buttons (←, Today, →) next to the month title. Default is 28px.").addText(text => text.setValue(this.plugin.settings.navButtonHeight).onChange(async value => { this.plugin.settings.navButtonHeight = value; await this.saveAndUpdate(); }));
         new Setting(containerEl).setName("Bold calendar header").setDesc("Toggles bold font weight for the day names row (Mon, Tue, etc.) in the calendar.").addToggle(toggle => toggle.setValue(this.plugin.settings.headerRowBold).onChange(async value => { this.plugin.settings.headerRowBold = value; await this.saveAndUpdate(); }));
 
@@ -3635,21 +4141,199 @@ class PeriodSettingsTab extends PluginSettingTab {
         new Setting(containerEl).setName("P/W column font size").setDesc("Font size for the Period/Week column labels. Default is 13px.").addText(text => text.setValue(this.plugin.settings.fontSize).onChange(async value => { this.plugin.settings.fontSize = value; await this.saveAndUpdate(); }));
         new Setting(containerEl).setName("Bold P/W column").setDesc("Toggles bold font weight for the Period/Week column in the calendar.").addToggle(toggle => toggle.setValue(this.plugin.settings.pwColumnBold).onChange(async value => { this.plugin.settings.pwColumnBold = value; await this.saveAndUpdate(); }));
         new Setting(containerEl).setName("Day number font size").setDesc("Font size for the day numbers (1, 2, 3...) within the calendar grid. Default is 15px.").addText(text => text.setValue(this.plugin.settings.dayNumberFontSize).onChange(async value => { this.plugin.settings.dayNumberFontSize = value; await this.saveAndUpdate(); }));
-        this.createRgbaColorSetting("Today's Date Highlight (Light Mode)", "Background color for the current day's cell in light mode.", "todayHighlightColorLight");
-        this.createRgbaColorSetting("Today's Date Highlight (Dark Mode)", "Background color for the current day's cell in dark mode.", "todayHighlightColorDark");
-               
-
-        this.createRgbaColorSetting("Date Cell Hover (Light Mode)", "Background color when hovering over a date cell in light mode.", "dateCellHoverColorLight");
-        this.createRgbaColorSetting("Date Cell Hover (Dark Mode)", "Background color when hovering over a date cell in dark mode.", "dateCellHoverColorDark");
-       
+        this.createRgbaColorSetting(containerEl,"Today's Date Highlight (Light Mode)", "Background color for the current day's cell in light mode.", "todayHighlightColorLight");
+        this.createRgbaColorSetting(containerEl,"Today's Date Highlight (Dark Mode)", "Background color for the current day's cell in dark mode.", "todayHighlightColorDark");
         
-        // --- Tabs Section ---
-        new Setting(containerEl).setName("Tabs").setHeading();
-    
+        new Setting(containerEl)
+            .setName("Today's date style")
+            .setDesc("Choose how to indicate the current day on the calendar.")
+            .addDropdown(dropdown => dropdown
+                .addOption('cell', 'Highlight Cell')
+                .addOption('circle', 'Square Around Date')
+                .setValue(this.plugin.settings.todayHighlightStyle)
+                .onChange(async (value) => {
+                    this.plugin.settings.todayHighlightStyle = value;
+                    await this.saveAndUpdate();
+                    // Re-render settings to show/hide the color picker
+                    this.display();
+                }));
+
+        // Only show the circle color picker if the 'circle' style is selected
+        if (this.plugin.settings.todayHighlightStyle === 'circle') {
+            this.createRgbaColorSetting(containerEl, "Today's Box Color", "Controls the filled box for 'today'. Use the color swatch for the color and the slider for the transparency/opacity.", "todayCircleColor");
+        }
+
+        this.createRgbaColorSetting(containerEl,"Date Cell Hover (Light Mode)", "Background color when hovering over a date cell in light mode.", "dateCellHoverColorLight");
+        this.createRgbaColorSetting(containerEl,"Date Cell Hover (Dark Mode)", "Background color when hovering over a date cell in dark mode.", "dateCellHoverColorDark");
+       
+    }
+
+    renderFunctionalSettings() {
+        const containerEl = this.contentEl;
+        containerEl.createEl("h1", { text: "Calendar Functional Settings" });
+        
+        // --- Period/Week System Section ---
+        new Setting(containerEl).setName("Period/Week System").setHeading();
+
+        
+        new Setting(containerEl).setName("Start of Period 1 Week 1").setDesc("The date for the start of P1W1. This is the anchor for all Period/Week calculations. Must be a Sunday.").addText(text => { text.inputEl.type = "date"; text.setValue(this.plugin.settings.startOfPeriod1Date).onChange(async value => { this.plugin.settings.startOfPeriod1Date = value; await this.saveAndUpdate(); }); });
+        new Setting(containerEl).setName("Period/Week format").setDesc("Choose the display format for the P/W column.").addDropdown(dropdown => dropdown.addOption("P#W#", "P#W#").addOption("P# W#", "P# W#").addOption("# W#", "# W#").addOption("p#w#", "p#p#").addOption("p# w#", "p# w#").addOption("# w#", "# w#").addOption("#-#", "#-#").addOption("# - #", "# - #").addOption("#/#", "#/#").addOption("# / #", "# / #").addOption("#,#", "#,#").addOption("#, #", "#, #").setValue(this.plugin.settings.pwFormat).onChange(async (value) => { this.plugin.settings.pwFormat = value; await this.saveAndUpdate(); }));
+        new Setting(containerEl).setName("Show Period/Week column").setDesc("Show or hide the Period/Week column on the left side of the calendar.").addToggle(toggle => toggle.setValue(this.plugin.settings.showPWColumn).onChange(async value => { this.plugin.settings.showPWColumn = value; await this.saveAndUpdate(); }));
+        
+        // --- Week Numbers Section ---
+        new Setting(containerEl).setName("Week Numbers").setHeading();
+
+        new Setting(containerEl)
+        .setName("Show week number column")
+        .setDesc("Display a column for week numbers on the left side of the calendar.")
+        .addToggle(toggle => toggle
+            .setValue(this.plugin.settings.showWeekNumbers)
+            .onChange(async (value) => {
+            this.plugin.settings.showWeekNumbers = value;
+            await this.saveAndUpdate();
+            }));
+
+        new Setting(containerEl)
+        .setName("Week number type")
+        .setDesc("Choose which week numbering system to use.")
+        .addDropdown(dropdown => dropdown
+            .addOption('period', 'Period System Week')
+            .addOption('calendar', 'Calendar Year Week (ISO)')
+            .setValue(this.plugin.settings.weekNumberType)
+            .onChange(async (value) => {
+            this.plugin.settings.weekNumberType = value;
+            await this.saveAndUpdate();
+            }));
+        
+        new Setting(containerEl)
+        .setName("Week number column label")
+        .setDesc("The text to display at the top of the week number column.")
+        .addText(text => text
+            .setValue(this.plugin.settings.weekNumberColumnLabel)
+            .onChange(async (value) => {
+            this.plugin.settings.weekNumberColumnLabel = value;
+            await this.saveAndUpdate();
+            }));
+
+        // --- Daily Notes Section ---
+        new Setting(containerEl).setName("Daily Notes").setHeading();
+        new Setting(containerEl).setName("Daily Notes folder").setDesc("Specify the folder where your daily notes are stored and created.").addText(text => { this.createPathSuggester(text.inputEl, (q) => this.app.vault.getAllLoadedFiles().filter(f => f instanceof TFolder && (!q || f.path.toLowerCase().includes(q))).map(f => f.path)); text.setValue(this.plugin.settings.dailyNotesFolder).onChange(async value => { this.plugin.settings.dailyNotesFolder = value; await this.saveAndUpdate(); }); });
+        new Setting(containerEl).setName("Daily Note open behavior").addDropdown(dropdown => dropdown.addOption('new-tab', 'Open in a new tab').addOption('current-tab', 'Open in the current tab').setValue(this.plugin.settings.dailyNoteOpenAction).onChange(async (value) => { this.plugin.settings.dailyNoteOpenAction = value; await this.saveAndUpdate(); }));
+        new Setting(containerEl).setName("Daily note template").setDesc("Path to a template file to use when creating a new daily note.").addText(text => { this.createPathSuggester(text.inputEl, (q) => this.app.vault.getMarkdownFiles().filter(f => !q || f.path.toLowerCase().includes(q)).map(f => f.path)); text.setPlaceholder("Example: Templates/Daily.md").setValue(this.plugin.settings.dailyNoteTemplatePath).onChange(async (value) => { this.plugin.settings.dailyNoteTemplatePath = value; await this.saveAndUpdate(); }); });
+        
+        // --- Grid Highlighting Section ---
+        new Setting(containerEl).setName("Grid Highlighting").setHeading();
+        new Setting(containerEl).setName("Enable row highlight").setDesc("Highlights the entire week's row when hovering over the P/W label.").addToggle(toggle => toggle.setValue(this.plugin.settings.enableRowHighlight).onChange(async (value) => { this.plugin.settings.enableRowHighlight = value; await this.saveAndUpdate(); }));
+        new Setting(containerEl).setName("Enable column highlight").setDesc("Highlights the entire day's column when hovering over the day name (e.g., Mon).").addToggle(toggle => toggle.setValue(this.plugin.settings.enableColumnHighlight).onChange(async (value) => { this.plugin.settings.enableColumnHighlight = value; await this.saveAndUpdate(); }));
+        new Setting(containerEl).setName("Enable complex grid highlight").setDesc("When hovering a date, highlights all cells in its row and column up to that date.").addToggle(toggle => toggle.setValue(this.plugin.settings.enableRowToDateHighlight).onChange(async (value) => { this.plugin.settings.enableRowToDateHighlight = value; await this.saveAndUpdate(); }));
+        this.createRgbaColorSetting(containerEl,"Grid Highlight Color (Light Mode)", "Color for row/column highlighting on hover in light mode.", "rowHighlightColorLight");
+        this.createRgbaColorSetting(containerEl,"Grid Highlight Color (Dark Mode)", "Color for row/column highlighting on hover in dark mode.", "rowHighlightColorDark");
+
+    }
+
+    renderDotsSettings() {
+        const containerEl = this.contentEl;
+        containerEl.createEl("h1", { text: "Calendar Dot Indicators" });
+        // --- Dot Functionality Section ---
+        new Setting(containerEl).setName("Functionality & Style").setHeading();
+        new Setting(containerEl).setName("Show dot for created notes").setDesc("Show a dot on days where any note (that is not a daily note) was created.").addToggle(toggle => toggle.setValue(this.plugin.settings.showOtherNoteDot).onChange(async value => { this.plugin.settings.showOtherNoteDot = value; await this.saveAndUpdate(); }));
+        new Setting(containerEl).setName("Show dot for modified notes").setDesc("Show a dot on days where any note (that is not a daily note) was modified.").addToggle(toggle => toggle.setValue(this.plugin.settings.showModifiedFileDot).onChange(async value => { this.plugin.settings.showModifiedFileDot = value; await this.saveAndUpdate(); }));
+        new Setting(containerEl)
+            .setName("Show dot for new assets")
+            .setDesc("Show a dot on days where an asset (image, PDF, etc.) was added to the vault.")
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.showAssetDot)
+                .onChange(async (value) => {
+                    this.plugin.settings.showAssetDot = value;
+                    await this.saveAndUpdate();
+                }));
+        new Setting(containerEl).setName("Calendar dot size").setDesc("The size (in pixels) of the colored dots that appear under calendar days. Default is 4.").addText(text => text.setValue(String(this.plugin.settings.calendarDotSize)).onChange(async (value) => { this.plugin.settings.calendarDotSize = Number(value) || 4; await this.saveAndUpdate(); }));
+        
+        // --- Dot Colors Section ---
+        new Setting(containerEl).setName("Dot Colors").setHeading();
+        this.createRgbaColorSetting(containerEl,"Daily Note Dot", "Dot for daily notes on the calendar and note lists .", "dailyNoteDotColor");
+        this.createRgbaColorSetting(containerEl,"Created Note Dot", "Dot on calendar and note lists for non-daily, newly created notes.", "otherNoteDotColor");
+        this.createRgbaColorSetting(containerEl,"Modified Note Dot", "Dot on calendar and note lists for non-daily, modified notes.", "calendarModifiedDotColor");
+        this.createRgbaColorSetting(containerEl,"Asset Note Dot", "Dot on calendar and note lists for newly added assets.", "assetDotColor");
+
+        // --- Popups Section ---
+        new Setting(containerEl).setName("Popups").setHeading();
+        new Setting(containerEl).setName("Popup hover delay").setDesc("How long to wait before showing the note list popup on hover. Default is 100ms.").addText(text => text.setValue(String(this.plugin.settings.otherNoteHoverDelay)).onChange(async (value) => { this.plugin.settings.otherNoteHoverDelay = Number(value) || 100; await this.saveAndUpdate(); }));
+        new Setting(containerEl).setName("Popup hide delay").setDesc("How long to wait before hiding the popup after the mouse leaves. Default is 100ms.").addText(text => text.setValue(String(this.plugin.settings.popupHideDelay)).onChange(async (value) => { this.plugin.settings.popupHideDelay = Number(value) || 100; await this.saveAndUpdate(); }));
+        new Setting(containerEl).setName("Popup gap").setDesc("The gap (in pixels) between a calendar day and its popup list. Can be negative. Default is -2.").addText(text => text.setValue(String(this.plugin.settings.popupGap)).onChange(async (value) => { this.plugin.settings.popupGap = Number(value) || -2; await this.saveAndUpdate(); }));
+        new Setting(containerEl).setName("Popup font size").setDesc("The font size for the note names inside the calendar popup. Default is 13px.").addText(text => text.setValue(this.plugin.settings.otherNotePopupFontSize).onChange(async value => { this.plugin.settings.otherNotePopupFontSize = value; await this.saveAndUpdate(); }));
+        this.createIgnoredFolderList(containerEl, "Ignore folders for calendar grid dots", "Files in these folders will not create 'created' or 'modified' dots on the calendar.", 'otherNoteIgnoreFolders');
+        this.createIgnoredFolderList(containerEl, "Ignore folders for asset dots", "Assets in these folders will not create dots on the calendar.", 'assetIgnoreFolders');
+
+    }
+
+    renderTaskIndicatorSettings() {
+        const containerEl = this.contentEl;
+        containerEl.createEl("h1", { text: "Calendar Task Indicators" });
+        new Setting(containerEl)
+            .setName("Task indicator style")
+            .setDesc("Choose how to indicate days with tasks on the calendar grid.")
+            .addDropdown(dropdown => dropdown
+                .addOption('none', 'None')
+                .addOption('badge', 'Number Badge')
+                .addOption('heatmap', 'Cell Color Heatmap')
+                .setValue(this.plugin.settings.taskIndicatorStyle)
+                .onChange(async (value) => {
+                    this.plugin.settings.taskIndicatorStyle = value;
+                    await this.saveAndUpdate();
+                    // We re-render the settings display to show/hide relevant options
+                    this.display(); 
+                }));
+
+        // Only show the badge/heatmap settings if they are relevant
+        if (this.plugin.settings.taskIndicatorStyle === 'badge') {
+            new Setting(containerEl)
+                .setName("Task badge font size")
+                .setDesc("The font size for the number inside the task badge. Default is 9px.")
+                .addText(text => text
+                    .setValue(this.plugin.settings.taskBadgeFontSize)
+                    .onChange(async (value) => {
+                        this.plugin.settings.taskBadgeFontSize = value;
+                        await this.saveAndUpdate();
+                    }));
+
+            this.createRgbaColorSetting(containerEl,"Task badge color", "The background color of the task count badge.", "taskBadgeColor");
+            this.createRgbaColorSetting(containerEl,"Task badge font color", "The color of the number inside the task count badge.", "taskBadgeFontColor");
+        }
+
+        if (this.plugin.settings.taskIndicatorStyle === 'heatmap') {
+            containerEl.createEl('p', { text: 'Configure the start, middle, and end points of the dynamic color gradient. Colors will be blended smoothly between these points.', cls: 'setting-item-description' });
+
+            new Setting(containerEl).setName("Gradient Midpoint").setDesc("The number of tasks that should have the exact 'Mid' color. Default is 5.").addText(text => text.setValue(String(this.plugin.settings.taskHeatmapMidpoint)).onChange(async (value) => { this.plugin.settings.taskHeatmapMidpoint = Number(value) || 5; await this.saveAndUpdate(); }));
+            new Setting(containerEl).setName("Gradient Maxpoint").setDesc("The number of tasks that should have the exact 'End' color. Any day with more tasks will also use the end color. Default is 10.").addText(text => text.setValue(String(this.plugin.settings.taskHeatmapMaxpoint)).onChange(async (value) => { this.plugin.settings.taskHeatmapMaxpoint = Number(value) || 10; await this.saveAndUpdate(); }));
+
+            this.createRgbaColorSetting(containerEl,"Heatmap: Start Color (1 Task)", "The color for days with 1 task.", "taskHeatmapStartColor");
+            this.createRgbaColorSetting(containerEl,"Heatmap: Mid Color", "The color for days meeting the 'Midpoint' task count.", "taskHeatmapMidColor");
+            this.createRgbaColorSetting(containerEl,"Heatmap: End Color", "The color for days meeting the 'Maxpoint' task count.", "taskHeatmapEndColor");
+        }
+        
+        new Setting(containerEl)
+            .setName("Task badge font size")
+            .setDesc("The font size for the number inside the task badge. Default is 10px.")
+            .addText(text => text
+                .setValue(this.plugin.settings.taskBadgeFontSize)
+                .onChange(async (value) => {
+                    this.plugin.settings.taskBadgeFontSize = value;
+                    await this.saveAndUpdate();
+                }));
+
+        this.createRgbaColorSetting(containerEl,"Task badge color", "The background color of the task count badge.", "taskBadgeColor");
+        this.createRgbaColorSetting(containerEl,"Task badge font color", "The color of the number inside the task count badge.", "taskBadgeFontColor");
+        
+    }
+
+    renderTabsSettings() {
+        const containerEl = this.contentEl;
+        containerEl.createEl("h1", { text: "General Tab Settings" });
         new Setting(containerEl).setName("Tab title font size").setDesc("Font size for the tab titles (ScratchPad, Notes, Tasks). Default is 14px.").addText(text => text.setValue(this.plugin.settings.tabTitleFontSize).onChange(async value => { this.plugin.settings.tabTitleFontSize = value; await this.saveAndUpdate(); }));
         new Setting(containerEl).setName("Bold tab titles").setDesc("Toggles bold font weight for the tab titles.").addToggle(toggle => toggle.setValue(this.plugin.settings.tabTitleBold).onChange(async value => { this.plugin.settings.tabTitleBold = value; await this.saveAndUpdate(); }));
         
-        this.createRgbaColorSetting("Active Tab Indicator", "Underline color for the active tab.", "selectedTabColor");
+        this.createRgbaColorSetting(containerEl,"Active Tab Indicator", "Underline color for the active tab.", "selectedTabColor");
         new Setting(containerEl).setName("Tab Order").setDesc("Enter the desired tab order, separated by commas (e.g., tasks,scratch,notes). You can also drag-and-drop the tabs in the plugin view.").addText(text => text.setValue(this.plugin.settings.tabOrder.join(', ')).onChange(async (value) => {
             const validKeys = ["scratch", "notes", "assets", "tasks"];
             const newOrder = value.split(',').map(s => s.trim()).filter(s => validKeys.includes(s));
@@ -3747,125 +4431,10 @@ class PeriodSettingsTab extends PluginSettingTab {
                 this.display();
             }));
 
-        containerEl.createEl("h1", { text: "Calendar Functional Settings" });
+    }
 
-        // --- Period/Week System Section ---
-        new Setting(containerEl).setName("Period/Week System").setHeading();
-
-        
-        new Setting(containerEl).setName("Start of Period 1 Week 1").setDesc("The date for the start of P1W1. This is the anchor for all Period/Week calculations. Must be a Sunday.").addText(text => { text.inputEl.type = "date"; text.setValue(this.plugin.settings.startOfPeriod1Date).onChange(async value => { this.plugin.settings.startOfPeriod1Date = value; await this.saveAndUpdate(); }); });
-        new Setting(containerEl).setName("Period/Week format").setDesc("Choose the display format for the P/W column.").addDropdown(dropdown => dropdown.addOption("P#W#", "P#W#").addOption("P# W#", "P# W#").addOption("# W#", "# W#").addOption("p#w#", "p#p#").addOption("p# w#", "p# w#").addOption("# w#", "# w#").addOption("#-#", "#-#").addOption("# - #", "# - #").addOption("#/#", "#/#").addOption("# / #", "# / #").addOption("#,#", "#,#").addOption("#, #", "#, #").setValue(this.plugin.settings.pwFormat).onChange(async (value) => { this.plugin.settings.pwFormat = value; await this.saveAndUpdate(); }));
-        new Setting(containerEl).setName("Show Period/Week column").setDesc("Show or hide the Period/Week column on the left side of the calendar.").addToggle(toggle => toggle.setValue(this.plugin.settings.showPWColumn).onChange(async value => { this.plugin.settings.showPWColumn = value; await this.saveAndUpdate(); }));
-        
-        // --- Week Numbers Section ---
-        new Setting(containerEl).setName("Week Numbers").setHeading();
-
-        new Setting(containerEl)
-        .setName("Show week number column")
-        .setDesc("Display a column for week numbers on the left side of the calendar.")
-        .addToggle(toggle => toggle
-            .setValue(this.plugin.settings.showWeekNumbers)
-            .onChange(async (value) => {
-            this.plugin.settings.showWeekNumbers = value;
-            await this.saveAndUpdate();
-            }));
-
-        new Setting(containerEl)
-        .setName("Week number type")
-        .setDesc("Choose which week numbering system to use.")
-        .addDropdown(dropdown => dropdown
-            .addOption('period', 'Period System Week')
-            .addOption('calendar', 'Calendar Year Week (ISO)')
-            .setValue(this.plugin.settings.weekNumberType)
-            .onChange(async (value) => {
-            this.plugin.settings.weekNumberType = value;
-            await this.saveAndUpdate();
-            }));
-        
-        new Setting(containerEl)
-        .setName("Week number column label")
-        .setDesc("The text to display at the top of the week number column.")
-        .addText(text => text
-            .setValue(this.plugin.settings.weekNumberColumnLabel)
-            .onChange(async (value) => {
-            this.plugin.settings.weekNumberColumnLabel = value;
-            await this.saveAndUpdate();
-            }));
-
-        // --- Daily Notes Section ---
-        new Setting(containerEl).setName("Daily Notes").setHeading();
-        new Setting(containerEl).setName("Daily Notes folder").setDesc("Specify the folder where your daily notes are stored and created.").addText(text => { this.createPathSuggester(text.inputEl, (q) => this.app.vault.getAllLoadedFiles().filter(f => f instanceof TFolder && (!q || f.path.toLowerCase().includes(q))).map(f => f.path)); text.setValue(this.plugin.settings.dailyNotesFolder).onChange(async value => { this.plugin.settings.dailyNotesFolder = value; await this.saveAndUpdate(); }); });
-        new Setting(containerEl).setName("Daily Note open behavior").addDropdown(dropdown => dropdown.addOption('new-tab', 'Open in a new tab').addOption('current-tab', 'Open in the current tab').setValue(this.plugin.settings.dailyNoteOpenAction).onChange(async (value) => { this.plugin.settings.dailyNoteOpenAction = value; await this.saveAndUpdate(); }));
-        new Setting(containerEl).setName("Daily note template").setDesc("Path to a template file to use when creating a new daily note.").addText(text => { this.createPathSuggester(text.inputEl, (q) => this.app.vault.getMarkdownFiles().filter(f => !q || f.path.toLowerCase().includes(q)).map(f => f.path)); text.setPlaceholder("Example: Templates/Daily.md").setValue(this.plugin.settings.dailyNoteTemplatePath).onChange(async (value) => { this.plugin.settings.dailyNoteTemplatePath = value; await this.saveAndUpdate(); }); });
-        
-        // --- Grid Highlighting Section ---
-        new Setting(containerEl).setName("Grid Highlighting").setHeading();
-        new Setting(containerEl).setName("Enable row highlight").setDesc("Highlights the entire week's row when hovering over the P/W label.").addToggle(toggle => toggle.setValue(this.plugin.settings.enableRowHighlight).onChange(async (value) => { this.plugin.settings.enableRowHighlight = value; await this.saveAndUpdate(); }));
-        new Setting(containerEl).setName("Enable column highlight").setDesc("Highlights the entire day's column when hovering over the day name (e.g., Mon).").addToggle(toggle => toggle.setValue(this.plugin.settings.enableColumnHighlight).onChange(async (value) => { this.plugin.settings.enableColumnHighlight = value; await this.saveAndUpdate(); }));
-        new Setting(containerEl).setName("Enable complex grid highlight").setDesc("When hovering a date, highlights all cells in its row and column up to that date.").addToggle(toggle => toggle.setValue(this.plugin.settings.enableRowToDateHighlight).onChange(async (value) => { this.plugin.settings.enableRowToDateHighlight = value; await this.saveAndUpdate(); }));
-        this.createRgbaColorSetting("Grid Highlight Color (Light Mode)", "Color for row/column highlighting on hover in light mode.", "rowHighlightColorLight");
-        this.createRgbaColorSetting("Grid Highlight Color (Dark Mode)", "Color for row/column highlighting on hover in dark mode.", "rowHighlightColorDark");
-
-        containerEl.createEl("h1", { text: "Calendar Dot Indicators" });
-        // --- Dot Functionality Section ---
-        new Setting(containerEl).setName("Functionality & Style").setHeading();
-        new Setting(containerEl).setName("Show dot for created notes").setDesc("Show a dot on days where any note (that is not a daily note) was created.").addToggle(toggle => toggle.setValue(this.plugin.settings.showOtherNoteDot).onChange(async value => { this.plugin.settings.showOtherNoteDot = value; await this.saveAndUpdate(); }));
-        new Setting(containerEl).setName("Show dot for modified notes").setDesc("Show a dot on days where any note (that is not a daily note) was modified.").addToggle(toggle => toggle.setValue(this.plugin.settings.showModifiedFileDot).onChange(async value => { this.plugin.settings.showModifiedFileDot = value; await this.saveAndUpdate(); }));
-        new Setting(containerEl)
-            .setName("Show dot for new assets")
-            .setDesc("Show a dot on days where an asset (image, PDF, etc.) was added to the vault.")
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.showAssetDot)
-                .onChange(async (value) => {
-                    this.plugin.settings.showAssetDot = value;
-                    await this.saveAndUpdate();
-                }));
-        new Setting(containerEl).setName("Calendar dot size").setDesc("The size (in pixels) of the colored dots that appear under calendar days. Default is 4.").addText(text => text.setValue(String(this.plugin.settings.calendarDotSize)).onChange(async (value) => { this.plugin.settings.calendarDotSize = Number(value) || 4; await this.saveAndUpdate(); }));
-        
-        // --- Dot Colors Section ---
-        new Setting(containerEl).setName("Dot Colors").setHeading();
-        this.createRgbaColorSetting("Daily Note Dot", "Dot for daily notes on the calendar and note lists .", "dailyNoteDotColor");
-        this.createRgbaColorSetting("Created Note Dot", "Dot on calendar and note lists for non-daily, newly created notes.", "otherNoteDotColor");
-        this.createRgbaColorSetting("Modified Note Dot", "Dot on calendar and note lists for non-daily, modified notes.", "calendarModifiedDotColor");
-        this.createRgbaColorSetting("Asset Note Dot", "Dot on calendar and note lists for newly added assets.", "assetDotColor");
-
-        // --- Popups Section ---
-        new Setting(containerEl).setName("Popups").setHeading();
-        new Setting(containerEl).setName("Popup hover delay").setDesc("How long to wait before showing the note list popup on hover. Default is 100ms.").addText(text => text.setValue(String(this.plugin.settings.otherNoteHoverDelay)).onChange(async (value) => { this.plugin.settings.otherNoteHoverDelay = Number(value) || 100; await this.saveAndUpdate(); }));
-        new Setting(containerEl).setName("Popup hide delay").setDesc("How long to wait before hiding the popup after the mouse leaves. Default is 100ms.").addText(text => text.setValue(String(this.plugin.settings.popupHideDelay)).onChange(async (value) => { this.plugin.settings.popupHideDelay = Number(value) || 100; await this.saveAndUpdate(); }));
-        new Setting(containerEl).setName("Popup gap").setDesc("The gap (in pixels) between a calendar day and its popup list. Can be negative. Default is -2.").addText(text => text.setValue(String(this.plugin.settings.popupGap)).onChange(async (value) => { this.plugin.settings.popupGap = Number(value) || -2; await this.saveAndUpdate(); }));
-        new Setting(containerEl).setName("Popup font size").setDesc("The font size for the note names inside the calendar popup. Default is 13px.").addText(text => text.setValue(this.plugin.settings.otherNotePopupFontSize).onChange(async value => { this.plugin.settings.otherNotePopupFontSize = value; await this.saveAndUpdate(); }));
-        this.createIgnoredFolderList(containerEl, "Ignore folders for calendar grid dots", "Files in these folders will not create 'created' or 'modified' dots on the calendar.", 'otherNoteIgnoreFolders');
-        this.createIgnoredFolderList(containerEl, "Ignore folders for asset dots", "Assets in these folders will not create dots on the calendar.", 'assetIgnoreFolders');
-
-        
-        containerEl.createEl("h1", { text: "Calendar Task Indicators" });
-
-        new Setting(containerEl)
-            .setName("Show task count on calendar")
-            .setDesc("Display a badge with the number of open tasks for each day.")
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.showTaskCountBadge)
-                .onChange(async (value) => {
-                    this.plugin.settings.showTaskCountBadge = value;
-                    await this.saveAndUpdate();
-                }));
-        
-        new Setting(containerEl)
-            .setName("Task badge font size")
-            .setDesc("The font size for the number inside the task badge. Default is 10px.")
-            .addText(text => text
-                .setValue(this.plugin.settings.taskBadgeFontSize)
-                .onChange(async (value) => {
-                    this.plugin.settings.taskBadgeFontSize = value;
-                    await this.saveAndUpdate();
-                }));
-
-        this.createRgbaColorSetting("Task badge color", "The background color of the task count badge.", "taskBadgeColor");
-        this.createRgbaColorSetting("Task badge font color", "The color of the number inside the task count badge.", "taskBadgeFontColor");
-        
-        
-        // --- Scratchpad Settings Section ---
+    renderScratchpadSettings() {
+        const containerEl = this.contentEl;
         containerEl.createEl("h1", { text: "ScratchPad Tab Settings" });
         new Setting(containerEl).setName("Functionality").setHeading();
         new Setting(containerEl).setName("ScratchPad tab click action").setDesc("What to do when the ScratchPad tab is clicked while it's already active.").addDropdown(dropdown => dropdown.addOption('new-tab', 'Open in a new tab').addOption('current-tab', 'Open in the current tab').setValue(this.plugin.settings.scratchpadOpenAction).onChange(async (value) => { this.plugin.settings.scratchpadOpenAction = value; await this.saveAndUpdate(); }));
@@ -3918,38 +4487,42 @@ class PeriodSettingsTab extends PluginSettingTab {
         new Setting(containerEl).setName("ScratchPad font size").setDesc("Font size for the text inside the ScratchPad editor. Default is 14px.").addText(text => text.setValue(this.plugin.settings.scratchFontSize).onChange(async value => { this.plugin.settings.scratchFontSize = value; await this.saveAndUpdate(); }));
         new Setting(containerEl).setName("Bold ScratchPad text").setDesc("Toggles bold font weight for the text in the ScratchPad.").addToggle(toggle => toggle.setValue(this.plugin.settings.scratchBold).onChange(async value => { this.plugin.settings.scratchBold = value; await this.saveAndUpdate(); }));
         new Setting(containerEl).setName("ScratchPad font family").setDesc("Examples: monospace, Arial, 'Courier New'. Leave blank to use the editor default.").addText(text => text.setValue(this.plugin.settings.scratchFontFamily).onChange(async (value) => { this.plugin.settings.scratchFontFamily = value; await this.saveAndUpdate(); }));
-        this.createRgbaColorSetting("Search highlight color", "The background color for the selected search result in the ScratchPad.", "scratchpadHighlightColor");
+        this.createRgbaColorSetting(containerEl,"Search highlight color", "The background color for the selected search result in the ScratchPad.", "scratchpadHighlightColor");
 
-        // --- Notes Tab Settings Section ---
+    }
+
+    renderNotesSettings() {
+        const containerEl = this.contentEl;
         containerEl.createEl("h1", { text: "Notes Tab Settings" });
         new Setting(containerEl).setName("Functionality").setHeading();
+        
+        new Setting(containerEl).setName("Notes tab open behavior").setDesc("Choose how to open notes when clicked from the notes list.").addDropdown(dropdown => dropdown.addOption('new-tab', 'Open in a new tab').addOption('current-tab', 'Open in the current tab').setValue(this.plugin.settings.notesOpenAction).onChange(async (value) => { this.plugin.settings.notesOpenAction = value; await this.saveAndUpdate(); }));
+        new Setting(containerEl).setName("Notes lookback days").setDesc("How many days back the Notes tab should look for created or modified notes. Default is 7.").addText(text => text.setValue(String(this.plugin.settings.notesLookbackDays)).onChange(async value => { this.plugin.settings.notesLookbackDays = Number(value) || 7; await this.saveAndUpdate(); }));
         new Setting(containerEl)
             .setName("Pinned notes tag")
-            .setDesc("The tag to use for pinned notes, without the '#'. Default is '#pin'.")
+            .setDesc("The tag to use for pinned notes, without the '#'. Default is 'pin'.")
             .addText(text => text
                 .setValue(this.plugin.settings.pinTag)
                 .onChange(async (value) => {
                     this.plugin.settings.pinTag = value;
                     await this.saveAndUpdate();
                 }));
-        new Setting(containerEl).setName("Notes tab open behavior").setDesc("Choose how to open notes when clicked from the notes list.").addDropdown(dropdown => dropdown.addOption('new-tab', 'Open in a new tab').addOption('current-tab', 'Open in the current tab').setValue(this.plugin.settings.notesOpenAction).onChange(async (value) => { this.plugin.settings.notesOpenAction = value; await this.saveAndUpdate(); }));
-        new Setting(containerEl).setName("Notes lookback days").setDesc("How many days back the Notes tab should look for created or modified notes. Default is 7.").addText(text => text.setValue(String(this.plugin.settings.notesLookbackDays)).onChange(async value => { this.plugin.settings.notesLookbackDays = Number(value) || 7; await this.saveAndUpdate(); }));
-        
         new Setting(containerEl).setName("Appearance").setHeading();
         new Setting(containerEl).setName("Show note status dots").setDesc("Show a colored dot next to each note, indicating if it was recently created or modified.").addToggle(toggle => toggle.setValue(this.plugin.settings.showNoteStatusDots).onChange(async value => { this.plugin.settings.showNoteStatusDots = value; await this.saveAndUpdate(); }));
-        this.createRgbaColorSetting("Created Note Dot", "Color for the dot on recently created notes in the list.", "noteCreatedColor");
-        this.createRgbaColorSetting("Modified Note Dot", "Color for the dot on recently modified notes in the list.", "noteModifiedColor");
+        this.createRgbaColorSetting(containerEl,"Created Note Dot", "Color for the dot on recently created notes in the list.", "noteCreatedColor");
+        this.createRgbaColorSetting(containerEl,"Modified Note Dot", "Color for the dot on recently modified notes in the list.", "noteModifiedColor");
         new Setting(containerEl).setName("Show note tooltips").setDesc("Show a detailed tooltip on hover, containing note path, dates, size, and tags.").addToggle(toggle => toggle.setValue(this.plugin.settings.showNoteTooltips).onChange(async value => { this.plugin.settings.showNoteTooltips = value; await this.saveAndUpdate(); }));
         new Setting(containerEl).setName("Notes list font size").setDesc("Font size for note titles in the list. Default is 14px.").addText(text => text.setValue(this.plugin.settings.notesFontSize).onChange(async value => { this.plugin.settings.notesFontSize = value; await this.saveAndUpdate(); }));
         new Setting(containerEl).setName("Bold note titles").setDesc("Toggles bold font weight for note titles in the list.").addToggle(toggle => toggle.setValue(this.plugin.settings.notesBold).onChange(async value => { this.plugin.settings.notesBold = value; await this.saveAndUpdate(); }));
-        this.createRgbaColorSetting("Note/Task Hover Color", "Background color when hovering a note or task in a list.", "notesHoverColor");
+        this.createRgbaColorSetting(containerEl,"Note/Task Hover Color", "Background color when hovering a note or task in a list.", "notesHoverColor");
         
         this.createIgnoredFolderList(containerEl, "Ignore folders in Notes tab", "Files in these folders will not appear in the 'Notes' list.", 'ignoreFolders');
         
-
-        // --- Assets Tab Settings Section ---
+    }
+    
+    renderAssetsSettings() {
+        const containerEl = this.contentEl;
         containerEl.createEl("h1", { text: "Assets Tab Settings" });
-
         new Setting(containerEl)
        .setName("Asset open behavior")
        .setDesc("Choose how to open assets when clicked from the Assets list.")
@@ -3984,14 +4557,16 @@ class PeriodSettingsTab extends PluginSettingTab {
         
         new Setting(containerEl).setName("Show indicator for unused assets").setDesc("An icon will appear next to assets that are not linked or embedded in any note, allowing for deletion.").addToggle(toggle => toggle.setValue(this.plugin.settings.showUnusedAssetsIndicator).onChange(async (value) => {this.plugin.settings.showUnusedAssetsIndicator = value;await this.saveAndUpdate();}));
 
-        // --- Tasks Tab Settings Section ---
-        containerEl.createEl("h1", { text: "Tasks Tab Settings" });
+    }
 
+    renderTasksSettings() {
+        const containerEl = this.contentEl;
+        containerEl.createEl("h1", { text: "Tasks Tab Settings" });
         new Setting(containerEl).setName("Display & Sorting").setHeading();
         new Setting(containerEl).setName("Task group heading font size").setDesc("The font size for the date/tag group headings (e.g., 'Overdue', 'Today'). Default is 13px.").addText(text => text.setValue(this.plugin.settings.taskHeadingFontSize).onChange(async value => { this.plugin.settings.taskHeadingFontSize = value; await this.saveAndUpdate(); }));
         new Setting(containerEl).setName("Task text font size").setDesc("The font size for the individual task items in the list. Default is 14px.").addText(text => text.setValue(this.plugin.settings.taskTextFontSize).onChange(async value => { this.plugin.settings.taskTextFontSize = value; await this.saveAndUpdate(); }));
         new Setting(containerEl).setName("Truncate long task text").setDesc("If enabled, long tasks will be shortened with '...'. If disabled, they will wrap to multiple lines.").addToggle(toggle => toggle.setValue(this.plugin.settings.taskTextTruncate).onChange(async (value) => { this.plugin.settings.taskTextTruncate = value; await this.saveAndUpdate(); }));
-        new Setting(containerEl).setName("Show completed tasks for Today").setDesc("If enabled, completed tasks with today's due date will also appear in the 'Today' and 'Tag' group views.").addToggle(toggle => toggle.setValue(this.plugin.settings.showCompletedTasksToday).onChange(async (value) => {this.plugin.settings.showCompletedTasksToday = value;await this.saveAndUpdate();}));
+        new Setting(containerEl).setName("Show completed tasks for Today").setDesc("If enabled, tasks that you marked as complete today will appear in the lists (regardless of their due date).").addToggle(toggle => toggle.setValue(this.plugin.settings.showCompletedTasksToday).onChange(async (value) => {this.plugin.settings.showCompletedTasksToday = value;await this.saveAndUpdate();}));
         new Setting(containerEl).setName("Task sort order").setDesc("The default order for tasks within each group.").addDropdown(dropdown => dropdown.addOption('dueDate', 'By Due Date (earliest first)').addOption('a-z', 'A-Z').addOption('z-a', 'Z-A').setValue(this.plugin.settings.taskSortOrder).onChange(async (value) => { this.plugin.settings.taskSortOrder = value; await this.saveAndUpdate(); }));
         new Setting(containerEl).setName("Group tasks by").setDesc("Choose how to group tasks in the view. Second-clicking the Tasks tab will also toggle this.").addDropdown(dropdown => dropdown.addOption('date', 'Date (Overdue, Today, etc.)').addOption('tag', 'Tag').setValue(this.plugin.settings.taskGroupBy).onChange(async (value) => { this.plugin.settings.taskGroupBy = value; await this.saveAndUpdate(); this.display(); }));
         
@@ -4028,14 +4603,90 @@ class PeriodSettingsTab extends PluginSettingTab {
         new Setting(containerEl).addButton(button => button.setButtonText("Reset Icons to Default").setIcon("rotate-ccw").setTooltip("Resets all task group icons to their original values").onClick(async () => { this.plugin.settings.taskGroupIcons = { ...DEFAULT_SETTINGS.taskGroupIcons }; await this.saveAndUpdate(); this.display(); }));
 
         new Setting(containerEl).setName("Task Group Backgrounds").setHeading();
-        this.createRgbaColorSetting("Overdue", "Background color for the 'Overdue' task group.", "taskGroupColorOverdue");
-        this.createRgbaColorSetting("Today", "Background color for the 'Today' task group.", "taskGroupColorToday");
-        this.createRgbaColorSetting("Tomorrow", "Background color for the 'Tomorrow' task group.", "taskGroupColorTomorrow");
-        this.createRgbaColorSetting("Next 7 Days", "Background color for the 'Next 7 Days' task group.", "taskGroupColorNext7Days");
-        this.createRgbaColorSetting("Future", "Background color for 'Future' task group.", "taskGroupColorFuture");
-        this.createRgbaColorSetting("No Due Date", "Background color for the 'No Due Date' task group.", "taskGroupColorNoDate");
-        this.createRgbaColorSetting("Tag", "Background color for task groups when grouped by tag.", "taskGroupColorTag");
+        this.createRgbaColorSetting(containerEl,"Overdue", "Background color for the 'Overdue' task group.", "taskGroupColorOverdue");
+        this.createRgbaColorSetting(containerEl,"Today", "Background color for the 'Today' task group.", "taskGroupColorToday");
+        this.createRgbaColorSetting(containerEl,"Tomorrow", "Background color for the 'Tomorrow' task group.", "taskGroupColorTomorrow");
+        this.createRgbaColorSetting(containerEl,"Next 7 Days", "Background color for the 'Next 7 Days' task group.", "taskGroupColorNext7Days");
+        this.createRgbaColorSetting(containerEl,"Future", "Background color for 'Future' task group.", "taskGroupColorFuture");
+        this.createRgbaColorSetting(containerEl,"No Due Date", "Background color for the 'No Due Date' task group.", "taskGroupColorNoDate");
+        this.createRgbaColorSetting(containerEl,"Tag", "Background color for task groups when grouped by tag.", "taskGroupColorTag");
     }
-} 
 
+    renderAboutTab() {
+        const containerEl = this.contentEl;
+        containerEl.createEl("h1", { text: "About Calendar Period Week Notes" });
+
+        containerEl.createEl("p", {
+            text: "This plugin provides two comprehensive calendar views together with an integrated panel containing a scratchpad area, notes, tasks, and assets."
+        });
+
+        new Setting(containerEl)
+            .setName("Support the Developer")
+            .setDesc("If you find this plugin useful, please consider supporting its development. It's greatly appreciated!")
+            .addButton(button => {
+                button
+                    .setButtonText("☕ Buy Me a Coffee")
+                    .setTooltip("https://buymeacoffee.com/fikte")
+                    .onClick(() => {
+                        // Make sure to replace "your-username" with your actual username!
+                        window.open("https://buymeacoffee.com/fikte");
+                    });
+                // This makes the button more prominent
+                button.buttonEl.addClass('mod-cta');
+                button.buttonEl.style.backgroundColor = '#FFDD00';
+                button.buttonEl.style.color = '#000000';
+                button.buttonEl.style.cursor = 'pointer';
+            });
+    }
+
+    async renderStartHereTab() {
+    const containerEl = this.contentEl;
+
+
+    // IMPORTANT: This multi-line string has no leading indentation.
+    const markdownContent =
+`# 🚀 Quick Start: Initial Setup
+
+---
+
+Welcome, to get the most out of this plugin, it's recommended to configure a few key settings to match your workflow.
+
+---
+
+## 1. Set Up Your Scratchpad Note
+The **Scratchpad** tab needs to point to a note file in your vault. By default, it looks for \`ScratchPad.md\` in your vault's root.
+- **Go to:** \`ScratchPad Tab\` and look for \`ScratchPage note path\`
+- **Action:** Set the **ScratchPad note path** to any note you prefer. If it doesn't exist, the plugin will create it for you.
+---
+## 2. Configure Your Daily Notes
+For calendar dots and click-to-open features to work, the plugin needs to know where your daily notes are.
+- **Go to:** \`Calendar Functional -> Daily Notes\`
+- **Action:** Set your **Daily Notes folder** and **Daily note format** to match your existing setup (e.g., \`YYYY-MM-DD\`).
+---
+## 3. Define Your Task Format
+This is the most important step for task management. For the plugin to recognize your tasks, they **must** use the \`📅\` emoji for due dates.
+
+**Due Dates:**
+\`\`\`markdown
+- [ ] My task with a due date 📅 2025-10-26
+- [ ] Review project notes #work 📅 2025-11-01
+\`\`\`
+
+**Completion Dates:**
+When you complete a task using the plugin, it will automatically add a completion marker (\`✅\`) and the date.
+\`\`\`markdown
+- [x] My completed task 📅 2025-10-26 ✅ 2025-09-19
+\`\`\`
+
+NOTE: If you do not use this Task format then you can toggle off the \`Tasks Tab\` in \`General Tab -> \`Tab Visibility\` section. 
+--- 
+## 4. (Optional) Set Your Period/Week Start Date
+If you plan to use the custom P/W calendar system (e.g., "P7W4"), you should set its starting point.
+- **Go to:** \`Calendar Functional -> Period/Week System\`
+- **Action:** Set the **Start of Period 1 Week 1** to a Sunday of your choice.
+`;
+    // Make sure to 'await' the renderer
+    await MarkdownRenderer.render(this.app, markdownContent, containerEl, '', this);
+    }
+}
 module.exports = PeriodMonthPlugin;
