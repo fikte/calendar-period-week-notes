@@ -1243,6 +1243,42 @@ body:has(.task-text:hover) .tooltip {
   margin-top: 0;
 }
 
+/* --- Pull to Refresh Indicator --- */
+.pm-refresh-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--icon-color);
+    z-index: 5;
+    opacity: 0;
+    transform: translateY(-50px) scale(0.7);
+    transition: transform 0.3s, opacity 0.3s;
+}
+.pm-refresh-indicator.is-pulling {
+    opacity: 0.8;
+}
+.pm-refresh-indicator.is-ready {
+    transform: translateY(0) scale(1);
+}
+
+.pm-refresh-indicator.is-refreshing .svg-icon {
+    animation: spin 1.2s linear infinite;
+}
+/* Re-use the spin animation from the refresh button */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+/* --- Mobile Keyboard Handling --- */
+.scratch-content.is-editing-mobile {
+    padding-bottom: 45vh; /* 45% of the visible screen height */
+}
+
 /* Colors for custom icons */
 .task-row .task-checkbox-symbol .svg-icon[data-lucide="map-pin"],
 .other-notes-popup-item .task-checkbox-symbol .svg-icon[data-lucide="map-pin"] { color: var(--text-accent) !important; }
@@ -1388,31 +1424,31 @@ class TemplateFileSuggest extends AbstractInputSuggest {
  * @returns {{period: number, week: number, weekSinceStart: number}} An object with the period, week, and total weeks since start.
  */
 function getPeriodWeek(date = new Date(), startOfPeriodsOverride) {
-    const defaultStartString = "2025-03-02";
-    let startString = startOfPeriodsOverride || defaultStartString;
+  const defaultStartString = "2025-03-02";
+  let startString = startOfPeriodsOverride || defaultStartString;
 
-    let startMoment = moment(startString, "YYYY-MM-DD", true);
+  let startMoment = moment(startString, "YYYY-MM-DD", true);
 
-    if (!startMoment.isValid()) {
-        console.warn(
-            `[Calendar Period Week Notes] Invalid "Start of Period 1" date format: "${startString}". ` +
-            `It must be YYYY-MM-DD. Falling back to default date ${defaultStartString}.`
-        );
-        startMoment = moment(defaultStartString, "YYYY-MM-DD", true);
-    }
+  if (!startMoment.isValid()) {
+    console.warn(
+      `[Calendar Period Week Notes] Invalid "Start of Period 1" date format: "${startString}". ` +
+      `It must be YYYY-MM-DD. Falling back to default date ${defaultStartString}.`
+    );
+    startMoment = moment(defaultStartString, "YYYY-MM-DD", true);
+  }
     
     // Use moment's built-in diff method to correctly calculate the number of
     // calendar days. This automatically handles Daylight Saving Time and other offsets.
     const daysSinceStart = moment(date).startOf('day').diff(startMoment.startOf('day'), 'days');
     // --- FIX END ---
 
-    const weekNumber = Math.floor(daysSinceStart / 7);
-    const periodIndex = Math.floor(weekNumber / 4);
+  const weekNumber = Math.floor(daysSinceStart / 7);
+  const periodIndex = Math.floor(weekNumber / 4);
     
-    const period = ((periodIndex % 13) + 13) % 13 + 1;
-    const week = ((weekNumber % 4) + 4) % 4 + 1;
+  const period = ((periodIndex % 13) + 13) % 13 + 1;
+  const week = ((weekNumber % 4) + 4) % 4 + 1;
 
-    return { period, week, weekSinceStart: weekNumber + 1 };
+  return { period, week, weekSinceStart: weekNumber + 1 };
 }
 
 /**
@@ -1439,6 +1475,11 @@ class PeriodMonthView extends ItemView {
     constructor(leaf, plugin) {
         super(leaf);
         this.plugin = plugin;
+
+        //pull down to fresh
+        this.taskPullStartY = 0;
+        this.taskPullDistance = 0;
+        this.isTaskPulling = false;
 
         // --- State Management ---
         this.displayedMonth = new Date(); // The month currently shown in the calendar.
@@ -1467,6 +1508,8 @@ class PeriodMonthView extends ItemView {
         this.tasksByDate = new Map();
         this.taskCache = new Map(); // Caches task content of files to detect changes.
         this.isAssetsGridView = this.plugin.settings.assetsDefaultView === 'grid';
+        this.unusedAssetPathsCache = new Set();    
+        this.isUnusedAssetCacheValid = false;
         
         // --- UI and Event Handling ---
         this.scratchWrapperEl = null;
@@ -1475,6 +1518,7 @@ class PeriodMonthView extends ItemView {
         this.hideTimeout = null;
         this.popupEl = null;
         this.taskRefreshDebounceTimer = null;
+        this.notesRefreshDebounceTimer = null;
         this.calendarRefreshDebounceTimer = null;
         this.titleUpdateTimeout = null;
         //this.isAssetsGridView = false;
@@ -1594,6 +1638,18 @@ class PeriodMonthView extends ItemView {
             default:
                 return 'var(--text-normal)'; // Default color for arrows, etc.
         }
+    }
+
+    handleViewportResize() {
+        // This logic should only run on mobile
+        if (!this.app.isMobile) return;
+
+        // A threshold of 200px is a safe bet to assume the keyboard is open.
+        // We compare the total window height with the currently visible area's height.
+        const keyboardVisible = window.innerHeight - window.visualViewport.height > 200;
+
+        // Toggle the class on the main plugin container
+        this.containerEl.firstElementChild.classList.toggle('keyboard-visible', keyboardVisible);
     }
 
     // ADD THIS ENTIRE NEW METHOD TO YOUR PeriodMonthView CLASS
@@ -1717,16 +1773,16 @@ class PeriodMonthView extends ItemView {
     }
     
     generateMonthGrid(dateForMonth, targetBodyEl) {
-        const { settings } = this.plugin;
-        const today = new Date();
-        const year = dateForMonth.getFullYear();
-        const month = dateForMonth.getMonth();
-        const firstDayOfMonth = new Date(year, month, 1);
-        const folder = settings.dailyNotesFolder || "";
-        const format = settings.dailyNoteDateFormat || "YYYY-MM-DD";
-        const existingNotes = new Set(this.app.vault.getMarkdownFiles().filter(file => !folder || file.path.startsWith(folder + "/")).map(file => file.basename));
-        
-        // This new logic correctly calculates the first day to show on the calendar
+    const { settings } = this.plugin;
+    const today = new Date();
+    const year = dateForMonth.getFullYear();
+    const month = dateForMonth.getMonth();
+    const firstDayOfMonth = new Date(year, month, 1);
+    const folder = settings.dailyNotesFolder || "";
+    const format = settings.dailyNoteDateFormat || "YYYY-MM-DD";
+    const existingNotes = new Set(this.app.vault.getMarkdownFiles().filter(file => !folder || file.path.startsWith(folder + "/")).map(file => file.basename));
+
+    // This new logic correctly calculates the first day to show on the calendar
         const startDayNumber = this.plugin.settings.weekStartDay === 'monday' ? 1 : 0; // Mon=1, Sun=0
         moment.updateLocale('en', { week: { dow: startDayNumber } });
 
@@ -1740,199 +1796,199 @@ class PeriodMonthView extends ItemView {
         let currentDay = new Date(firstDayOfMonth);
         currentDay.setDate(firstDayOfMonth.getDate() - diff);
 
-        const requiredRows = 6;
-        for (let i = 0; i < requiredRows; i++) {
-            const row = targetBodyEl.createEl("tr");
+        const requiredRows = 6;
+        for (let i = 0; i < requiredRows; i++) {
+            const row = targetBodyEl.createEl("tr");
 
-            if (settings.highlightCurrentWeek) {
-                const todayMoment = moment();
-                const startOfWeekMoment = moment(currentDay);
-                if (todayMoment.weekYear() === startOfWeekMoment.weekYear() && todayMoment.week() === startOfWeekMoment.week()) {
-                    row.addClass('current-week-row');
-                }
-            }
+                if (settings.highlightCurrentWeek) {
+            const todayMoment = moment();
+            const startOfWeekMoment = moment(currentDay);
+            if (todayMoment.weekYear() === startOfWeekMoment.weekYear() && todayMoment.week() === startOfWeekMoment.week()) {
+                row.addClass('current-week-row');
+            }
+        }
 
-            const weekMoment = moment(new Date(currentDay));
-            const isoWeek = weekMoment.isoWeek();
-            const isoYear = weekMoment.isoWeekYear();
-            const isoMonth = weekMoment.month();
-            const periodWeekData = getPeriodWeek(new Date(currentDay), settings.startOfPeriod1Date);
-            
-            const dateInfoForWeek = {
-                year: isoYear,
-                month: isoMonth,
-                period: periodWeekData.period,
-                week: periodWeekData.week,
-                calendarWeek: isoWeek,
-                weekSinceStart: periodWeekData.weekSinceStart
-            };
+        const weekMoment = moment(new Date(currentDay));
+          const isoWeek = weekMoment.isoWeek();
+          const isoYear = weekMoment.isoWeekYear();
+          const isoMonth = weekMoment.month();
+          const periodWeekData = getPeriodWeek(new Date(currentDay), settings.startOfPeriod1Date);
+    
+          const dateInfoForWeek = {
+            year: isoYear,
+            month: isoMonth,
+            period: periodWeekData.period,
+            week: periodWeekData.week,
+            calendarWeek: isoWeek,
+            weekSinceStart: periodWeekData.weekSinceStart
+          };
 
-            const clickHandler = () => {
-                this.openWeeklyNote(dateInfoForWeek);
-            };
+          const clickHandler = () => {
+            this.openWeeklyNote(dateInfoForWeek);
+          };
 
-            let weeklyNoteExists = false;
-            if (settings.enableWeeklyNotes) {
-                const pweek = ((dateInfoForWeek.weekSinceStart - 1) % 52) + 1;
-                const replacements = {
-                    YYYY: dateInfoForWeek.year,
-                    MM: String(dateInfoForWeek.month+1).padStart(2, '0'),
-                    PN: "P" + dateInfoForWeek.period,
-                    PW: "W" + dateInfoForWeek.week,
-                    WKP: String(pweek).padStart(2, '0'),
-                    WKC: String(dateInfoForWeek.calendarWeek).padStart(2, '0')
-                };
-                const expectedFileName = settings.weeklyNoteFormat.replace(/YYYY|WKP|WKC|MM|PN|PW/g, match => replacements[match]);
-                const expectedPath = `${settings.weeklyNoteFolder}/${expectedFileName}.md`;
-                weeklyNoteExists = this.existingWeeklyNotes.has(expectedPath);
-            }
+          let weeklyNoteExists = false;
+          if (settings.enableWeeklyNotes) {
+            const pweek = ((dateInfoForWeek.weekSinceStart - 1) % 52) + 1;
+            const replacements = {
+              YYYY: dateInfoForWeek.year,
+              MM: String(dateInfoForWeek.month+1).padStart(2, '0'),
+              PN: "P" + dateInfoForWeek.period,
+              PW: "W" + dateInfoForWeek.week,
+              WKP: String(pweek).padStart(2, '0'),
+              WKC: String(dateInfoForWeek.calendarWeek).padStart(2, '0')
+            };
+            const expectedFileName = settings.weeklyNoteFormat.replace(/YYYY|WKP|WKC|MM|PN|PW/g, match => replacements[match]);
+            const expectedPath = `${settings.weeklyNoteFolder}/${expectedFileName}.md`;
+            weeklyNoteExists = this.existingWeeklyNotes.has(expectedPath);
+          }
 
-            if (settings.showPWColumn) {
-                const pwCell = row.createEl("td", { cls: "pw-label-cell" });
-                const pwContent = pwCell.createDiv({ cls: "day-content" });
-                pwContent.createDiv({ cls: "day-number" }).setText(this.formatPW(periodWeekData.period, periodWeekData.week));
-                
-                pwCell.style.cursor = "pointer";
-                if (weeklyNoteExists && settings.showWeeklyNoteDot && !settings.showWeekNumbers) {
-                    const dotsContainer = pwContent.createDiv({ cls: 'dots-container' });
-                    dotsContainer.createDiv({ cls: 'calendar-dot weekly-note-dot' });
-                }
-                pwCell.addEventListener('click', clickHandler);
-                pwCell.addEventListener('mouseenter', () => { if (this.plugin.settings.enableRowHighlight) { const highlightColor = document.body.classList.contains('theme-dark') ? this.plugin.settings.rowHighlightColorDark : this.plugin.settings.rowHighlightColorLight; row.style.backgroundColor = highlightColor; } });
-                pwCell.addEventListener('mouseleave', () => { row.style.backgroundColor = ''; });
-            }
+          if (settings.showPWColumn) {
+            const pwCell = row.createEl("td", { cls: "pw-label-cell" });
+                    const pwContent = pwCell.createDiv({ cls: "day-content" });
+                    pwContent.createDiv({ cls: "day-number" }).setText(this.formatPW(periodWeekData.period, periodWeekData.week));
+                    
+            pwCell.style.cursor = "pointer";
+            if (weeklyNoteExists && settings.showWeeklyNoteDot && !settings.showWeekNumbers) {
+              const dotsContainer = pwContent.createDiv({ cls: 'dots-container' });
+              dotsContainer.createDiv({ cls: 'calendar-dot weekly-note-dot' });
+            }
+            pwCell.addEventListener('click', clickHandler);
+            pwCell.addEventListener('mouseenter', () => { if (this.plugin.settings.enableRowHighlight) { const highlightColor = document.body.classList.contains('theme-dark') ? this.plugin.settings.rowHighlightColorDark : this.plugin.settings.rowHighlightColorLight; row.style.backgroundColor = highlightColor; } });
+            pwCell.addEventListener('mouseleave', () => { row.style.backgroundColor = ''; });
+          }
 
-            if (settings.showWeekNumbers) {
-                const weekNum = settings.weekNumberType === 'period' ? periodWeekData.weekSinceStart : isoWeek;
-                const weekCell = row.createEl("td", { cls: "week-number-cell" });
-                const weekContent = weekCell.createDiv({ cls: "day-content" });
-                weekContent.createDiv({ cls: "day-number" }).setText(weekNum.toString());
-                
-                weekCell.style.cursor = "pointer";
-                if (weeklyNoteExists && settings.showWeeklyNoteDot) {
-                    const dotsContainer = weekContent.createDiv({ cls: 'dots-container' });
-                    dotsContainer.createDiv({ cls: 'calendar-dot weekly-note-dot' });
-                }
-                weekCell.addEventListener('click', clickHandler);
-                weekCell.addEventListener('mouseenter', () => { if (this.plugin.settings.enableRowHighlight) { const highlightColor = document.body.classList.contains('theme-dark') ? this.plugin.settings.rowHighlightColorDark : this.plugin.settings.rowHighlightColorLight; row.style.backgroundColor = highlightColor; } });
-                weekCell.addEventListener('mouseleave', () => { row.style.backgroundColor = ''; });
-            }
+          if (settings.showWeekNumbers) {
+            const weekNum = settings.weekNumberType === 'period' ? periodWeekData.weekSinceStart : isoWeek;
+            const weekCell = row.createEl("td", { cls: "week-number-cell" });
+                    const weekContent = weekCell.createDiv({ cls: "day-content" });
+                    weekContent.createDiv({ cls: "day-number" }).setText(weekNum.toString());
+                    
+            weekCell.style.cursor = "pointer";
+            if (weeklyNoteExists && settings.showWeeklyNoteDot) {
+              const dotsContainer = weekContent.createDiv({ cls: 'dots-container' });
+              dotsContainer.createDiv({ cls: 'calendar-dot weekly-note-dot' });
+            }
+            weekCell.addEventListener('click', clickHandler);
+            weekCell.addEventListener('mouseenter', () => { if (this.plugin.settings.enableRowHighlight) { const highlightColor = document.body.classList.contains('theme-dark') ? this.plugin.settings.rowHighlightColorDark : this.plugin.settings.rowHighlightColorLight; row.style.backgroundColor = highlightColor; } });
+            weekCell.addEventListener('mouseleave', () => { row.style.backgroundColor = ''; });
+          }
 
-            for (let d = 0; d < 7; d++) {
-                const dayDate = new Date(currentDay);
-                dayDate.setDate(currentDay.getDate() + d);
-                const isOtherMonth = dayDate.getMonth() !== month;
-                const cell = row.createEl("td");
-                const contentDiv = cell.createDiv("day-content");
-                const dayNumber = contentDiv.createDiv("day-number");
-                dayNumber.textContent = dayDate.getDate().toString();
-                const dateKey = moment(dayDate).format("YYYY-MM-DD");
-                const tasksForDay = this.tasksByDate.get(dateKey) || [];
-                const taskCount = tasksForDay.length;
-                
-                const isToday = isSameDay(dayDate, today)
-                if (taskCount > 0) {
-                    if (settings.taskIndicatorStyle === 'badge') {
-                        contentDiv.createDiv({ cls: 'task-count-badge', text: taskCount.toString() });
-                    } else if (settings.taskIndicatorStyle === 'heatmap') {
-                        const shouldApplyHeatmap = !(isToday && settings.todayHighlightStyle === 'cell');
-                        if (shouldApplyHeatmap) {
-                        
-                            const startColor = parseRgbaString(settings.taskHeatmapStartColor);
-                            const midColor = parseRgbaString(settings.taskHeatmapMidColor);
-                            const endColor = parseRgbaString(settings.taskHeatmapEndColor);
-                            const midPoint = settings.taskHeatmapMidpoint;
-                            const maxPoint = settings.taskHeatmapMaxpoint;
-                            if (startColor && midColor && endColor) {
-                                let finalColor;
-                                if (taskCount >= maxPoint) { finalColor = settings.taskHeatmapEndColor; }
-                                else if (taskCount >= midPoint) { const factor = (taskCount - midPoint) / (maxPoint - midPoint); finalColor = blendRgbaColors(midColor, endColor, factor); }
-                                else { const divisor = midPoint - 1; const factor = divisor > 0 ? (taskCount - 1) / divisor : 1; finalColor = blendRgbaColors(startColor, midColor, factor); }
-                                contentDiv.style.backgroundColor = finalColor;
-                                // This creates a border using the theme's background color, making a clean gap.
-                                contentDiv.style.border = `0.5px solid var(--background-secondary)`;
-                                // A slightly smaller radius makes it look neatly inset.
-                                contentDiv.style.borderRadius = '8px'; 
-                                contentDiv.style.boxSizing = 'border-box';
-                            
-                            }
-                        }
-                    }
-                }
-                if (isOtherMonth) dayNumber.addClass("day-number-other-month");
-                if (isSameDay(dayDate, today)) cell.addClass("today-cell");
-                const createdFiles = this.createdNotesMap.get(dateKey) || [];
-                const modifiedFiles = this.modifiedNotesMap.get(dateKey) || [];
-                const dailyNoteFileName = formatDate(dayDate, format);
-                const dailyNoteExists = existingNotes.has(dailyNoteFileName);
-                const dotsContainer = contentDiv.createDiv({ cls: 'dots-container' });
-                if (dailyNoteExists) { dotsContainer.createDiv({ cls: "period-month-daily-note-dot calendar-dot" }); }
-                if (settings.showOtherNoteDot && createdFiles.length > 0) { dotsContainer.createDiv({ cls: 'other-note-dot calendar-dot' }); }
-                if (settings.showModifiedFileDot && modifiedFiles.length > 0) { dotsContainer.createDiv({ cls: 'modified-file-dot calendar-dot' }); }
-                const assetsCreated = this.assetCreationMap.get(dateKey) || [];
-                if (settings.showAssetDot && assetsCreated.length > 0) { dotsContainer.createDiv({ cls: 'asset-dot calendar-dot' }); }
-                if (settings.showTaskDot && taskCount > 0) { dotsContainer.createDiv({ cls: 'task-dot calendar-dot' }); }
-                const hasPopupContent = dailyNoteExists || tasksForDay.length > 0 || createdFiles.length > 0 || modifiedFiles.length > 0 || assetsCreated.length > 0;
-                if (hasPopupContent) {
-                    cell.addEventListener('mouseenter', () => {
-                        this.hideFilePopup();
-                        clearTimeout(this.hideTimeout);
-                        this.hoverTimeout = setTimeout(() => {
-                            const dailyNoteFile = dailyNoteExists ? this.app.vault.getAbstractFileByPath(folder ? `${folder}/${dailyNoteFileName}.md` : `${dailyNoteFileName}.md`) : null;
-                            const dataToShow = {
-                                tasks: tasksForDay,
-                                daily: dailyNoteFile ? [dailyNoteFile] : [],
-                                created: settings.showOtherNoteDot ? createdFiles : [],
-                                modified: settings.showModifiedFileDot ? modifiedFiles : [],
-                                assets: settings.showAssetDot ? assetsCreated : [],
-                            };
-                            this.showFilePopup(cell, dataToShow);
-                        }, this.plugin.settings.otherNoteHoverDelay);
-                    });
-                    cell.addEventListener('mouseleave', () => {
-                        clearTimeout(this.hoverTimeout);
-                        this.hideTimeout = setTimeout(() => this.hideFilePopup(), this.plugin.settings.popupHideDelay);
-                    });
-                }
-                cell.addEventListener("click", () => this.openDailyNote(dayDate));
-                cell.addEventListener('mouseenter', () => {
-                    if (!this.plugin.settings.enableRowToDateHighlight) return;
-                    const highlightColor = document.body.classList.contains('theme-dark')
-                    ? this.plugin.settings.rowHighlightColorDark
-                    : this.plugin.settings.rowHighlightColorLight;
-                    const row = cell.parentElement;
-                    const allRows = Array.from(row.parentElement.children);
-                    const rowIndex = allRows.indexOf(row);
-                    const colIndex = Array.from(row.children).indexOf(cell);
-                    const table = cell.closest('table');
-                    for (let j = 0; j <= colIndex; j++) {
-                        const cellToHighlight = row.children[j];
-                        if (cellToHighlight) cellToHighlight.style.backgroundColor = highlightColor;
-                    }
-                    for (let i = 0; i < rowIndex; i++) { 
-                        const priorRow = allRows[i];
-                        const cellToHighlight = priorRow.children[colIndex];
-                        if (cellToHighlight) cellToHighlight.style.backgroundColor = highlightColor;
-                    }
-                    if (table) {
-                        const headerRow = table.querySelector('thead tr');
-                        if (headerRow) {
-                            const headerCell = headerRow.children[colIndex];
-                            if (headerCell) headerCell.style.backgroundColor = highlightColor;
-                        }
-                    }
-                });
-                cell.addEventListener('mouseleave', () => {
-                    if (!this.plugin.settings.enableRowToDateHighlight) return;
-                    const table = cell.closest('table');
-                    if (table) {
-                        const allCells = table.querySelectorAll('tbody td, thead th');
-                        allCells.forEach(c => c.style.backgroundColor = '');
-                    }
-                });
-            }
-            currentDay.setDate(currentDay.getDate() + 7);
-        }
+          for (let d = 0; d < 7; d++) {
+            const dayDate = new Date(currentDay);
+            dayDate.setDate(currentDay.getDate() + d);
+            const isOtherMonth = dayDate.getMonth() !== month;
+            const cell = row.createEl("td");
+            const contentDiv = cell.createDiv("day-content");
+            const dayNumber = contentDiv.createDiv("day-number");
+            dayNumber.textContent = dayDate.getDate().toString();
+            const dateKey = moment(dayDate).format("YYYY-MM-DD");
+            const tasksForDay = this.tasksByDate.get(dateKey) || [];
+            const taskCount = tasksForDay.length;
+          
+            const isToday = isSameDay(dayDate, today)
+            if (taskCount > 0) {
+              if (settings.taskIndicatorStyle === 'badge') {
+                contentDiv.createDiv({ cls: 'task-count-badge', text: taskCount.toString() });
+              } else if (settings.taskIndicatorStyle === 'heatmap') {
+                const shouldApplyHeatmap = !(isToday && settings.todayHighlightStyle === 'cell');
+                if (shouldApplyHeatmap) {
+              
+                  const startColor = parseRgbaString(settings.taskHeatmapStartColor);
+                  const midColor = parseRgbaString(settings.taskHeatmapMidColor);
+                  const endColor = parseRgbaString(settings.taskHeatmapEndColor);
+                  const midPoint = settings.taskHeatmapMidpoint;
+                  const maxPoint = settings.taskHeatmapMaxpoint;
+                  if (startColor && midColor && endColor) {
+                    let finalColor;
+                    if (taskCount >= maxPoint) { finalColor = settings.taskHeatmapEndColor; }
+                    else if (taskCount >= midPoint) { const factor = (taskCount - midPoint) / (maxPoint - midPoint); finalColor = blendRgbaColors(midColor, endColor, factor); }
+                    else { const divisor = midPoint - 1; const factor = divisor > 0 ? (taskCount - 1) / divisor : 1; finalColor = blendRgbaColors(startColor, midColor, factor); }
+                    contentDiv.style.backgroundColor = finalColor;
+                                    // This creates a border using the theme's background color, making a clean gap.
+                                    contentDiv.style.border = `0.5px solid var(--background-secondary)`;
+                                    // A slightly smaller radius makes it look neatly inset.
+                                    contentDiv.style.borderRadius = '8px'; 
+                                    contentDiv.style.boxSizing = 'border-box';
+                  
+                  }
+                }
+              }
+            }
+            if (isOtherMonth) dayNumber.addClass("day-number-other-month");
+            if (isSameDay(dayDate, today)) cell.addClass("today-cell");
+            const createdFiles = this.createdNotesMap.get(dateKey) || [];
+            const modifiedFiles = this.modifiedNotesMap.get(dateKey) || [];
+            const dailyNoteFileName = formatDate(dayDate, format);
+            const dailyNoteExists = existingNotes.has(dailyNoteFileName);
+            const dotsContainer = contentDiv.createDiv({ cls: 'dots-container' });
+            if (dailyNoteExists) { dotsContainer.createDiv({ cls: "period-month-daily-note-dot calendar-dot" }); }
+            if (settings.showOtherNoteDot && createdFiles.length > 0) { dotsContainer.createDiv({ cls: 'other-note-dot calendar-dot' }); }
+            if (settings.showModifiedFileDot && modifiedFiles.length > 0) { dotsContainer.createDiv({ cls: 'modified-file-dot calendar-dot' }); }
+            const assetsCreated = this.assetCreationMap.get(dateKey) || [];
+            if (settings.showAssetDot && assetsCreated.length > 0) { dotsContainer.createDiv({ cls: 'asset-dot calendar-dot' }); }
+            if (settings.showTaskDot && taskCount > 0) { dotsContainer.createDiv({ cls: 'task-dot calendar-dot' }); }
+                    const hasPopupContent = dailyNoteExists || tasksForDay.length > 0 || createdFiles.length > 0 || modifiedFiles.length > 0 || assetsCreated.length > 0;
+            if (hasPopupContent) {
+              cell.addEventListener('mouseenter', () => {
+                this.hideFilePopup();
+                clearTimeout(this.hideTimeout);
+                this.hoverTimeout = setTimeout(() => {
+                  const dailyNoteFile = dailyNoteExists ? this.app.vault.getAbstractFileByPath(folder ? `${folder}/${dailyNoteFileName}.md` : `${dailyNoteFileName}.md`) : null;
+                  const dataToShow = {
+                    tasks: tasksForDay,
+                    daily: dailyNoteFile ? [dailyNoteFile] : [],
+                    created: settings.showOtherNoteDot ? createdFiles : [],
+                    modified: settings.showModifiedFileDot ? modifiedFiles : [],
+                    assets: settings.showAssetDot ? assetsCreated : [],
+                  };
+                  this.showFilePopup(cell, dataToShow);
+                }, this.plugin.settings.otherNoteHoverDelay);
+              });
+              cell.addEventListener('mouseleave', () => {
+                clearTimeout(this.hoverTimeout);
+                this.hideTimeout = setTimeout(() => this.hideFilePopup(), this.plugin.settings.popupHideDelay);
+              });
+            }
+            cell.addEventListener("click", () => this.openDailyNote(dayDate));
+            cell.addEventListener('mouseenter', () => {
+              if (!this.plugin.settings.enableRowToDateHighlight) return;
+              const highlightColor = document.body.classList.contains('theme-dark')
+              ? this.plugin.settings.rowHighlightColorDark
+              : this.plugin.settings.rowHighlightColorLight;
+              const row = cell.parentElement;
+              const allRows = Array.from(row.parentElement.children);
+              const rowIndex = allRows.indexOf(row);
+              const colIndex = Array.from(row.children).indexOf(cell);
+              const table = cell.closest('table');
+              for (let j = 0; j <= colIndex; j++) {
+                const cellToHighlight = row.children[j];
+                if (cellToHighlight) cellToHighlight.style.backgroundColor = highlightColor;
+              }
+              for (let i = 0; i < rowIndex; i++) { 
+                const priorRow = allRows[i];
+                const cellToHighlight = priorRow.children[colIndex];
+                if (cellToHighlight) cellToHighlight.style.backgroundColor = highlightColor;
+              }
+              if (table) {
+                const headerRow = table.querySelector('thead tr');
+                if (headerRow) {
+                  const headerCell = headerRow.children[colIndex];
+                  if (headerCell) headerCell.style.backgroundColor = highlightColor;
+                }
+              }
+            });
+            cell.addEventListener('mouseleave', () => {
+              if (!this.plugin.settings.enableRowToDateHighlight) return;
+              const table = cell.closest('table');
+              if (table) {
+                const allCells = table.querySelectorAll('tbody td, thead th');
+                allCells.forEach(c => c.style.backgroundColor = '');
+              }
+            });
+          }
+          currentDay.setDate(currentDay.getDate() + 7);
+        }
         if (settings.highlightCurrentWeek) {
             const highlightedRow = targetBodyEl.querySelector('.current-week-row');
             if (highlightedRow) {
@@ -1946,7 +2002,7 @@ class PeriodMonthView extends ItemView {
                 });
             }
         }
-    }
+  }
 
     /**
      * Finds all markdown files that link to or embed the given asset file.
@@ -2425,7 +2481,6 @@ class PeriodMonthView extends ItemView {
             this.addTaskBtn.addEventListener("click", () => this.addNewTaskToScratchpad());
         }
     
-    
         if (this.isScratchpadPreview && this.plugin.settings.scratchpad?.showPreviewToggle) {
             // --- CONFIGURE UI FOR PREVIEW MODE ---
             if (this.scratchpadViewToggleBtn) {
@@ -2471,10 +2526,23 @@ class PeriodMonthView extends ItemView {
             this.scratchHighlighterEl = this.scratchWrapperEl.createDiv({ cls: "scratch-base scratch-highlighter" });
             this.noteTextarea = this.scratchWrapperEl.createEl("textarea", { cls: "scratch-base scratch-content" });
             
+            if (this.app.isMobile) {
+                this.noteTextarea.addEventListener('focus', () => {
+                    // When you tap the text area, add the class to create the padding.
+                    this.noteTextarea.classList.add('is-editing-mobile');
+                });
+
+                this.noteTextarea.addEventListener('blur', () => {
+                    // When you tap away, remove the class to restore the normal view.
+                    this.noteTextarea.classList.remove('is-editing-mobile');
+                });
+            }
+
             this.noteTextarea.value = this.noteText;
             if (wasFocused) this.noteTextarea.focus();
             this.updateScratchpadHighlights();
-            
+        
+    
             // Save content on input.
             this.noteTextarea.addEventListener("input", async () => {
                 this.noteText = this.noteTextarea.value;
@@ -2584,31 +2652,87 @@ class PeriodMonthView extends ItemView {
         this.registerEvent(this.app.vault.on("create", createOrModifyHandler));
         this.registerEvent(this.app.vault.on("delete", deleteHandler));
         this.registerEvent(this.app.vault.on("rename", renameHandler));
-    
-        // --- THIS IS THE FINAL, WORKING CLICK HANDLER ---
-        /*this.registerDomEvent(this.containerEl, 'click', (event) => {
-            const header = event.target.closest('.task-group-header');
-            if (header) {
-                const groupContainer = header.closest('.task-group-container');
-                if (groupContainer) {
-                    const taskListWrapper = groupContainer.querySelector('.task-list-wrapper');
-                    if (taskListWrapper) {
-                        // Check if the group is currently collapsed or in the process of collapsing
-                        const isCollapsed = groupContainer.classList.contains('is-collapsed');
-                        
-                        // Toggle the state and run the correct animation
-                        if (isCollapsed) {
-                            groupContainer.classList.remove('is-collapsed');
-                            this.animateTaskGroup(taskListWrapper, true); // Expand
-                        } else {
-                            groupContainer.classList.add('is-collapsed');
-                            this.animateTaskGroup(taskListWrapper, false); // Collapse
-                        }
-                    }
-                }
+
+        // Event listener to invalidate the cache on any change
+        this.registerEvent(this.app.vault.on('all', () => {
+            this.isUnusedAssetCacheValid = false;
+        }));
+
+
+        const PULL_THRESHOLD = 70; // How far the user needs to pull down to trigger a refresh
+
+        const resetPullStyles = () => {
+            this.taskRefreshIndicator.removeClass('is-ready', 'is-pulling', 'is-refreshing');
+            this.tasksContentEl.style.transform = `translateY(0px)`;
+            this.taskRefreshIndicator.style.transform = `translateY(-50px) scale(0.7)`;
+            setIcon(this.taskRefreshIndicator, 'arrow-down');
+        };
+
+        this.registerDomEvent(this.tasksContentEl, 'touchstart', (e) => {
+            if (this.tasksContentEl.scrollTop === 0) {
+                this.isTaskPulling = true;
+                this.taskPullStartY = e.touches[0].clientY;
             }
-        });*/
-        
+        }, { passive: false });
+
+        this.registerDomEvent(this.tasksContentEl, 'touchmove', (e) => {
+        if (!this.isTaskPulling) return;
+
+            const currentY = e.touches[0].clientY;
+            // We only care about the downward pull distance from the start
+            this.taskPullDistance = Math.max(0, currentY - this.taskPullStartY);
+
+            // This is the crucial check:
+            // Only interfere if the list is scrolled to the top AND the user is pulling down.
+            if (this.tasksContentEl.scrollTop === 0 && this.taskPullDistance > 0) {
+                // Prevent the browser from scrolling the page
+                e.preventDefault();
+
+                const pullRatio = Math.min(this.taskPullDistance, PULL_THRESHOLD);
+                this.tasksContentEl.style.transform = `translateY(${pullRatio}px)`;
+                
+                this.taskRefreshIndicator.addClass('is-pulling');
+                this.taskRefreshIndicator.style.transform = `translateY(${pullRatio - 50}px) scale(0.7)`;
+
+                if (this.taskPullDistance > PULL_THRESHOLD) {
+                    this.taskRefreshIndicator.addClass('is-ready');
+                    setIcon(this.taskRefreshIndicator, 'check');
+                } else {
+                    this.taskRefreshIndicator.removeClass('is-ready');
+                    setIcon(this.taskRefreshIndicator, 'arrow-down');
+                }
+            } else {
+                // If we've started scrolling down the list, stop tracking the pull
+                this.isTaskPulling = false;
+            }
+
+        }, { passive: false });
+
+        this.registerDomEvent(this.tasksContentEl, 'touchend', async (e) => {
+            if (!this.isTaskPulling) return;
+            this.isTaskPulling = false;
+
+            if (this.taskPullDistance > PULL_THRESHOLD) {
+                // Trigger the refresh
+                this.taskRefreshIndicator.addClass('is-refreshing', 'is-ready');
+                setIcon(this.taskRefreshIndicator, 'loader');
+                
+                await this.populateTasks();
+                
+                // Reset styles after refresh is complete
+                setTimeout(() => {
+                    resetPullStyles();
+                }, 300); // Small delay for user to see the end of the spin
+
+            } else {
+                // Snap back if not pulled far enough
+                resetPullStyles();
+            }
+            
+            this.taskPullDistance = 0;
+            
+        });
+    
     }
 
     /**
@@ -2650,7 +2774,16 @@ class PeriodMonthView extends ItemView {
                 if (oldTasks.length !== newTasks.length || oldTasks.join('\n') !== newTasks.join('\n')) {
                     await this.populateTasks();
                 }
-            }, 3500);
+            }, 500);
+        }
+
+        // If the Notes/Pinned tab is active, refresh it.
+        if (this.activeTab === 'notes') {
+            // A small debounce to prevent excessive re-renders while typing.
+            clearTimeout(this.notesRefreshDebounceTimer);
+            this.notesRefreshDebounceTimer = setTimeout(() => {
+                this.populateNotes();
+            }, 300); // 300ms is a responsive delay
         }
 
         // If the Assets tab is active, refresh it.
@@ -2662,9 +2795,56 @@ class PeriodMonthView extends ItemView {
         // Debounce the calendar refresh to avoid race conditions with file system writes
         clearTimeout(this.calendarRefreshDebounceTimer);
         this.calendarRefreshDebounceTimer = setTimeout(async () => {
-            await this.buildTasksByDateMap();
+            await this.updateTasksForFile(file);
             this.renderCalendar();
         }, 400); // A 400ms delay is enough to ensure file is saved
+    }
+
+    // Add this new method to your PeriodMonthView class
+    async updateTasksForFile(file) {
+        if (!file || !(file instanceof TFile) || !file.path.toLowerCase().endsWith('.md')) {
+            // If no file, or it's not markdown, do a full rebuild just in case.
+            await this.buildTasksByDateMap();
+            return;
+        }
+
+        const dueDateRegex = /📅\s*(\d{4}-\d{2}-\d{2})/;
+        const taskLineRegex = /^\s*(?:-|\d+\.)\s*\[([^xX])\]\s*(.*)/;
+
+        // 1. Remove all old tasks associated with this file path
+        for (const [dateKey, tasks] of this.tasksByDate.entries()) {
+            const remainingTasks = tasks.filter(task => task.file.path !== file.path);
+            if (remainingTasks.length > 0) {
+                this.tasksByDate.set(dateKey, remainingTasks);
+            } else {
+                this.tasksByDate.delete(dateKey); // Clean up empty entries
+            }
+        }
+
+        // 2. Add new tasks from the modified file
+        const content = await this.app.vault.cachedRead(file);
+        const lines = content.split('\n');
+        lines.forEach((line, index) => {
+            const taskMatch = line.match(taskLineRegex);
+            if (taskMatch) {
+                const status = taskMatch[1];
+                const taskText = taskMatch[2];
+                const dateMatch = taskText.match(dueDateRegex);
+
+                if (dateMatch) {
+                    const dateKey = dateMatch[1];
+                    if (!this.tasksByDate.has(dateKey)) {
+                        this.tasksByDate.set(dateKey, []);
+                    }
+                    this.tasksByDate.get(dateKey).push({
+                        text: taskText.trim(),
+                        file: file,
+                        lineNumber: index,
+                        status: status
+                    });
+                }
+            }
+        });
     }
 
     /**
@@ -2952,7 +3132,14 @@ class PeriodMonthView extends ItemView {
         this.assetsContentEl.empty();
       
         const settings = this.plugin.settings;
-        const unusedAssetPaths = settings.showUnusedAssetsIndicator ? await this.getUnusedAssetPaths() : new Set();
+        let unusedAssetPaths = new Set();
+        if (settings.showUnusedAssetsIndicator) {
+            if (!this.isUnusedAssetCacheValid) {
+                this.unusedAssetPathsCache = await this.getUnusedAssetPaths();
+                this.isUnusedAssetCacheValid = true;
+            }
+            unusedAssetPaths = this.unusedAssetPathsCache;
+        }
         const cutoff = moment().startOf('day').subtract(settings.assetsLookbackDays - 1, 'days').valueOf();
         const ignoreFolders = (settings.assetIgnoreFolders || []).map(f => f.toLowerCase().endsWith('/') ? f.toLowerCase() : f.toLowerCase() + '/');
         const hiddenTypes = (settings.hiddenAssetTypes || "").split(',').map(ext => ext.trim().toLowerCase()).filter(ext => ext.length > 0);
@@ -2989,7 +3176,7 @@ class PeriodMonthView extends ItemView {
         ];
 
         if (filteredAssets.length === 0) {
-            this.assetsContentEl.createDiv({ text: 'No assets found.', cls: 'task-group-empty-message' });
+            this.assetsContentEl.createDiv({ text: 'No assets found', cls: 'task-group-empty-message' });
             return;
         }
 
@@ -3147,6 +3334,52 @@ class PeriodMonthView extends ItemView {
         });
     }
 
+    renderNoteItem(file, searchInputEl) {
+        const settings = this.plugin.settings;
+        const row = createDiv("note-row");
+        
+        // Create a function for the tooltip to keep the code clean
+        const createTooltipText = (file) => {
+            const ctime = new Date(file.stat.ctime).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
+            const mtime = new Date(file.stat.mtime).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
+            const size = (file.stat.size / 1024).toFixed(2) + ' KB';
+            const path = file.path;
+            return `Created: ${ctime}\nModified: ${mtime}\nSize: ${size}\nPath: ${path}`;
+        };
+
+        const titleWrapper = row.createDiv({ cls: 'note-title-wrapper' });
+        if (settings.showNoteTooltips) {
+            titleWrapper.setAttribute('aria-label', createTooltipText(file));
+        }
+
+        if (settings.showNoteStatusDots) {
+            const dot = titleWrapper.createDiv({ cls: `note-status-dot` });
+            if (this.isDailyNote(file)) dot.style.backgroundColor = settings.dailyNoteDotColor;
+            else if (this.isWeeklyNote(file)) dot.style.backgroundColor = settings.weeklyNoteDotColor;
+            else dot.addClass(isSameDay(new Date(file.stat.ctime), new Date(file.stat.mtime)) ? "note-status-dot-created" : "note-status-dot-modified");
+        }
+
+        const titlePathWrapper = titleWrapper.createDiv({ cls: 'note-title-path-wrapper' });
+        titlePathWrapper.createDiv({ text: file.basename, cls: "note-title" });
+        if (file.parent && file.parent.path !== '/') {
+            titlePathWrapper.createDiv({ text: file.parent.path, cls: 'note-path' });
+        }
+
+        row.createDiv({ text: formatDateTime(new Date(file.stat.mtime)), cls: "note-mod-date" });
+        
+        row.dataset.key = file.path; // Set a unique key for reconciliation
+
+        this.registerDomEvent(row, "click", () => {
+            const openInNewTab = settings.notesOpenAction === 'new-tab';
+            this.app.workspace.getLeaf(openInNewTab).openFile(file);
+        });
+
+        this.addKeydownListeners(row, searchInputEl);
+        this.addFileContextMenu(row, file, () => this.populateNotes());
+        
+        return row;
+    }
+
     /**
      * Gets the final, ordered list of tabs to display, combining user-defined order
      * with the full list of possible tabs to ensure none are missing.
@@ -3225,10 +3458,10 @@ class PeriodMonthView extends ItemView {
             });
             th.addEventListener('mouseleave', () => {
                 th.style.backgroundColor = ''; // Always clear the header's highlight
-                const rows = tableBody.querySelectorAll('tr');
-                rows.forEach(row => {
-                    const cell = row.children[colIndex];
-                    if (cell) {
+        const rows = tableBody.querySelectorAll('tr');
+        rows.forEach(row => {
+          const cell = row.children[colIndex];
+          if (cell) {
                         // Check if the cell is in the permanently highlighted row
                         if (this.plugin.settings.highlightCurrentWeek && row.classList.contains('current-week-row')) {
                             // If yes, restore the permanent highlight color
@@ -3241,7 +3474,7 @@ class PeriodMonthView extends ItemView {
                             cell.style.backgroundColor = '';
                         }
                     }
-                });
+        });
             });
         });
     }
@@ -3564,7 +3797,7 @@ class PeriodMonthView extends ItemView {
         collapseBtn.setAttribute("aria-label", "Toggle calendar visibility");
         
         setIcon(this.collapseBtn, this.isCalendarCollapsed ? "chevron-up" : "chevron-down");
-     
+   
         this.collapseBtn.addEventListener("click", () => {
             this.isCalendarCollapsed = !this.isCalendarCollapsed;
             this.containerEl.firstElementChild.classList.toggle("calendar-collapsed", this.isCalendarCollapsed);
@@ -3615,6 +3848,9 @@ class PeriodMonthView extends ItemView {
             this.assetsContentEl = tabWrapper.createDiv({ cls: "notes-container" });
             this.tasksContentEl = tabWrapper.createDiv({ cls: "tasks-container" });
             
+            this.taskRefreshIndicator = tabWrapper.createDiv({ cls: 'pm-refresh-indicator' });
+            setIcon(this.taskRefreshIndicator, 'arrow-down');
+
             // Function to handle switching between tabs.
             const switchTabs = (tab) => {
                 this.activeTab = tab;
@@ -3733,7 +3969,6 @@ class PeriodMonthView extends ItemView {
             this.generateMonthGrid(this.displayedMonth, this.calendarBodyEl);
         }
     }
-    
 
     /**
      * Shows a popup listing all notes, tasks, and assets associated with a specific day.
@@ -3925,10 +4160,18 @@ class PeriodMonthView extends ItemView {
     
         // --- (Logic for fetching notes remains the same) ---
         if (this.notesViewMode === 'pinned') {
-            const pinTag = `#${settings.pinTag.toLowerCase()}`;
+            const pinTagBody = `#${settings.pinTag.toLowerCase()}`;
+            const pinTagFrontmatter = settings.pinTag.toLowerCase();
             notesToShow = this.app.vault.getMarkdownFiles().filter(file => {
                 const cache = this.app.metadataCache.getFileCache(file);
-                return cache?.tags?.some(tag => tag.tag.toLowerCase() === pinTag);
+                if (!cache) return false;
+                if (cache.tags?.some(tag => tag.tag.toLowerCase() === pinTagBody)) return true;
+                const frontmatterTags = cache.frontmatter?.tags;
+                if (frontmatterTags) {
+                    if (Array.isArray(frontmatterTags)) return frontmatterTags.map(t => String(t).toLowerCase()).includes(pinTagFrontmatter);
+                    if (typeof frontmatterTags === 'string') return frontmatterTags.toLowerCase().split(/, ?/).includes(pinTagFrontmatter);
+                }
+                return false;
             }).sort((a, b) => a.basename.localeCompare(b.basename));
         } else {
             const cutoff = moment().subtract(settings.notesLookbackDays, 'days').valueOf();
@@ -3940,128 +4183,103 @@ class PeriodMonthView extends ItemView {
         const searchTerm = this.notesSearchTerm.toLowerCase();
         const filteredNotes = searchTerm ? notesToShow.filter(file => file.basename.toLowerCase().includes(searchTerm)) : notesToShow;
         const searchInputEl = this.notesSearchInputEl;
-    
-        // --- (Tooltip and Grouping logic remains the same) ---
-        const createTooltipText = (file) => {
-            const ctime = new Date(file.stat.ctime).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
-            const mtime = new Date(file.stat.mtime).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
-            const size = (file.stat.size / 1024).toFixed(2) + ' KB';
-            const path = file.path;
-            const tagsCache = this.app.metadataCache.getFileCache(file)?.tags;
-            let tags = "No tags";
-            if (tagsCache && tagsCache.length > 0) {
-               tags = [...new Set(tagsCache.map(t => t.tag))].join(' ');
+        
+        // --- NEW RECONCILIATION LOGIC ---
+        const existingNoteRows = new Map();
+        this.notesContentEl.querySelectorAll('.note-row').forEach(row => {
+            if (row.dataset.key) {
+                existingNoteRows.set(row.dataset.key, row);
             }
-            return `Created: ${ctime}\nModified: ${mtime}\nSize: ${size}\nPath: ${path}\nTags: ${tags}`;
-         };
-   
-         const addTooltip = (element, file) => {
-            if (this.plugin.settings.showNoteTooltips) {
-               element.setAttribute('aria-label', createTooltipText(file));
-            }
-         };
-        const groups = { today: [], yesterday: [], thisWeek: [], lastWeek: [], thisMonth: [], older: [] };
-        const now = moment();
-        filteredNotes.forEach(file => {
-            const modTime = moment(file.stat.mtime);
-            if (modTime.isSame(now, 'day')) groups.today.push(file);
-            else if (modTime.isSame(now.clone().subtract(1, 'day'), 'day')) groups.yesterday.push(file);
-            else if (modTime.isSame(now, 'week')) groups.thisWeek.push(file);
-            else if (modTime.isSame(now.clone().subtract(1, 'week'), 'week')) groups.lastWeek.push(file);
-            else if (modTime.isSame(now, 'month')) groups.thisMonth.push(file);
-            else groups.older.push(file);
         });
-        const groupOrder = [
-            { key: 'today', label: 'Today' }, { key: 'yesterday', label: 'Yesterday' },
-            { key: 'thisWeek', label: 'This Week' }, { key: 'lastWeek', label: 'Last Week' },
-            { key: 'thisMonth', label: 'This Month' }, { key: 'older', label: 'Older' },
-        ];
-    
-        // --- Corrected Rendering Logic ---
-        groupOrder.forEach(groupInfo => {
-            const notesInGroup = groups[groupInfo.key];
-            if (notesInGroup.length > 0) {
-                
-                const groupContainer = this.notesContentEl.createDiv({ cls: 'note-group-container' });
-                const isCollapsed = this.collapsedNoteGroups[groupInfo.key];
-                if (isCollapsed) groupContainer.addClass('is-collapsed');
-    
-                const header = groupContainer.createDiv({ cls: 'note-group-header' });
-                const headerContent = header.createDiv({ cls: 'note-group-header-content' });
-                
-                const collapseIcon = headerContent.createDiv({ cls: 'note-group-collapse-icon' });
-                setIcon(collapseIcon, 'chevron-down');
-                headerContent.createSpan({ text: groupInfo.label });
-                header.createDiv({ cls: 'note-group-count', text: notesInGroup.length });
-    
-                header.addEventListener('click', () => {
-                    const currentlyCollapsed = groupContainer.classList.toggle('is-collapsed');
-                    this.collapsedNoteGroups[groupInfo.key] = currentlyCollapsed;
-                    this.plugin.saveSettings();
-                });
-    
-                const listWrapper = groupContainer.createDiv({ cls: 'note-list-wrapper' });
-    
-                notesInGroup.forEach(file => {
-                    const row = listWrapper.createDiv("note-row"); // Append to listWrapper, NOT this.notesContentEl
-                    const titleWrapper = row.createDiv({ cls: 'note-title-wrapper' });
-                    addTooltip(titleWrapper, file);
-    
-                    if (settings.showNoteStatusDots) {
-                        const dot = titleWrapper.createDiv({ cls: `note-status-dot` });
-                        if (this.isDailyNote(file)) dot.style.backgroundColor = settings.dailyNoteDotColor;
-                        else if (this.isWeeklyNote(file)) dot.style.backgroundColor = settings.weeklyNoteDotColor;
-                        else dot.addClass(isSameDay(new Date(file.stat.ctime), new Date(file.stat.mtime)) ? "note-status-dot-created" : "note-status-dot-modified");
-                    }
-    
-                    const titlePathWrapper = titleWrapper.createDiv({ cls: 'note-title-path-wrapper' });
-                    titlePathWrapper.createDiv({ text: file.basename, cls: "note-title" });
-                    if (file.parent && file.parent.path !== '/') titlePathWrapper.createDiv({ text: file.parent.path, cls: 'note-path' });
-                    
-                    row.createDiv({ text: formatDateTime(new Date(file.stat.mtime)), cls: "note-mod-date" });
-                
-                    this.registerDomEvent(row, "click", () => {
-                        // Get all markdown tabs and find one with the matching file path
-                        const markdownLeaves = this.app.workspace.getLeavesOfType("markdown");
-                        const existingLeaf = markdownLeaves.find(leaf => leaf.view.file?.path === file.path);
+        
+        // Clear out group containers if they exist, as grouping logic will rebuild them
+        const groupContainers = this.notesContentEl.querySelectorAll('.note-group-container');
+        if (groupContainers.length > 0) {
+            this.notesContentEl.empty();
+        }
 
-                        if (existingLeaf) {
-                            // If found, make that tab active
-                            this.app.workspace.setActiveLeaf(existingLeaf);
-                        } else {
-                            // Otherwise, open the file according to the user's settings
-                            const openInNewTab = this.plugin.settings.notesOpenAction === 'new-tab';
-                            this.app.workspace.getLeaf(openInNewTab).openFile(file);
-                        }
+        if (filteredNotes.length === 0) {
+            this.notesContentEl.empty();
+            const message = this.notesViewMode === 'pinned' ? 'No pinned notes found' : 'No notes found';
+            this.notesContentEl.createDiv({ text: message, cls: 'task-group-empty-message' });
+            return;
+        }
+
+        const renderNoteList = (container, notes) => {
+            notes.forEach(file => {
+                // We don't need a full reconciliation here since we rebuild groups, just render the item.
+                const noteEl = this.renderNoteItem(file, searchInputEl);
+                container.appendChild(noteEl);
+            });
+        };
+
+        if (this.notesViewMode === 'pinned') {
+            const listWrapper = this.notesContentEl.createDiv({ cls: 'note-list-wrapper' });
+            renderNoteList(listWrapper, filteredNotes);
+        } else {
+            // Grouping logic
+            const groups = { today: [], yesterday: [], thisWeek: [], lastWeek: [], thisMonth: [], older: [] };
+            const now = moment();
+            filteredNotes.forEach(file => {
+                const modTime = moment(file.stat.mtime);
+                if (modTime.isSame(now, 'day')) groups.today.push(file);
+                else if (modTime.isSame(now.clone().subtract(1, 'day'), 'day')) groups.yesterday.push(file);
+                else if (modTime.isSame(now, 'week')) groups.thisWeek.push(file);
+                else if (modTime.isSame(now.clone().subtract(1, 'week'), 'week')) groups.lastWeek.push(file);
+                else if (modTime.isSame(now, 'month')) groups.thisMonth.push(file);
+                else groups.older.push(file);
+            });
+
+            const groupOrder = [
+                { key: 'today', label: 'Today' }, { key: 'yesterday', label: 'Yesterday' },
+                { key: 'thisWeek', label: 'This Week' }, { key: 'lastWeek', label: 'Last Week' },
+                { key: 'thisMonth', label: 'This Month' }, { key: 'older', label: 'Older' },
+            ];
+
+            groupOrder.forEach(groupInfo => {
+                const notesInGroup = groups[groupInfo.key];
+                if (notesInGroup.length > 0) {
+                    const groupContainer = this.notesContentEl.createDiv({ cls: 'note-group-container' });
+                    const isCollapsed = this.collapsedNoteGroups[groupInfo.key];
+                    if (isCollapsed) groupContainer.addClass('is-collapsed');
+
+                    const header = groupContainer.createDiv({ cls: 'note-group-header' });
+                    const headerContent = header.createDiv({ cls: 'note-group-header-content' });
+                    const collapseIcon = headerContent.createDiv({ cls: 'note-group-collapse-icon' });
+                    setIcon(collapseIcon, 'chevron-down');
+                    headerContent.createSpan({ text: groupInfo.label });
+                    header.createDiv({ cls: 'note-group-count', text: notesInGroup.length });
+
+                    header.addEventListener('click', () => {
+                        const currentlyCollapsed = groupContainer.classList.toggle('is-collapsed');
+                        this.collapsedNoteGroups[groupInfo.key] = currentlyCollapsed;
+                        this.plugin.saveSettings();
                     });
 
-                    this.addKeydownListeners(row, searchInputEl);
-                    this.addFileContextMenu(row, file, () => this.populateNotes());
-
-
-
-                });
-            }
-        });
-    
-        if (filteredNotes.length === 0) {
-            this.notesContentEl.createDiv({ text: 'No notes found.', cls: 'task-group-empty-message' });
+                    const listWrapper = groupContainer.createDiv({ cls: 'note-list-wrapper' });
+                    renderNoteList(listWrapper, notesInGroup);
+                }
+            });
         }
     }
-    
-    
 
     /**
      * Scans the vault for tasks, filters and sorts them, and populates the "Tasks" tab.
      */
     async populateTasks() {
         if (!this.tasksContentEl) return;
+
         const settings = this.plugin.settings;
         this.tasksContentEl.toggleClass('show-full-text', !settings.taskTextTruncate);
 
-        // 1. GATHER NEW DATA (Same as your original logic)
-        const taskIgnoreFolders = (settings.taskIgnoreFolders || []).map(f => f.toLowerCase().endsWith('/') ? f.toLowerCase() : f.toLowerCase() + '/');
-        const files = this.app.vault.getMarkdownFiles().filter(file => !taskIgnoreFolders.some(f => file.path.toLowerCase().startsWith(f)));
+        if (this.taskCache) { this.taskCache.clear(); } else { this.taskCache = new Map(); }
+
+            const taskIgnoreFolders = (settings.taskIgnoreFolders || []).map(f => f.toLowerCase().endsWith('/') ? f.toLowerCase() : f.toLowerCase() + '/');
+            const files = this.app.vault.getMarkdownFiles().filter(file => {
+            const filePathLower = file.path.toLowerCase();
+            return !taskIgnoreFolders.some(folder => folder && filePathLower.startsWith(folder));
+        });
+
 
         let allTasks = [];
         const taskRegex = /^\s*(?:-|\d+\.)\s*\[(.)\]\s*(.*)/;
@@ -4072,6 +4290,9 @@ class PeriodMonthView extends ItemView {
         for (const file of files) {
             const content = await this.app.vault.cachedRead(file);
             const lines = content.split('\n');
+
+            this.taskCache.set(file.path, this.extractTaskLines(content));
+
             lines.forEach((line, index) => {
                 const match = line.match(taskRegex);
                 if (match) {
@@ -4152,7 +4373,7 @@ class PeriodMonthView extends ItemView {
         if (this.tasksContentEl.children.length === 0) {
             // Clear any old message and add a new one
             this.tasksContentEl.empty();
-            const message = searchTerm ? 'No tasks match your search term.' : 'No tasks found.';
+            const message = searchTerm ? 'No tasks match your search term.' : 'No tasks found';
             this.tasksContentEl.createDiv({ text: message, cls: 'task-group-empty-message' });
         } else {
             // Remove any "no tasks" message if it exists
@@ -4363,7 +4584,7 @@ class PeriodMonthView extends ItemView {
             }
         });
     
-        if (tasks.length === 0) this.tasksContentEl.createDiv({ text: 'No tasks found.', cls: 'task-group-empty-message' });
+        if (tasks.length === 0) this.tasksContentEl.createDiv({ text: 'No tasks found', cls: 'task-group-empty-message' });
     }
 
     renderTasksByDate(tasks, settings) { // Receives 'settings' as an argument
@@ -5896,7 +6117,7 @@ class PeriodSettingsTab extends PluginSettingTab {
         <p>This is the most important step for task management. For the plugin to recognize your tasks due dates, they <strong>must</strong> use the <code>📅</code> emoji for due dates.</p>
         <p><strong>Due Dates:</strong></p>
         <pre><code>- [ ] My task with a due date 📅 2025-10-26
-- [ ] Review project notes #work 📅 2025-11-01</code></pre>
+        - [ ] Review project notes #work 📅 2025-11-01</code></pre>
         <p><strong>Completion Dates:</strong></p>
         <pre><code>- [x] My completed task 📅 2025-10-26 ✅ 2025-09-19</code></pre>
         <p>NOTE: If you do not use this Task format then you can toggle off the <code>Tasks Tab</code> in <code>General Tab -> </code>Tab Visibility<code> section.</p>
@@ -5909,7 +6130,6 @@ class PeriodSettingsTab extends PluginSettingTab {
         </ul>
     `;
 }
-
 
 }
 module.exports = PeriodMonthPlugin;
