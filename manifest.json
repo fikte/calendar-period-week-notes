@@ -1,7 +1,7 @@
 {
   "id": "calendar-period-week-notes",
   "name": "Calendar Period Week Notes",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "minAppVersion": "0.15.0",
   "description": "A Calendar together with period week numbering and visual of when notes are created / modified and tasks. A ScratchPad note area which is saved in your vault, a notes list area to click to open recent files or see pinned files. A task area to easily see what needs completing today, tomorrow and in the future. An an asset file file view which also shows where assets are not being linked to on pages. Lots of configuration settings to adjust and make this your own style",
   "author": "Tim Williams",
