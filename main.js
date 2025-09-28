@@ -1438,11 +1438,8 @@ function getPeriodWeek(date = new Date(), startOfPeriodsOverride) {
     // Use moment's built-in diff method to correctly calculate the number of
     // calendar days. This automatically handles Daylight Saving Time and other offsets.
     const daysSinceStart = moment(date).startOf('day').diff(startMoment.startOf('day'), 'days');
-    // --- FIX END ---
-
     const weekNumber = Math.floor(daysSinceStart / 7);
     const periodIndex = Math.floor(weekNumber / 4);
-
     const period = ((periodIndex % 13) + 13) % 13 + 1;
     const week = ((weekNumber % 4) + 4) % 4 + 1;
 
@@ -1571,7 +1568,6 @@ class PeriodMonthView extends ItemView {
         this.notesRefreshDebounceTimer = null;
         this.calendarRefreshDebounceTimer = null;
         this.titleUpdateTimeout = null;
-        //this.isAssetsGridView = false;
         this.existingWeeklyNotes = new Set();
         this.dailyRefreshTimeout = null; // Timeout to trigger daily refresh at midnight
         this.themeObserver = null;
@@ -1625,7 +1621,6 @@ class PeriodMonthView extends ItemView {
             checkboxEl.style.border = 'none';
             checkboxEl.style.borderRadius = '50%';
 
-            // --- THIS IS THE CORRECTED STYLING FOR THE TICK ---
             const svgEl = checkboxEl.querySelector('.svg-icon');
             if (svgEl) {
                 svgEl.style.width = '75%';
@@ -1696,6 +1691,64 @@ class PeriodMonthView extends ItemView {
                 return 'var(--text-normal)'; // Default color for arrows, etc.
         }
     }
+
+    /**
+     * Renders a single note item row in a given container.
+     * @param {TFile} file The note file to render.
+     * @param {HTMLElement} container The parent element to append the row to.
+     */
+    /**
+     * Renders a single note item row in a given container.
+     * @param {TFile} file The note file to render.
+     * @param {HTMLElement} container The parent element to append the row to.
+     */
+    renderNoteItem(file, container) {
+        const settings = this.plugin.settings;
+        const searchInputEl = this.notesSearchInputEl;
+
+        const row = container.createDiv("note-row");
+        const titleWrapper = row.createDiv({ cls: 'note-title-wrapper' });
+
+        if (settings.showNoteTooltips) {
+            const ctime = new Date(file.stat.ctime).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
+            const mtime = new Date(file.stat.mtime).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
+            const size = (file.stat.size / 1024).toFixed(2) + ' KB';
+            const path = file.path;
+            const tagsCache = this.app.metadataCache.getFileCache(file)?.tags;
+            let tags = "No tags";
+            if (tagsCache && tagsCache.length > 0) {
+                tags = [...new Set(tagsCache.map(t => t.tag))].join(' ');
+            }
+            titleWrapper.setAttribute('aria-label', `Created: ${ctime}\nModified: ${mtime}\nSize: ${size}\nPath: ${path}\nTags: ${tags}`);
+        }
+        
+        if (settings.showNoteStatusDots) {
+            const dot = titleWrapper.createDiv({ cls: `note-status-dot` });
+            if (this.isDailyNote(file)) dot.style.backgroundColor = settings.dailyNoteDotColor;
+            else if (this.isWeeklyNote(file)) dot.style.backgroundColor = settings.weeklyNoteDotColor;
+            else dot.addClass(isSameDay(new Date(file.stat.ctime), new Date(file.stat.mtime)) ? "note-status-dot-created" : "note-status-dot-modified");
+        }
+    
+        const titlePathWrapper = titleWrapper.createDiv({ cls: 'note-title-path-wrapper' });
+        titlePathWrapper.createDiv({ text: file.basename, cls: "note-title" });
+        if (file.parent && file.parent.path !== '/') titlePathWrapper.createDiv({ text: file.parent.path, cls: 'note-path' });
+                    
+        row.createDiv({ text: formatDateTime(new Date(file.stat.mtime)), cls: "note-mod-date" });
+                
+        row.addEventListener("click", () => {
+            const markdownLeaves = this.app.workspace.getLeavesOfType("markdown");
+            const existingLeaf = markdownLeaves.find(leaf => leaf.view.file?.path === file.path);
+            if (existingLeaf) {
+                this.app.workspace.setActiveLeaf(existingLeaf);
+            } else {
+                const openInNewTab = this.plugin.settings.notesOpenAction === 'new-tab';
+                this.app.workspace.getLeaf(openInNewTab).openFile(file);
+            }
+        });
+
+        this.addKeydownListeners(row, searchInputEl);
+        this.addFileContextMenu(row, file, () => this.populateNotes());
+    }
 
     /**
      * Schedules a refresh to occur at the next midnight.
@@ -2353,11 +2406,9 @@ class PeriodMonthView extends ItemView {
             text = mode === 'pinned' ? textLabels.pinned : textLabels.notes;
         }
         else if (key === 'tasks') {
-            // --- THIS IS THE CORRECTED LOGIC ---
             const groupBy = this.plugin.settings.taskGroupBy;
             iconName = groupBy === 'tag' ? 'circle-check' : icons.tasks;
             text = groupBy === 'tag' ? "Tasks by Tag" : "Tasks by Date";
-            // --- END OF CORRECTION ---
         }
         else if (key === 'assets') {
             iconName = this.isAssetsGridView ? 'image' : 'file-image';
@@ -2792,7 +2843,6 @@ class PeriodMonthView extends ItemView {
             // We only care about the downward pull distance from the start
             this.taskPullDistance = Math.max(0, currentY - this.taskPullStartY);
 
-            // This is the crucial check:
             // Only interfere if the list is scrolled to the top AND the user is pulling down.
             if (this.tasksContentEl.scrollTop === 0 && this.taskPullDistance > 0) {
                 // Prevent the browser from scrolling the page
@@ -3208,7 +3258,6 @@ class PeriodMonthView extends ItemView {
                 }
             }
         }
-
         const allAssetPaths = this.app.vault.getFiles()
             .filter(file => !file.path.toLowerCase().endsWith('.md'))
             .map(file => file.path);
@@ -3308,10 +3357,7 @@ class PeriodMonthView extends ItemView {
                         } else {
                             setIcon(preview, 'file-question');
                         }
-
                         const nameEl = item.createDiv({ text: file.name, cls: "asset-grid-name" });
-
-                        // --- NEW CLICK LISTENERS ---
 
                         // 1. Clicking the image preview opens the asset file.
                         preview.addEventListener("click", (e) => {
@@ -3425,52 +3471,6 @@ class PeriodMonthView extends ItemView {
                 }
             }
         });
-    }
-
-    renderNoteItem(file, searchInputEl) {
-        const settings = this.plugin.settings;
-        const row = createDiv("note-row");
-
-        // Create a function for the tooltip to keep the code clean
-        const createTooltipText = (file) => {
-            const ctime = new Date(file.stat.ctime).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
-            const mtime = new Date(file.stat.mtime).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
-            const size = (file.stat.size / 1024).toFixed(2) + ' KB';
-            const path = file.path;
-            return `Created: ${ctime}\nModified: ${mtime}\nSize: ${size}\nPath: ${path}`;
-        };
-
-        const titleWrapper = row.createDiv({ cls: 'note-title-wrapper' });
-        if (settings.showNoteTooltips) {
-            titleWrapper.setAttribute('aria-label', createTooltipText(file));
-        }
-
-        if (settings.showNoteStatusDots) {
-            const dot = titleWrapper.createDiv({ cls: `note-status-dot` });
-            if (this.isDailyNote(file)) dot.style.backgroundColor = settings.dailyNoteDotColor;
-            else if (this.isWeeklyNote(file)) dot.style.backgroundColor = settings.weeklyNoteDotColor;
-            else dot.addClass(isSameDay(new Date(file.stat.ctime), new Date(file.stat.mtime)) ? "note-status-dot-created" : "note-status-dot-modified");
-        }
-
-        const titlePathWrapper = titleWrapper.createDiv({ cls: 'note-title-path-wrapper' });
-        titlePathWrapper.createDiv({ text: file.basename, cls: "note-title" });
-        if (file.parent && file.parent.path !== '/') {
-            titlePathWrapper.createDiv({ text: file.parent.path, cls: 'note-path' });
-        }
-
-        row.createDiv({ text: formatDateTime(new Date(file.stat.mtime)), cls: "note-mod-date" });
-
-        row.dataset.key = file.path; // Set a unique key for reconciliation
-
-        this.registerDomEvent(row, "click", () => {
-            const openInNewTab = settings.notesOpenAction === 'new-tab';
-            this.app.workspace.getLeaf(openInNewTab).openFile(file);
-        });
-
-        this.addKeydownListeners(row, searchInputEl);
-        this.addFileContextMenu(row, file, () => this.populateNotes());
-
-        return row;
     }
 
     /**
@@ -3656,14 +3656,6 @@ class PeriodMonthView extends ItemView {
     }
 
     /**
-     * A helper function to create a standardized search input with a clear button and keyboard navigation.
-     * @param {HTMLElement} container The parent element.
-     * @param {string} placeholder The placeholder text for the input.
-     * @param {HTMLElement} clearButton The 'x' button element.
-     * @param {(term: string) => void} onInput The callback function to execute on input.
-     * @returns {HTMLInputElement} The created input element.
-     */
-    /**
     * A helper function to create a standardized search input with a clear button.
     * @param {HTMLElement} container The parent element.
     * @param {string} placeholder The placeholder text for the input.
@@ -3746,27 +3738,19 @@ class PeriodMonthView extends ItemView {
                     if (key === 'scratch') {
                         this.openScratchpadFile();
                     } else if (key === 'tasks') {
-                        // --- THIS IS THE CORRECTED LOGIC BLOCK ---
                         const currentGroupBy = this.plugin.settings.taskGroupBy;
                         const newGroupBy = currentGroupBy === 'date' ? 'tag' : 'date';
                         this.plugin.settings.taskGroupBy = newGroupBy;
 
                         await this.plugin.saveData(this.plugin.settings);
-
-                        // THIS IS THE CRITICAL LINE THAT WAS MISSING
                         this.getTabLabel(tabEl, 'tasks');
-
                         await this.populateTasks();
-
-                        //new Notice(`Tasks now grouped by ${newGroupBy}.`);
-                        // --- END OF CORRECTION ---
 
                     } else if (key === 'assets') {
                         this.isAssetsGridView = !this.isAssetsGridView;
                         this.getTabLabel(tabEl, 'assets');
                         await this.populateAssets();
                         const viewMode = this.isAssetsGridView ? 'grid' : 'list';
-                        // new Notice(`Assets view changed to ${viewMode} mode.`);
                     } else if (key === 'notes') {
                         this.notesViewMode = this.notesViewMode === 'recent' ? 'pinned' : 'recent';
                         this.plugin.settings.notesViewMode = this.notesViewMode;
@@ -3995,7 +3979,6 @@ class PeriodMonthView extends ItemView {
                     }
                 });
             }
-
 
             const notesPlaceholder = this.notesViewMode === 'pinned' ? 'Filter notes...' : 'Filter notes...';
             this.notesSearchInputEl = this.setupSearchInput(notesSearchContainer, notesPlaceholder, (term) => {
@@ -4249,101 +4232,115 @@ class PeriodMonthView extends ItemView {
      * Populates the "Notes" tab with either recent or pinned notes.
      */
     async populateNotes() {
-        if (!this.notesContentEl) return;
-
-        const settings = this.plugin.settings;
-        let notesToShow = [];
-
-        // --- (Logic for fetching notes remains the same) ---
-        if (this.notesViewMode === 'pinned') {
-            const pinTagBody = `#${settings.pinTag.toLowerCase()}`;
-            const pinTagFrontmatter = settings.pinTag.toLowerCase();
-            notesToShow = this.app.vault.getMarkdownFiles().filter(file => {
-                const cache = this.app.metadataCache.getFileCache(file);
+        if (!this.notesContentEl) return;
+        this.notesContentEl.empty();
+        
+        const settings = this.plugin.settings;
+        let notesToShow = [];
+    
+        if (this.notesViewMode === 'pinned') {
+            const pinValue = settings.pinTag.toLowerCase();
+            notesToShow = this.app.vault.getMarkdownFiles().filter(file => {
+                const cache = this.app.metadataCache.getFileCache(file);
                 if (!cache) return false;
-                if (cache.tags?.some(tag => tag.tag.toLowerCase() === pinTagBody)) return true;
-                const frontmatterTags = cache.frontmatter?.tags;
-                if (frontmatterTags) {
-                    if (Array.isArray(frontmatterTags)) return frontmatterTags.map(t => String(t).toLowerCase()).includes(pinTagFrontmatter);
-                    if (typeof frontmatterTags === 'string') return frontmatterTags.toLowerCase().split(/, ?/).includes(pinTagFrontmatter);
+
+                // 1. Check for the pin tag (e.g., #pin) in the note's tags
+                const pinTag = `#${pinValue}`;
+                if (cache.tags?.some(tag => tag.tag.toLowerCase().includes(pinTag))) {
+                    return true;
+                }
+
+                // 2. Check for the pin value (e.g., "pin") in the note's properties (frontmatter)
+                const frontmatter = cache.frontmatter;
+                if (frontmatter) {
+                    for (const key in frontmatter) {
+                        const value = frontmatter[key];
+                        // Check if the property value is a string containing the pin value
+                        if (value && typeof value === 'string' && value.toLowerCase().includes(pinValue)) {
+                            return true;
+                        }
+                        // Check if the property value is an array that includes the pin value
+                        if (Array.isArray(value)) {
+                            if (value.some(item => typeof item === 'string' && item.toLowerCase().includes(pinValue))) {
+                                return true;
+                            }
+                        }
+                    }
                 }
                 return false;
-            }).sort((a, b) => a.basename.localeCompare(b.basename));
-        } else {
-            const cutoff = moment().subtract(settings.notesLookbackDays, 'days').valueOf();
-            notesToShow = this.app.vault.getMarkdownFiles()
-                .filter(file => !settings.ignoreFolders.some(f => file.path.startsWith(f)) && (file.stat.mtime >= cutoff || file.stat.ctime >= cutoff))
-                .sort((a, b) => b.stat.mtime - a.stat.mtime);
-        }
+            }).sort((a, b) => a.basename.localeCompare(b.basename));
+        } else {
+            const cutoff = moment().subtract(settings.notesLookbackDays, 'days').valueOf();
+            notesToShow = this.app.vault.getMarkdownFiles()
+                .filter(file => !settings.ignoreFolders.some(f => file.path.startsWith(f)) && (file.stat.mtime >= cutoff || file.stat.ctime >= cutoff))
+                .sort((a,b) => b.stat.mtime - a.stat.mtime);
+        }
+        
+        const searchTerm = this.notesSearchTerm.toLowerCase();
+        const filteredNotes = searchTerm ? notesToShow.filter(file => file.basename.toLowerCase().includes(searchTerm)) : notesToShow;
+        
+        if (filteredNotes.length === 0) {
+            const message = this.notesViewMode === 'pinned' ? 'No pinned notes found.' : 'No recent notes found.';
+            this.notesContentEl.createDiv({ text: message, cls: 'task-group-empty-message' });
+            return;
+        }
 
-        const searchTerm = this.notesSearchTerm.toLowerCase();
-        const filteredNotes = searchTerm ? notesToShow.filter(file => file.basename.toLowerCase().includes(searchTerm)) : notesToShow;
-        const searchInputEl = this.notesSearchInputEl;
+        if (this.notesViewMode === 'pinned') {
+            const groupContainer = this.notesContentEl.createDiv({ cls: 'note-group-container' });
+            const header = groupContainer.createDiv({ cls: 'note-group-header' });
+            const headerContent = header.createDiv({ cls: 'note-group-header-content' });
+            setIcon(headerContent, settings.tabIcons.pinned || 'pin');
+            headerContent.createSpan({ text: 'Pinned Notes' });
+            header.createDiv({ cls: 'note-group-count', text: filteredNotes.length });
 
-        this.notesContentEl.empty(); // Clear everything to rebuild groups
-
-        if (filteredNotes.length === 0) {
-            const message = this.notesViewMode === 'pinned' ? 'No pinned notes found' : 'No notes found';
-            this.notesContentEl.createDiv({ text: message, cls: 'task-group-empty-message' });
-            return;
-        }
-
-        // Helper to render the actual list of notes for a given container
-        const renderNoteList = (container, notes) => {
-            notes.forEach(file => {
-                const noteEl = this.renderNoteItem(file, searchInputEl);
-                container.appendChild(noteEl);
-            });
-        };
-
-        if (this.notesViewMode === 'pinned') {
-            renderNoteList(this.notesContentEl, filteredNotes);
-        } else {
-            // Grouping logic
-            const groups = { today: [], yesterday: [], thisWeek: [], lastWeek: [], thisMonth: [], older: [] };
-            const now = moment();
-            filteredNotes.forEach(file => {
-                const modTime = moment(file.stat.mtime);
-                if (modTime.isSame(now, 'day')) groups.today.push(file);
-                else if (modTime.isSame(now.clone().subtract(1, 'day'), 'day')) groups.yesterday.push(file);
-                else if (modTime.isSame(now, 'week')) groups.thisWeek.push(file);
-                else if (modTime.isSame(now.clone().subtract(1, 'week'), 'week')) groups.lastWeek.push(file);
-                else if (modTime.isSame(now, 'month')) groups.thisMonth.push(file);
-                else groups.older.push(file);
-            });
-
-            const groupOrder = [
-                { key: 'today', label: 'Today' }, { key: 'yesterday', label: 'Yesterday' },
-                { key: 'thisWeek', label: 'This Week' }, { key: 'lastWeek', label: 'Last Week' },
-                { key: 'thisMonth', label: 'This Month' }, { key: 'older', label: 'Older' },
-            ];
-
-            groupOrder.forEach(groupInfo => {
-                const notesInGroup = groups[groupInfo.key];
-                if (notesInGroup.length > 0) {
-                    const groupContainer = this.notesContentEl.createDiv({ cls: 'note-group-container' });
-                    const isCollapsed = this.collapsedNoteGroups[groupInfo.key];
-                    if (isCollapsed) groupContainer.addClass('is-collapsed');
-
-                    const header = groupContainer.createDiv({ cls: 'note-group-header' });
-                    const headerContent = header.createDiv({ cls: 'note-group-header-content' });
-                    const collapseIcon = headerContent.createDiv({ cls: 'note-group-collapse-icon' });
-                    setIcon(collapseIcon, 'chevron-down');
-                    headerContent.createSpan({ text: groupInfo.label });
-                    header.createDiv({ cls: 'note-group-count', text: notesInGroup.length });
-
-                    header.addEventListener('click', () => {
-                        const currentlyCollapsed = groupContainer.classList.toggle('is-collapsed');
-                        this.collapsedNoteGroups[groupInfo.key] = currentlyCollapsed;
-                        this.plugin.saveSettings();
-                    });
-
-                    const listWrapper = groupContainer.createDiv({ cls: 'note-list-wrapper' });
-                    renderNoteList(listWrapper, notesInGroup);
-                }
-            });
-        }
-    }
+            const listWrapper = groupContainer.createDiv({ cls: 'note-list-wrapper' });
+            filteredNotes.forEach(file => {
+                this.renderNoteItem(file, listWrapper);
+            });
+        } else {
+            const groups = { today: [], yesterday: [], thisWeek: [], lastWeek: [], thisMonth: [], older: [] };
+            const now = moment();
+            filteredNotes.forEach(file => {
+                const modTime = moment(file.stat.mtime);
+                if (modTime.isSame(now, 'day')) groups.today.push(file);
+                else if (modTime.isSame(now.clone().subtract(1, 'day'), 'day')) groups.yesterday.push(file);
+                else if (modTime.isSame(now, 'week')) groups.thisWeek.push(file);
+                else if (modTime.isSame(now.clone().subtract(1, 'week'), 'week')) groups.lastWeek.push(file);
+                else if (modTime.isSame(now, 'month')) groups.thisMonth.push(file);
+                else groups.older.push(file);
+            });
+            const groupOrder = [ { key: 'today', label: 'Today' }, { key: 'yesterday', label: 'Yesterday' }, { key: 'thisWeek', label: 'This Week' }, { key: 'lastWeek', label: 'Last Week' }, { key: 'thisMonth', label: 'This Month' }, { key: 'older', label: 'Older' }, ];
+            
+            groupOrder.forEach(groupInfo => {
+                const notesInGroup = groups[groupInfo.key];
+                if (notesInGroup.length > 0) {
+                    const groupContainer = this.notesContentEl.createDiv({ cls: 'note-group-container' });
+                    const isCollapsed = this.collapsedNoteGroups[groupInfo.key];
+                    if (isCollapsed) groupContainer.addClass('is-collapsed');
+        
+                    const header = groupContainer.createDiv({ cls: 'note-group-header' });
+                    const headerContent = header.createDiv({ cls: 'note-group-header-content' });
+                    
+                    const collapseIcon = headerContent.createDiv({ cls: 'note-group-collapse-icon' });
+                    setIcon(collapseIcon, 'chevron-down');
+                    headerContent.createSpan({ text: groupInfo.label });
+                    header.createDiv({ cls: 'note-group-count', text: notesInGroup.length });
+        
+                    header.addEventListener('click', () => {
+                        const currentlyCollapsed = groupContainer.classList.toggle('is-collapsed');
+                        this.collapsedNoteGroups[groupInfo.key] = currentlyCollapsed;
+                        this.plugin.saveSettings();
+                    });
+        
+                    const listWrapper = groupContainer.createDiv({ cls: 'note-list-wrapper' });
+        
+                    notesInGroup.forEach(file => {
+                        this.renderNoteItem(file, listWrapper);
+                    });
+                }
+            });
+        }
+    }
 
     /**
      * Scans the vault for tasks, filters and sorts them, and populates the "Tasks" tab.
@@ -5316,7 +5313,6 @@ class PeriodSettingsTab extends PluginSettingTab {
     }
 
     // --- RENDER METHODS FOR EACH TAB ---
-
     renderGeneralSettings() {
         const containerEl = this.contentEl;
         containerEl.createEl("h1", { text: "General Display Settings" });
@@ -5809,28 +5805,8 @@ class PeriodSettingsTab extends PluginSettingTab {
         new Setting(containerEl).setName("Functionality").setHeading();
         new Setting(containerEl).setName("ScratchPad tab click action").setDesc("What to do when the ScratchPad tab is clicked while it's already active.").addDropdown(dropdown => dropdown.addOption('new-tab', 'Open in a new tab').addOption('current-tab', 'Open in the current tab').setValue(this.plugin.settings.scratchpadOpenAction).onChange(async (value) => { this.plugin.settings.scratchpadOpenAction = value; await this.saveAndUpdate(); }));
         new Setting(containerEl).setName("ScratchPad note path").setDesc("The full path to the note that the ScratchPad tab will read from and write to.").addText(text => { this.createPathSuggester(text.inputEl, (q) => this.app.vault.getMarkdownFiles().filter(f => !q || f.path.toLowerCase().includes(q)).map(f => f.path)); text.setValue(this.plugin.settings.fixedNoteFile).onChange(async value => { this.plugin.settings.fixedNoteFile = value; await this.saveAndUpdate(); }); });
-
-        new Setting(containerEl)
-            .setName("Show preview/edit button")
-            .setDesc("Show the button to toggle between plain text editing and a rendered Markdown preview.")
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.scratchpad?.showPreviewToggle ?? false)
-                .onChange(async (value) => {
-                    if (!this.plugin.settings.scratchpad) this.plugin.settings.scratchpad = {};
-                    this.plugin.settings.scratchpad.showPreviewToggle = value;
-                    await this.saveAndUpdate();
-                }));
-
-        new Setting(containerEl)
-            .setName("Show '+ Task' button")
-            .setDesc("Show the button in the scratchpad area to quickly add a new task.")
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.scratchpad?.showAddTaskButton ?? true)
-                .onChange(async (value) => {
-                    if (!this.plugin.settings.scratchpad) this.plugin.settings.scratchpad = {};
-                    this.plugin.settings.scratchpad.showAddTaskButton = value;
-                    await this.saveAndUpdate();
-                }));
+        new Setting(containerEl).setName("Show preview/edit button").setDesc("Show the button to toggle between plain text editing and a rendered Markdown preview.").addToggle(toggle => toggle.setValue(this.plugin.settings.scratchpad?.showPreviewToggle ?? false).onChange(async (value) => {if (!this.plugin.settings.scratchpad) this.plugin.settings.scratchpad = {};this.plugin.settings.scratchpad.showPreviewToggle = value;await this.saveAndUpdate();}));
+        new Setting(containerEl).setName("Show '+ Task' button").setDesc("Show the button in the scratchpad area to quickly add a new task.").addToggle(toggle => toggle.setValue(this.plugin.settings.scratchpad?.showAddTaskButton ?? true).onChange(async (value) => {if (!this.plugin.settings.scratchpad) this.plugin.settings.scratchpad = {};this.plugin.settings.scratchpad.showAddTaskButton = value;await this.saveAndUpdate();}));
 
         const taskTitleSetting = new Setting(containerEl).setName("Task Creation Format");
         taskTitleSetting.descEl.innerHTML = `
@@ -5865,7 +5841,6 @@ class PeriodSettingsTab extends PluginSettingTab {
         const containerEl = this.contentEl;
         containerEl.createEl("h1", { text: "Notes Tab Settings" });
         new Setting(containerEl).setName("Functionality").setHeading();
-
         new Setting(containerEl).setName("Notes tab open behavior").setDesc("Choose how to open notes when clicked from the notes list.").addDropdown(dropdown => dropdown.addOption('new-tab', 'Open in a new tab').addOption('current-tab', 'Open in the current tab').setValue(this.plugin.settings.notesOpenAction).onChange(async (value) => { this.plugin.settings.notesOpenAction = value; await this.saveAndUpdate(); }));
         new Setting(containerEl).setName("Notes lookback days").setDesc("How many days back the Notes tab should look for created or modified notes. Default is 7.").addText(text => text.setValue(String(this.plugin.settings.notesLookbackDays)).onChange(async value => { this.plugin.settings.notesLookbackDays = Number(value) || 7; await this.saveAndUpdate(); }));
         new Setting(containerEl)
@@ -5885,7 +5860,6 @@ class PeriodSettingsTab extends PluginSettingTab {
         new Setting(containerEl).setName("Notes list font size").setDesc("Font size for note titles in the list. Default is 14px.").addText(text => text.setValue(this.plugin.settings.notesFontSize).onChange(async value => { this.plugin.settings.notesFontSize = value; await this.saveAndUpdate(); }));
         new Setting(containerEl).setName("Bold note titles").setDesc("Toggles bold font weight for note titles in the list.").addToggle(toggle => toggle.setValue(this.plugin.settings.notesBold).onChange(async value => { this.plugin.settings.notesBold = value; await this.saveAndUpdate(); }));
         this.createRgbaColorSetting(containerEl, "Note/Task Hover Color", "Background color when hovering a note or task in a list.", "notesHoverColor");
-
         this.createIgnoredFolderList(containerEl, "Ignore folders in Notes tab", "Files in these folders will not appear in the 'Notes' list.", 'ignoreFolders');
 
     }
