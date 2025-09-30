@@ -768,22 +768,103 @@ body .period-month-container.today-style-cell .today-cell .day-content {
 }
 
 /* --- Popups & Tooltips --- */
+/* Common base styles for popups */
 .other-notes-popup, .custom-suggestion-container {
-  position: absolute; 
-  z-index: 100; 
-  background-color: var(--background-secondary); 
-  border: 1px solid #4a4a4a; 
-  border-radius: 15px; 
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2); 
-  padding: 8px; 
-  max-height: 200px; 
-  overflow-y: auto;
-  max-width: 600px;
+    position: absolute;
+    z-index: 100;
+    background-color: var(--background-secondary);
+    border: 1px solid #4a4a4a;
+    border-radius: 15px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    max-width: 650px;
 }
-.custom-suggestion-container { 
-  z-index: 999; 
-  margin-top: 4px; 
+
+/* Main popup specific styles */
+.other-notes-popup {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Hide overflow on the main container */
+    max-height: 250px; /* Increased slightly for mobile header */
 }
+
+/* Popup header */
+.popup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--background-modifier-border);
+    flex-shrink: 0; /* Prevent header from shrinking */
+    cursor: pointer;
+    gap: 10px;
+}
+.popup-header-title {
+    font-weight: normal;
+    color: var(--text-muted);
+    flex-grow: 1; /* Allow title to take available space */
+    flex-shrink: 1; /* Allow title to shrink if needed */
+    min-width: 0; /* Important for text-overflow to work with flex items */
+    white-space: nowrap; /* Prevent title from wrapping */
+    overflow: hidden; /* Hide overflow */
+    text-overflow: ellipsis; /* Add ellipsis for long titles */
+    font-size: --var(--other-note-popup-font-size);
+}
+
+.popup-close-btn {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    /* Default for DARK theme: Light grey circle */
+    background-color: #9c9b9b; 
+    /* Default for DARK theme: Dark 'x' icon */
+    color: #383838; 
+    transition: background-color 0.1s ease-in-out, color 0.1s ease-in-out;
+}
+
+.popup-close-btn:hover {
+    /* Hover for DARK theme: Even lighter circle */
+    background-color: #f5f5f5;
+}
+
+/* --- Light Theme Overrides --- */
+body.theme-light .popup-close-btn {
+    /* Default for LIGHT theme: Dark grey circle */
+    background-color: #5c5c5c;
+    /* Default for LIGHT theme: White 'x' icon */
+    color: #ffffff;
+}
+
+body.theme-light .popup-close-btn:hover {
+    /* Hover for LIGHT theme: Even darker circle */
+    background-color: #383838;
+}
+
+.popup-close-btn .svg-icon {
+    width: 14px;
+    height: 14px;
+}
+
+
+/* Content wrapper for scrolling and padding */
+.popup-content-wrapper {
+    padding: 8px;
+    overflow-y: auto;
+}
+
+/* Suggestion container specific styles */
+.custom-suggestion-container {
+    z-index: 999;
+    margin-top: 4px;
+    padding: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
 .other-notes-popup-item {
   display: flex; 
   align-items: flex-start; 
@@ -846,6 +927,7 @@ body:has(.task-text:hover) .tooltip {
   color: var(--text-normal); 
   font-weight: normal;
 }
+
 
 /* --- Vertical View --- */
 .vertical-calendar-scroller { 
@@ -928,25 +1010,42 @@ body:has(.task-text:hover) .tooltip {
     right: 6px;
     top: 50%;
     transform: translateY(-50%);
-    color: var(--icon-color);
-    background-color: var(--background-modifier-hover);
-    cursor: pointer;
     visibility: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 20px;
-    height: 20px;
+    width: 15px;
+    height: 15px;
     border-radius: 50%;
+    cursor: pointer;
     transition: background-color 0.1s ease-in-out;
+    background-color: #9c9b9b;
+    /* Color is now set directly on the icon rule below */
 }
+
 .search-input-clear-btn:hover {
-    color: var(--icon-color-hover);
-    background-color: var(--background-modifier-border);
+    background-color: #f5f5f5;
 }
+
 .search-input-clear-btn .svg-icon {
-    width: 14px;
-    height: 14px;
+    width: 13px;
+    height: 13px;
+    /* FIX: Force the icon color to be dark */
+    color: #383838 !important;
+}
+
+/* --- Light Theme Overrides --- */
+body.theme-light .search-input-clear-btn {
+    background-color: #5c5c5c;
+}
+
+body.theme-light .search-input-clear-btn:hover {
+    background-color: #383838;
+}
+
+body.theme-light .search-input-clear-btn .svg-icon {
+    /* FIX: Force the icon color to be white in the light theme */
+    color: #ffffff !important;
 }
 
 /* --- Task Header Icons --- */
@@ -1261,6 +1360,7 @@ body:has(.task-text:hover) .tooltip {
     opacity: 0.8;
 }
 .pm-refresh-indicator.is-ready {
+    opacity: 1;
     transform: translateY(0) scale(1);
 }
 
@@ -1526,6 +1626,7 @@ class PeriodMonthView extends ItemView {
         this.taskPullStartY = 0;
         this.taskPullDistance = 0;
         this.isTaskPulling = false;
+ 
 
         // --- State Management ---
         this.displayedMonth = new Date(); // The month currently shown in the calendar.
@@ -2084,7 +2185,7 @@ class PeriodMonthView extends ItemView {
                                 modified: settings.showModifiedFileDot ? modifiedFiles : [],
                                 assets: settings.showAssetDot ? assetsCreated : [],
                             };
-                            this.showFilePopup(cell, dataToShow);
+                            this.showFilePopup(cell, dataToShow, dayDate);
                         }, this.plugin.settings.otherNoteHoverDelay);
                     });
                     cell.addEventListener('mouseleave', () => {
@@ -2282,7 +2383,6 @@ class PeriodMonthView extends ItemView {
         this.hideFilePopup(); // Hide any other popups
         const backlinks = await this.findAssetBacklinks(assetFile);
 
-        // If there are no backlinks, show a brief notice instead of an empty popup.
         if (backlinks.length === 0) {
             new Notice("No backlinks found for this asset.");
             return;
@@ -2290,9 +2390,18 @@ class PeriodMonthView extends ItemView {
 
         this.popupEl = createDiv({ cls: 'other-notes-popup' });
 
-        // The 'noteFile' here is the markdown file that contains the link to the asset
+        // Add header with a close button
+        const headerRow = this.popupEl.createDiv({ cls: 'popup-header' });
+        headerRow.createDiv({ cls: 'popup-header-title', text: 'Backlinks' });
+        const closeBtn = headerRow.createDiv({ cls: 'popup-close-btn' });
+        setIcon(closeBtn, 'x');
+        headerRow.addEventListener('click', () => this.hideFilePopup());
+
+        // Create a scrollable wrapper for the content
+        const contentWrapper = this.popupEl.createDiv({ cls: 'popup-content-wrapper' });
+
         backlinks.forEach(noteFile => {
-            const itemEl = this.popupEl.createDiv({ cls: 'other-notes-popup-item' });
+            const itemEl = contentWrapper.createDiv({ cls: 'other-notes-popup-item' });
             setIcon(itemEl, 'file-text');
 
             const titlePathWrapper = itemEl.createDiv({ cls: 'note-title-path-wrapper' });
@@ -2302,7 +2411,6 @@ class PeriodMonthView extends ItemView {
             }
 
             itemEl.addEventListener('click', async () => {
-                // Find the line number of the asset within the selected note
                 const cache = this.app.metadataCache.getFileCache(noteFile);
                 let targetLine = 0;
                 if (cache) {
@@ -2311,12 +2419,10 @@ class PeriodMonthView extends ItemView {
                         const linkedFile = this.app.metadataCache.getFirstLinkpathDest(ref.link, noteFile.path);
                         if (linkedFile && linkedFile.path === assetFile.path) {
                             targetLine = ref.position.start.line;
-                            break; // Stop after finding the first match
+                            break;
                         }
                     }
                 }
-
-                // Open the note and scroll to the target line
                 const openInNewTab = this.plugin.settings.notesOpenAction === 'new-tab';
                 const leaf = this.app.workspace.getLeaf(openInNewTab);
                 await leaf.openFile(noteFile, { eState: { line: targetLine } });
@@ -2324,7 +2430,6 @@ class PeriodMonthView extends ItemView {
             });
         });
 
-        // Add mouse listeners to the popup itself to prevent it from closing immediately.
         this.popupEl.addEventListener('mouseenter', () => clearTimeout(this.hideTimeout));
         this.popupEl.addEventListener('mouseleave', () => {
             this.hideTimeout = setTimeout(() => this.hideFilePopup(), this.plugin.settings.popupHideDelay);
@@ -2332,7 +2437,6 @@ class PeriodMonthView extends ItemView {
 
         document.body.appendChild(this.popupEl);
 
-        // --- Popup positioning logic ---
         const popupRect = this.popupEl.getBoundingClientRect();
         const targetRect = targetEl.getBoundingClientRect();
         const viewportWidth = window.innerWidth;
@@ -2892,6 +2996,8 @@ class PeriodMonthView extends ItemView {
             this.taskPullDistance = 0;
 
         });
+
+    
 
         this.scheduleDailyRefresh();
 
@@ -4054,17 +4160,27 @@ class PeriodMonthView extends ItemView {
      * Shows a popup listing all notes, tasks, and assets associated with a specific day.
      * @param {HTMLElement} targetEl The calendar day element to position the popup near.
      * @param {object} dataByType An object containing arrays of items to display, keyed by type.
+     * @param {Date} date The date for which the popup is being shown.
      */
-    showFilePopup(targetEl, dataByType) {
+    showFilePopup(targetEl, dataByType, date) {
         this.hideFilePopup();
         this.popupEl = createDiv({ cls: 'other-notes-popup' });
         const { settings } = this.plugin;
 
-        // --- Helper function for rendering file/asset items ---
-        const addFileToList = (file, type) => {
-            const itemEl = this.popupEl.createDiv({ cls: 'other-notes-popup-item' });
+        // Add header with a close button and dynamic date title
+        const headerRow = this.popupEl.createDiv({ cls: 'popup-header' });
+        const formattedDate = moment(date).format("dddd, D MMMM YYYY");
+        headerRow.createDiv({ cls: 'popup-header-title', text: formattedDate });
+        const closeBtn = headerRow.createDiv({ cls: 'popup-close-btn' });
+        setIcon(closeBtn, 'x');
+        // Make the entire header row clickable to close the popup
+        headerRow.addEventListener('click', () => this.hideFilePopup());
 
-            // This part for the dot/thumbnail stays the same
+        // Create a scrollable wrapper for the content
+        const contentWrapper = this.popupEl.createDiv({ cls: 'popup-content-wrapper' });
+
+        const addFileToList = (container, file, type) => {
+            const itemEl = container.createDiv({ cls: 'other-notes-popup-item' });
             if (type === 'asset' && this.isImageAsset(file)) {
                 const thumbnail = itemEl.createEl('img', { cls: 'popup-asset-thumbnail' });
                 thumbnail.src = this.app.vault.getResourcePath(file);
@@ -4075,79 +4191,59 @@ class PeriodMonthView extends ItemView {
                 else if (type === 'modified') dot.style.backgroundColor = settings.calendarModifiedDotColor;
                 else if (type === 'asset') dot.style.backgroundColor = settings.assetDotColor;
             }
-
-            // NEW: Create a wrapper for the title and path
             const titlePathWrapper = itemEl.createDiv({ cls: 'note-title-path-wrapper' });
             const displayName = file.path.toLowerCase().endsWith('.md') ? file.basename : file.name;
             titlePathWrapper.createDiv({ text: displayName, cls: "note-title" });
-
-            // Add the parent folder path
             if (file.parent && file.parent.path !== '/') {
                 titlePathWrapper.createDiv({ text: file.parent.path, cls: 'note-path' });
             }
-
             itemEl.addEventListener('click', () => {
                 this.app.workspace.openLinkText(file.path, "", settings.notesOpenAction === 'new-tab');
                 this.hideFilePopup();
             });
         };
 
-        // --- Helper function for rendering interactive task items ---
-        const addTaskToList = (task) => {
-            const itemEl = this.popupEl.createDiv({ cls: 'other-notes-popup-item' });
+        const addTaskToList = (container, task) => {
+            const itemEl = container.createDiv({ cls: 'other-notes-popup-item' });
             itemEl.dataset.taskStatus = task.status;
-
             const checkbox = itemEl.createDiv({ cls: 'task-checkbox-symbol' });
-            this._renderTaskSymbol(checkbox, task); // This is the crucial call
-
+            this._renderTaskSymbol(checkbox, task);
             checkbox.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 await this.toggleTaskCompletion(task);
-
                 task.status = (task.status.toLowerCase() === 'x') ? ' ' : 'x';
-                this._renderTaskSymbol(checkbox, task); // Re-render the symbol for instant feedback
-
+                this._renderTaskSymbol(checkbox, task);
                 await this.buildTasksByDateMap();
                 this.renderCalendar();
             });
-
             const textSpan = itemEl.createSpan({ cls: 'task-text' });
             MarkdownRenderer.render(this.app, task.text, textSpan, task.file.path, this);
-
             itemEl.addEventListener('click', () => {
                 this.app.workspace.openLinkText(task.file.path, '', false, { eState: { line: task.lineNumber } });
                 this.hideFilePopup();
             });
         };
 
-        // --- NEW Structured Rendering Logic ---
-        const allFiles = [
-            ...(dataByType.daily || []),
-            ...(dataByType.created || []),
-            ...(dataByType.modified || []),
-            ...(dataByType.assets || [])
-        ];
+        const allFiles = [...(dataByType.daily || []), ...(dataByType.created || []), ...(dataByType.modified || []), ...(dataByType.assets || [])];
         const hasTasks = dataByType.tasks && dataByType.tasks.length > 0;
         const hasFiles = allFiles.length > 0;
 
         if (hasTasks) {
-            this.popupEl.createEl('h6', { text: 'Tasks', cls: 'popup-section-header' });
-            dataByType.tasks.forEach(task => addTaskToList(task));
+            contentWrapper.createEl('h6', { text: 'Tasks', cls: 'popup-section-header' });
+            dataByType.tasks.forEach(task => addTaskToList(contentWrapper, task));
         }
-
         if (hasTasks && hasFiles) {
-            this.popupEl.createDiv({ cls: 'popup-separator' });
+            contentWrapper.createDiv({ cls: 'popup-separator' });
         }
-
         if (hasFiles) {
-            this.popupEl.createEl('h6', { text: 'Notes & Assets', cls: 'popup-section-header' });
-            (dataByType.daily || []).forEach(file => addFileToList(file, 'daily'));
-            (dataByType.created || []).forEach(file => addFileToList(file, 'created'));
-            (dataByType.modified || []).forEach(file => addFileToList(file, 'modified'));
-            (dataByType.assets || []).forEach(file => addFileToList(file, 'asset'));
+            contentWrapper.createEl('h6', { text: 'Notes & Assets', cls: 'popup-section-header' });
+            (dataByType.daily || []).forEach(file => addFileToList(contentWrapper, file, 'daily'));
+            (dataByType.created || []).forEach(file => addFileToList(contentWrapper, file, 'created'));
+            (dataByType.modified || []).forEach(file => addFileToList(contentWrapper, file, 'modified'));
+            (dataByType.assets || []).forEach(file => addFileToList(contentWrapper, file, 'asset'));
         }
 
-        if (!this.popupEl.hasChildNodes()) {
+        if (!contentWrapper.hasChildNodes()) {
             this.hideFilePopup();
             return;
         }
@@ -4159,7 +4255,6 @@ class PeriodMonthView extends ItemView {
 
         document.body.appendChild(this.popupEl);
 
-        // --- Smart Positioning Logic ---
         const popupRect = this.popupEl.getBoundingClientRect();
         const targetRect = targetEl.getBoundingClientRect();
         const viewportWidth = window.innerWidth;
@@ -4751,21 +4846,48 @@ class PeriodMonthView extends ItemView {
      * @param {HTMLElement} container The parent container for the task row.
      */
     renderTaskItem(task) {
-        const taskRow = createDiv({ cls: 'task-row' }); // Use createDiv, not container.createDiv
+        const taskRow = createDiv({ cls: 'task-row' });
         taskRow.dataset.key = this.getTaskKey(task);
         taskRow.dataset.taskStatus = task.status;
         const searchInputEl = this.tasksSearchInputEl;
 
         const checkbox = taskRow.createDiv({ cls: 'task-checkbox-symbol' });
         this._renderTaskSymbol(checkbox, task);
+        const textEl = taskRow.createSpan({ cls: 'task-text' });
+
+        // On initial render, check if the task is already completed and apply the style.
+        if (task.status.toLowerCase() === 'x') {
+            textEl.classList.add('completed');
+        }
 
         checkbox.addEventListener('click', async (e) => {
             e.stopPropagation();
+
+            // Determine the state *before* the change is made
+            const wasCompleted = task.status.toLowerCase() === 'x';
+
+            // Modify the file. This also triggers the background file watcher
+            // which will correctly refresh the entire task list after a short delay.
             await this.toggleTaskCompletion(task);
-            this.populateTasks();
+
+            // --- Provide Instant UI Feedback ---
+            // We update the local task object and the DOM immediately so the user
+            // sees the change without waiting for the file watcher to finish.
+
+            if (wasCompleted) {
+                // If it WAS completed, its new state is INCOMPLETE
+                task.status = ' ';
+                textEl.classList.remove('completed');
+            } else {
+                // If it was NOT completed, its new state is COMPLETE
+                task.status = 'x';
+                textEl.classList.add('completed');
+            }
+            
+            // Finally, re-render the checkbox symbol itself using the new status
+            this._renderTaskSymbol(checkbox, task);
         });
 
-        const textEl = taskRow.createSpan({ cls: 'task-text' });
         MarkdownRenderer.render(this.app, task.text, textEl, task.file.path, this);
 
         taskRow.addEventListener('click', () => this.app.workspace.openLinkText(task.file.path, '', false, { eState: { line: task.lineNumber } }));
@@ -4778,7 +4900,7 @@ class PeriodMonthView extends ItemView {
             }
         }, 0);
 
-        return taskRow; // This is the crucial addition
+        return taskRow;
     }
 
     /**
@@ -4816,6 +4938,9 @@ class PeriodMonthView extends ItemView {
      * @param {object} task The new task object with updated data.
      */
     updateTaskItem(taskRowEl, task) {
+        // Only update if the text content has changed
+        const textEl = taskRowEl.querySelector('.task-text');
+        
         // Only update if the status has changed
         if (taskRowEl.dataset.taskStatus !== task.status) {
             const checkbox = taskRowEl.querySelector('.task-checkbox-symbol');
@@ -4823,10 +4948,16 @@ class PeriodMonthView extends ItemView {
                 this._renderTaskSymbol(checkbox, task);
             }
             taskRowEl.dataset.taskStatus = task.status;
+
+            if (textEl) {
+                if (task.status.toLowerCase() === 'x') {
+                    textEl.classList.add('completed');
+                } else {
+                    textEl.classList.remove('completed');
+                }
+            }
         }
 
-        // Only update if the text content has changed
-        const textEl = taskRowEl.querySelector('.task-text');
         // A simple check to see if the rendered HTML might be different
         if (textEl && textEl.textContent !== task.text) {
             textEl.empty(); // Clear existing rendered markdown
