@@ -156,6 +156,8 @@ Almost every visual and functional element can be tailored to your liking. See t
         - **Tasks Tab**: Toggles grouping between "Date" and "Tag".
             
         - **Scratchpad Tab**: Opens the scratchpad note file in a full editor tab.
+          
+        - **Assets Tab✱: Toggle between two column and list view for assets. 
             
 
 ---
