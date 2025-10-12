@@ -259,6 +259,12 @@ The plugin offers extensive options to tailor its appearance and functionality.
 | **Daily Note date format** | The date format for daily note filenames. | `YYYY-MM-DD` |
 | **Daily Note open behavior** | Open daily notes in a `new-tab` or the `current-tab`. | `new-tab` |
 | **Daily note template** | Path to a template file to use when creating new daily notes. | `""` |
+| **ICS URL** | External calendar ICS feed URL from Google Calendar, Outlook, etc. | `""` |
+| **Show ICS dot** | Show a dot for external calendar events on the calendar. | `true` |
+| **ICS refresh interval** | How often to refresh the ICS feed in minutes. | `60` |
+| **Calendar events placeholder** | The placeholder text in daily note templates for event insertion. | `%%CALENDAR_EVENTS%%` |
+| **Calendar events format** | Template format for events using placeholders: `{{summary}}`, `{{startTime}}`, `{{endTime}}`. | `- {{startTime}} - {{endTime}}: {{summary}}` |
+| **Calendar event indicator style** | Choose between `dot`, `heatmap`, or `badge` for displaying events. | `dot` |
 | **Auto-reload interval** | Time in milliseconds between automatic data refreshes. | `5000` |
 
 ### Grid Highlighting
@@ -296,6 +302,7 @@ The plugin offers extensive options to tailor its appearance and functionality.
 | **Show dot for created notes** | Show a dot on days a non-daily note was created. | `true` |
 | **Show dot for modified notes** | Show a dot on days a non-daily note was modified. | `true` |
 | **Show dot for new assets** | Show a dot on days an asset was added to the vault. | `true` |
+| **Show dot for external ics calendar events** | Show a dot on days that have a calendar event from an external calendar source. | `true` |
 | **Calendar dot size** | The size of the dots in pixels. | `4` |
 | **Daily Note dot color** | Color for daily note dots. | `rgba(74, 144, 226, 1)` |
 | **Weekly Note dot color** | Color for weekly note dots. | `rgba(160, 115, 240, 1)` |
@@ -305,19 +312,10 @@ The plugin offers extensive options to tailor its appearance and functionality.
 | **Calendar Event dot color** | Color for calendar event dots. | `rgba(148, 148, 148, 1)` |
 | **Popup hover delay** | Delay in ms before showing the details popup. | `100` |
 | **Popup hide delay** | Delay in ms before hiding the popup after mouse leaves. | `100` |
+| **Popup gap** | The gap in pixels between a calendar day and its popup. Can be negative. | `-2` |
 | **Popup font size** | The font size of text inside the hover popup. | `13px` |
-| **Ignore folders for dots** | Define folder paths to exclude from creating dots. | `[]` |
-
-### External Calendar (ICS) Settings
-
-| Setting | Description | Default Value |
-| --- | --- | --- |
-| **ICS URL** | External calendar ICS feed URL from Google Calendar, Outlook, etc. | `""` |
-| **Show ICS dot** | Show a dot for external calendar events on the calendar. | `true` |
-| **ICS refresh interval** | How often to refresh the ICS feed in minutes. | `60` |
-| **Calendar events placeholder** | The placeholder text in daily note templates for event insertion. | `%%CALENDAR_EVENTS%%` |
-| **Calendar events format** | Template format for events using placeholders: `{{summary}}`, `{{startTime}}`, `{{endTime}}`. | `- {{startTime}} - {{endTime}}: {{summary}}` |
-| **Calendar event indicator style** | Choose between `dot`, `heatmap`, or `badge` for displaying events. | `dot` |
+| **Ignore folders for calendar grid dots** | Define folder paths to exclude from creating dots on the calendar. | `[]` |
+| **Ignore folders for asset dots** | Define folder paths to exclude from creating asset dots. | `[]` |
 
 ### Task Indicators
 
@@ -340,7 +338,7 @@ The plugin offers extensive options to tailor its appearance and functionality.
 | Setting | Description | Default Value |
 | --- | --- | --- |
 | **ScratchPad note path** | The full vault path to the note file used by the scratchpad. | `ScratchPad.md` |
-| **Scratchpad open action** | Choose between `new-tab` or `current-tab` when double-clicking the tab. | `new-tab` |
+| **Scratchpad tab click action** | Choose between `new-tab` or `current-tab` when double-clicking the tab. | `new-tab` |
 | **Show preview/edit button** | Shows the button to toggle between plain text and Markdown preview. | `false` |
 | **Show '+ Task' button** | Shows the button to quickly add a new task. | `true` |
 | **Task Creation Format** | The template string for the '+ Task' button with placeholders like `{today}`, `{friday}`, `\|` for cursor. | `- [ ] #Tag \| 📅 {friday}` |
@@ -359,7 +357,9 @@ The plugin offers extensive options to tailor its appearance and functionality.
 | **Show note status dots** | Shows a colored dot next to each note in the list. | `true` |
 | **Show note tooltips** | Show a detailed tooltip on hover with file metadata. | `true` |
 | **Notes list font size** | Font size for note titles in the list. | `14px` |
-| **Bold note titles** | Toggles bold font weight for note titles. | `false` |
+| **Bold note titles** | Toggles bold font weight for note titles in the list. | `false` |
+| **Created Note Dot Color** | Color for the dot on recently created notes in the list. | `rgba(76, 175, 80, 1)` |
+| **Modified Note Dot Color** | Color for the dot on recently modified notes in the list. | `rgba(255, 152, 0, 1)` |
 | **Note/Task Hover Color** | Background color when hovering over items in lists. | `rgba(171, 171, 171, 0.15)` |
 | **Ignore folders in Notes tab** | Define folder paths to exclude from the "Recent Notes" list. | `[]` |
 
