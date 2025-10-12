@@ -127,7 +127,7 @@ A fully functional panel right below your calendar, with draggable tabs to organ
     - **Collapsible asset groups** organized by type or date.
   
 
-### 📅 External Calendar Integration {NOTE: This is coming soon in version 1.2.4) 
+### 📅 External Calendar Events Integration 
 
 - **ICS Feed Support**: Integrate external calendars (Google Calendar, Outlook, etc.) via ICS URL.
     
@@ -138,6 +138,8 @@ A fully functional panel right below your calendar, with draggable tabs to organ
 - **Template Insertion**: Automatically insert calendar events into daily notes using customizable format placeholders.
     
 - **Event Popup**: View event details in the date hover popup.
+  
+- **Add Events to Daily Note**: Automatically dd your calendar events as a configurable list to the daily note. Requires the use of a template when creating a daily note.  
     
 
 ### ⚙️ Deep Customization
