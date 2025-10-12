@@ -138,10 +138,7 @@ A fully functional panel right below your calendar, with draggable tabs to organ
 - **Template Insertion**: Automatically insert calendar events into daily notes using customizable format placeholders.
     
 - **Event Popup**: View event details in the date hover popup.
-  
-- **Add Events to Daily Note**: Automatically dd your calendar events as a configurable list to the daily note. Requires the use of a template when creating a daily note.  
-    
-
+      
 ### ⚙️ Deep Customization
 
 Almost every visual and functional element can be tailored to your liking. See the detailed settings section below for a full list.
@@ -215,37 +212,45 @@ Almost every visual and functional element can be tailored to your liking. See t
 
 The plugin offers extensive options to tailor its appearance and functionality.
 
-### General Display & Tabs
+### General Display
 
 | Setting | Description | Default Value |
 | --- | --- | --- |
-| **Calendar font size** | Font size for day names and week numbers. | `13px` |
+| **Calendar font size** | Font size for day names and P/W column. | `13px` |
 | **Day number font size** | Font size for the date numbers in calendar cells. | `15px` |
+| **Navigation buttons height** | The height of the `←`, `Today`, and `→` buttons. | `28px` |
+| **Bold calendar header** | Toggles bold font weight for the day names row. | `false` |
+| **Bold Period/Week column** | Toggles bold font weight for the P/W column. | `false` |
+| **Show calendar grid lines** | Toggles the visibility of borders between calendar days. | `false` |
+| **Show P/W separator line** | Display a vertical line between the Period/Week column and the first date column. | `true` |
+| **P/W separator line color** | Color of the vertical line between Period/Week and date columns. | `rgba(128, 128, 128, 0.3)` |
 | **Month title format** | Sets the display format for the main month title using moment.js tokens. | `MMM YYYY` |
 | **Month title font size** | The font size of the main "Month Year" title. | `20px` |
 | **Bold month title** | Toggles bold font weight for the main title. | `false` |
 | **Month Title Color (Light)** | The color of the main title for light theme. | `rgba(51, 51, 51, 1)` |
 | **Month Title Color (Dark)** | The color of the main title for dark theme. | `rgba(255, 255, 255, 1)` |
-| **Navigation buttons height** | The height of the `←`, `Today`, and `→` buttons. | `28px` |
-| **Bold calendar header** | Toggles bold font weight for the day names row. | `false` |
-| **Bold Period/Week column** | Toggles bold font weight for the P/W column. | `false` |
-| **Show calendar grid lines** | Toggles the visibility of borders between calendar days. | `false` |
-| **Calendar layout** | Choose between Normal, Condensed, or Spacious layout for day cells. | `normal` |
+| **Calendar layout** | Choose between Normal, Condensed, Spacious, or Super Condensed layout for day cells. | `normal` |
 | **Week start day** | Choose between Sunday or Monday as the first day of the week. | `sunday` |
+
+### Tabs Configuration
+
+| Setting | Description | Default Value |
+| --- | --- | --- |
 | **Tab title font size** | Font size for the tab titles. | `14px` |
 | **Bold tab titles** | Toggles bold font weight for tab titles. | `false` |
 | **Active Tab Indicator** | The color of the underline for the currently active tab. | `rgba(102, 102, 102, 1)` |
 | **Tab Order** | A comma-separated list to define the order of tabs. | `scratch,notes,tasks,assets` |
 | **Tab Visibility** | Individual toggles to show or hide the Scratch, Notes, Tasks, and Assets tabs. | All `true` |
-| **Desktop/Mobile tab display** | Choose between `Icon Only`, `Text Only`, or `Icon and Text`. | Desktop: `iconOnly`<br>Mobile: `iconOnly` |
+| **Desktop tab display** | Choose between `Icon Only`, `Text Only`, or `Icon and Text`. | `iconOnly` |
+| **Mobile tab display** | Choose between `Icon Only`, `Text Only`, or `Icon and Text`. | `iconOnly` |
 | **Tab Icons** | Customize the icon for each tab. | Scratch: `pencil`<br>Notes: `files`<br>Tasks: `check-circle`<br>Pinned: `pin`<br>Assets: `image-file` |
 
 ### Calendar Functional Settings
 
 | Setting | Description | Default Value |
 | --- | --- | --- |
-| **Start of Period 1 Week 1** | The Sunday date that anchors the entire Period/Week calculation system. | `2025-03-02` |
-| **Period/Week format** | The display format for the P/W column. | `P#W#` |
+| **Start of Period 1 Week 1** | The date that anchors the entire Period/Week calculation system. Must match your Week Start Day. | `2025-03-02` |
+| **Period/Week format** | The display format for the P/W column (e.g., `P#W#`, `P# W#`, `#-#`). | `P#W#` |
 | **Show Period/Week column** | Toggles the visibility of the P/W column. | `false` |
 | **Show week number column** | Toggles the visibility of a separate week number column. | `true` |
 | **Week number type** | Choose between `Period System Week` or `Calendar Year Week (ISO)`. | `calendar` |
@@ -254,21 +259,20 @@ The plugin offers extensive options to tailor its appearance and functionality.
 | **Daily Note date format** | The date format for daily note filenames. | `YYYY-MM-DD` |
 | **Daily Note open behavior** | Open daily notes in a `new-tab` or the `current-tab`. | `new-tab` |
 | **Daily note template** | Path to a template file to use when creating new daily notes. | `""` |
-| **ICS URL** | External calendar ICS feed URL from Google Calendar, Outlook, etc. | `""` |
-| **Show ICS dot** | Show a dot for external calendar events on the calendar. | `true` |
-| **ICS refresh interval** | How often to refresh the ICS feed in minutes. | `60` |
-| **Calendar events placeholder** | The placeholder text in daily note templates for event insertion. | `%%CALENDAR_EVENTS%%` |
-| **Calendar events format** | Template format for events using placeholders: `{{summary}}`, `{{startTime}}`, `{{endTime}}`. | `- {{startTime}} - {{endTime}}: {{summary}}` |
-| **Calendar event indicator style** | Choose between `dot`, `heatmap`, or `badge` for displaying events. | `dot` |
 | **Auto-reload interval** | Time in milliseconds between automatic data refreshes. | `5000` |
+
+### Grid Highlighting
+
+| Setting | Description | Default Value |
+| --- | --- | --- |
 | **Enable row highlight** | Highlights the entire week's row when hovering over the P/W label. | `true` |
 | **Enable column highlight** | Highlights the entire day column when hovering over the day name label. | `true` |
 | **Enable complex grid highlight** | When hovering over a date, highlights all cells in its row and column. | `false` |
 | **Highlight current week** | Highlights the entire row of the current week. | `false` |
 | **Grid Highlight Color (Light)** | The color used for the row/column/grid hover effects in light mode. | `rgba(163, 163, 163, 0.2)` |
 | **Grid Highlight Color (Dark)** | The color used for the row/column/grid hover effects in dark mode. | `rgba(51, 51, 51, 1)` |
-| **Today highlight style** | Choose between `circle` or `cell` style for highlighting today's date. | `circle` |
-| **Today circle color** | The color used for today's highlight circle. | `rgba(40, 120, 240, 1)` |
+| **Today highlight style** | Choose between `none`, `circle`, `cell`, or `number` style for highlighting today's date. | `circle` |
+| **Today circle color** | The color used for today's highlight circle/number. | `rgba(40, 120, 240, 1)` |
 | **Today cell color (Light)** | Background color for today's cell highlight in light mode. | `rgba(255, 255, 0, 0.3)` |
 | **Today cell color (Dark)** | Background color for today's cell highlight in dark mode. | `rgba(102, 102, 102, 1)` |
 | **Date cell hover color (Light)** | Background color when hovering over a date in light mode. | `rgba(0, 0, 0, 0.075)` |
@@ -304,6 +308,17 @@ The plugin offers extensive options to tailor its appearance and functionality.
 | **Popup font size** | The font size of text inside the hover popup. | `13px` |
 | **Ignore folders for dots** | Define folder paths to exclude from creating dots. | `[]` |
 
+### External Calendar (ICS) Settings
+
+| Setting | Description | Default Value |
+| --- | --- | --- |
+| **ICS URL** | External calendar ICS feed URL from Google Calendar, Outlook, etc. | `""` |
+| **Show ICS dot** | Show a dot for external calendar events on the calendar. | `true` |
+| **ICS refresh interval** | How often to refresh the ICS feed in minutes. | `60` |
+| **Calendar events placeholder** | The placeholder text in daily note templates for event insertion. | `%%CALENDAR_EVENTS%%` |
+| **Calendar events format** | Template format for events using placeholders: `{{summary}}`, `{{startTime}}`, `{{endTime}}`. | `- {{startTime}} - {{endTime}}: {{summary}}` |
+| **Calendar event indicator style** | Choose between `dot`, `heatmap`, or `badge` for displaying events. | `dot` |
+
 ### Task Indicators
 
 | Setting | Description | Default Value |
@@ -328,9 +343,9 @@ The plugin offers extensive options to tailor its appearance and functionality.
 | **Scratchpad open action** | Choose between `new-tab` or `current-tab` when double-clicking the tab. | `new-tab` |
 | **Show preview/edit button** | Shows the button to toggle between plain text and Markdown preview. | `false` |
 | **Show '+ Task' button** | Shows the button to quickly add a new task. | `true` |
-| **Task Creation Format** | The template string for the '+ Task' button. | `- [ ] #Tag \| 📅 {friday}` |
+| **Task Creation Format** | The template string for the '+ Task' button with placeholders like `{today}`, `{friday}`, `\|` for cursor. | `- [ ] #Tag \| 📅 {friday}` |
 | **ScratchPad font size** | Customize the font size used in the scratchpad editor. | `14px` |
-| **ScratchPad font family** | Customize the font family used in the scratchpad editor. | `""` |
+| **ScratchPad font family** | Customize the font family used in the scratchpad editor. | `""` (uses default) |
 | **Bold ScratchPad text** | Toggles bold font weight for scratchpad text. | `false` |
 | **Search highlight color** | The background color for highlighted search terms. | `rgba(255, 165, 0, 0.4)` |
 
@@ -366,9 +381,9 @@ The plugin offers extensive options to tailor its appearance and functionality.
 | **Task text font size** | Font size for individual task items. | `14px` |
 | **Truncate long task text** | If enabled, long task text is shortened with `...`. | `false` |
 | **Show completed tasks for Today** | If enabled, completed tasks due today will still appear. | `true` |
-| **Task sort order** | Default sorting for tasks within each group. | `dueDate` |
-| **Group tasks by** | The default grouping method (`Date` or `Tag`). | `date` |
-| **Date Groups to Show** | Toggles to show/hide specific date groups. | All enabled |
+| **Task sort order** | Default sorting for tasks within each group (`dueDate`, `a-z`, `z-a`). | `dueDate` |
+| **Group tasks by** | The default grouping method (`date` or `tag`). | `date` |
+| **Date Groups to Show** | Toggles to show/hide specific date groups (Overdue, Today, Tomorrow, Next 7 Days, Future, No Date). | All enabled |
 | **Task Group Icons** | Customize the icon for each task group header. | Overdue: `alarm-clock-off`<br>Today: `target`<br>Tomorrow: `arrow-right`<br>Next 7 Days: `calendar-days`<br>Future: `telescope`<br>No Date: `help-circle`<br>Tag: `tag` |
 | **Task Group Backgrounds** | Individual RGBA color pickers for each task group. | Overdue: `rgba(255, 71, 71, 0.15)`<br>Today: `rgba(255, 165, 0, 0.15)`<br>Tomorrow: `rgba(64, 158, 255, 0.15)`<br>Next 7 Days: `rgba(77, 171, 185, 0.15)`<br>Future: `rgba(128, 128, 128, 0.15)`<br>No Date: `rgba(105, 180, 105, 0.15)`<br>Tag: `rgba(105, 105, 105, 0.15)` |
 | **Exclude folders from Task search** | Define folder paths to exclude from the task search. | `[]` |
