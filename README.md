@@ -4,29 +4,30 @@ A powerhouse daily and weekly planning dashboard for Obsidian. This plugin combi
 
 Move beyond simple daily notes with a unique **Period/Week** numbering system, interactive **popups**, and a deeply integrated **task manager**.
 
-<img width="456" height="344" alt="image" src="https://github.com/user-attachments/assets/e25fce2a-61d6-42e5-85a5-78bc792f74f5" />
+<img width="458" height="330" alt="image" src="https://github.com/user-attachments/assets/26127fb2-434d-41d0-a6a7-6eea96d8a87c" />
 
 _The main calendar grid with period / week column, dot indicators, and heat map for the number of tasks for a date._
 
-<img width="456" height="983" alt="image" src="https://github.com/user-attachments/assets/755c64cb-b630-48f1-b132-18f23381ebb1" />
+<img width="457" height="950" alt="image" src="https://github.com/user-attachments/assets/c7f8a318-1bb5-4a4e-9d7c-104665070356" />
 
 _The vertical calendar grid which allows you to scroll up and down to see previous dates and forward dates up to the next year._
 
-<img width="524" height="983" alt="image" src="https://github.com/user-attachments/assets/875cbed1-d3ef-4732-be15-a1254bf18662" />
+<img width="456" height="1065" alt="image" src="https://github.com/user-attachments/assets/19f5899c-386c-4a19-9590-f548dffc0f10" />
 
-_The main interface showing the calendar with period / week column, dot indicators, and the integrated tabs for ScratchPad, Notes, Tasks, and Assets._
+_The main interface showing the calendar with the calendar week column, dot indicators, and the integrated tabs for ScratchPad, Notes, Tasks, and Assets._
 
-<img width="522" height="971" alt="image" src="https://github.com/user-attachments/assets/46a9a9b1-f096-499b-8946-078fb8fcffee" />
+<img width="457" height="337" alt="image" src="https://github.com/user-attachments/assets/cfaf1407-206d-42e8-ae8a-7e62d1764acc" />
 
-_The main interface showing the calendar with period / week column, dot indicators, and the integrated tabs for ScratchPad, Notes, Tasks, and Assets._
+_The main interface showing in light appearance with the calendar week column, heat map for tasks, and the integrated tab buttons for Tasks, ScratchPad, Pinned Notes and Assets._
 
-<img width="1307" height="1014" alt="image" src="https://github.com/user-attachments/assets/9ec24c67-df3d-4c38-897a-09eb2c19c062" />
+<img width="797" height="882" alt="image" src="https://github.com/user-attachments/assets/63015011-b52f-462c-a945-e1d838aee2ed" />
+<img width="380" height="748" alt="image" src="https://github.com/user-attachments/assets/ddffdc98-9323-4831-885c-4b12b2c52113" />
 
-_The main interface showing the calendar with period / week column, dot indicators, and the integrated tabs for ScratchPad, Notes, Tasks, and Assets. The main Obsidian window showing the preview markup from the ScratchPad textarea._
+_COMMING SOON IN v1.2.6: The Themes settings tab provides the ability to view different themes in light and dark app appearances and then apply with one click. Navigate up and down the different themes with the arrow keys and left / right to toggle between light and dark appearance._
 
-<img width="523" height="1176" alt="image" src="https://github.com/user-attachments/assets/42aa3b5c-efdc-4a5c-b9e4-64092d81c376" />
+<img width="1194" height="656" alt="image" src="https://github.com/user-attachments/assets/14722219-a54a-4928-8c84-c92a1364d261" />
 
-_The calendar view shown in the vertical scrolling mode. Also configured in the settings this is showing the ISO week numbers. Click or tap the top month title text to flip between the two calendar views._
+_Some of the available themes._
 
 
 ---
