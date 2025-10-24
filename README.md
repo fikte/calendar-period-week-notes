@@ -23,12 +23,11 @@ _The main interface showing in light appearance with the calendar week column, h
 <img width="797" height="882" alt="image" src="https://github.com/user-attachments/assets/63015011-b52f-462c-a945-e1d838aee2ed" />
 <img width="380" height="748" alt="image" src="https://github.com/user-attachments/assets/ddffdc98-9323-4831-885c-4b12b2c52113" />
 
-_COMMING SOON IN v1.2.6: The Themes settings tab provides the ability to view different themes in light and dark app appearances and then apply with one click. Navigate up and down the different themes with the arrow keys and left / right to toggle between light and dark appearance._
+_The Themes settings tab provides the ability to view different themes in light and dark app appearances and then apply with one click. Navigate up and down the different themes with the arrow keys and left / right to toggle between light and dark appearance._
 
 <img width="1194" height="656" alt="image" src="https://github.com/user-attachments/assets/14722219-a54a-4928-8c84-c92a1364d261" />
 
 _Some of the available themes._
-
 
 ---
 
@@ -47,14 +46,17 @@ _Some of the available themes._
     -   🟠 Modified Notes (non-daily)
     -   🔴 New Assets (images, PDFs, etc.)
     -   ⚫ Calendar Events (from external ICS feed)
--   **Task & Event Indicators**: Visualize your workload with three distinct styles:
+-   **Enhanced Task & Event Indicators**: Visualize your workload with multiple styles:
     -   **Badge**: A numerical count of open tasks/events for the day.
     -   **Heatmap**: The cell background color changes based on the number of tasks/events.
     -   **Dot**: A single, customizable dot to indicate any tasks/events.
--   **Interactive Popups**: Hover over any day to see a detailed popup listing the specific notes, tasks, assets, and calendar events for that day, with clickable links to open them.
+    -   **Custom Task Statuses**: Go beyond a simple checkbox. Use symbols like `/` for in-progress, `>` for forwarded, `!` for important, or `?` for questions, all with customizable icons.
+-   **Interactive & Mobile-Friendly Popups**:
+    -   On desktop, hover over any day to see a detailed popup listing the specific notes, tasks, assets, and calendar events for that day, with clickable links.
+    -   On mobile, **long-press a date** to open the popup as a convenient bottom sheet, and **tap the date** to open the daily note.
 -   **Advanced Highlighting**: Customize how dates are highlighted, with options for the current week row, day column on hover, or even shading for weekends.
 -   **Week Numbers**: Display standard ISO week numbers or week numbers based on your custom Period/Week system in a dedicated column.
--   **Weekly Notes**: Create and manage weekly notes, indicated by a dot on the week number. Features customizable naming formats and template support.
+-   **Weekly Notes**: Create and manage weekly notes, indicated by a dot on the week number. Features fully customizable naming formats and template support.
 
 ### 🧩 Integrated & Draggable Tabbed Dashboard
 
@@ -65,14 +67,16 @@ A powerful panel located directly below the calendar. All tabs can be reordered 
     -   **Find-as-you-type search** with result highlighting.
     -   A quick-add button to insert new tasks using a customizable format with dynamic date placeholders (`{today}`, `{friday}`) and cursor positioning (`|`).
     -   **Click the tab** while it's active to open the scratchpad file in a full editor tab.
--   **📂 Notes & Pinned Tab**:
-    -   View a sorted list of recently created or modified notes within a configurable lookback period.
-    -   **Click the tab** while active to switch to **"Pinned" mode**, showing only notes with a specific tag (e.g., `#pin`).
-    -   Pinned notes can be sorted alphabetically or in a **custom drag-and-drop order**.
+-   **📂 Notes & Pinned Tab**: A unified tab for browsing notes.
+    -   **Click the tab** to toggle between **"Recent"** mode and **"Pinned"** mode.
+    -   **Recent Mode**: View a sorted list of recently created or modified notes within a configurable lookback period, grouped by date (Today, Yesterday, etc.).
+    -   **Pinned Mode**: Shows only notes with a specific tag (e.g., `#pin`).
+    -   **Custom Sorting**: Sort pinned notes alphabetically, or activate a **custom drag-and-drop order** by holding `Alt` (Windows/Linux) or `Option` (macOS).
     -   Detailed tooltips on hover show file path, dates, size, and tags.
 -   **✔️ Tasks Tab**: A complete task management system that scans your entire vault.
-    -   **Group tasks** by due date (`Overdue`, `Today`, `Tomorrow`, `Next 7 Days`, `Future`, `No Date`) or by `#tag`.
+    -   **Group tasks** by due date (`Overdue`, `Today`, `Tomorrow`...) or by `#tag`.
     -   Toggle the grouping method by **clicking the tab** while it's active.
+    -   **Animated Groups**: Task groups smoothly expand and collapse with an animation.
     -   Check off tasks directly from the list to update the underlying Markdown file instantly.
     -   Click any task to jump directly to its line in the source file.
     -   Collapsible task groups with customizable icons and background colors.
@@ -87,13 +91,34 @@ A powerful panel located directly below the calendar. All tabs can be reordered 
 
 -   **ICS Feed Support**: Integrate external calendars (Google Calendar, Outlook, etc.) by providing an `.ics` URL.
 -   **Auto-Refresh**: Set a configurable refresh interval (from 15 minutes to 12 hours) to keep events up to date.
--   **Template Insertion**: Automatically insert upcoming calendar events into your daily notes using a placeholder (`%%CALENDAR_EVENTS%%`) and a fully customizable format for each event.
+-   **Intelligent Template Insertion**:
+    -   When creating a daily note for a day with events, a dialog will ask if you want to include them.
+    -   Events are inserted into your daily note using a placeholder (`%%CALENDAR_EVENTS%%`) and a fully customizable format.
+    -   **Handles All-Day Events**: Correctly formats all-day events by replacing start/end times with "All-day".
 -   **Event Display**: View event details in the date hover popup and visualize them on the calendar grid using a dot, or by contributing to the task heatmap/badge count.
+
+### 🎨 Powerful Theming Engine
+
+-   **16 Pre-built Themes**: Instantly change the look and feel with a diverse collection of themes, ranging from minimalist and dark to bright and colorful, designed to complement your main Obsidian theme.
+-   **Create & Customize**: Every color in the plugin is customizable. Build your own theme from scratch or tweak an existing one to perfectly match your preferences.
+-   **Share Your Creations**: Use the **Export Theme Only** function in the settings to save your colors to a JSON file. This allows for easy backups and sharing with the community.
+
+| # | Theme               | #  | Theme     |
+|:--|:--------------------|:---|:----------|
+| 1 | Autumn              | 9  | Izzy      |
+| 2 | Beach               | 10 | Kate      |
+| 3 | Calm                | 11 | Pride     |
+| 4 | Christmas           | 12 | Scary     |
+| 5 | Default-Developer   | 13 | Sky       |
+| 6 | Default             | 14 | Spring    |
+| 7 | Garden              | 15 | Summer    |
+| 8 | Halloween           | 16 | Winter    |
+
 
 ### ⚙️ Deep Customization
 
 -   **Tabbed Settings**: A clean, organized settings interface with dedicated tabs for every feature.
--   **Import/Export**: Save your complete plugin configuration to a JSON file for backup or sharing. You can also export a "Theme Only" file containing just your color and font preferences.
+-   **Import/Export**: Save and load your complete plugin configuration to a JSON file for backup or sharing.
 
 ---
 
@@ -119,12 +144,12 @@ A powerful panel located directly below the calendar. All tabs can be reordered 
 
 1.  **Open the View**: Click the `📅` icon in the left ribbon or use the command palette (`Ctrl/Cmd + P`) and search for "Open Calendar Period Week Notes".
 2.  **Navigate the Calendar**:
-    -   Click on any date to open (or create) the daily note for that day.
-    -   Hover over a date with indicators to see the details popup.
-    -   Use the `←` and `→` arrows to change the month.
+    -   On desktop, click a date to open its daily note. On mobile, **tap** a date to open the note.
+    -   On desktop, hover a date to see the details popup. On mobile, **long-press** the date.
+    -   Use the `←` and `→` arrows to change the month. Click the `Today` button to return to the current month.
     -   Click the month title (e.g., "October 2025") to switch between monthly and vertical views.
     -   Click the chevron button to collapse/expand the calendar grid.
-    -   Click on the week number to open (or create) a weekly note.
+    -   Click on a week number to open (or create) a weekly note.
 3.  **Use the Tabs**:
     -   Click a tab to switch panels.
     -   Drag and drop tabs to reorder them.
@@ -133,6 +158,7 @@ A powerful panel located directly below the calendar. All tabs can be reordered 
         -   **Notes Tab**: Toggles between "Recent" and "Pinned" views.
         -   **Tasks Tab**: Toggles grouping between "Date" and "Tag".
         -   **Assets Tab**: Toggles between grid and list view.
+4.  **Reorder Pinned Notes**: In the Pinned Notes view, click the header to cycle the sort order to `Custom`. Then, hold `Alt` (Windows/Linux) or `Option` (macOS) and drag notes to set your preferred order.
 
 ---
 
@@ -193,9 +219,9 @@ The plugin offers extensive options organized into the following tabs.
 | **Weekend shade color (Light/Dark)**| Background color for weekend columns.                                                                                                                                                | `rgba(0,0,0,0.03)` / `rgba(255,255,255,0.03)`    |
 | **External calendar URL (.ics)**    | URL for an external .ics calendar feed.                                                                                                                                              | `""`                                            |
 | **Auto-refresh Interval**           | How often to refresh the external calendar (in minutes).                                                                                                                             | `60`                                            |
-| **Calendar Event Indicator**        | Display events as `Dot Only`, or `Add to Heatmap`/`Add to Task Badge`.                                                                                                                 | `dot`                                           |
+| **Calendar Event Indicator**        | Display events as `Dot Only`, `Add to Heatmap` or `Add to Task Badge`.                                                                                                                 | `dot`                                           |
 | **Calendar Events Placeholder**     | Placeholder in daily notes for event insertion (e.g., `%%CALENDAR_EVENTS%%`).                                                                                                          | `%%CALENDAR_EVENTS%%`                           |
-| **Calendar Event Format**           | Template for each event, using `{{summary}}`, `{{startTime}}`, `{{endTime}}`.                                                                                                          | `- {{startTime}} - {{endTime}}: {{summary}}`      |
+| **Calendar Event Format**           | Template for each event. Use `{{summary}}`, `{{startTime}}`, and `{{endTime}}`. `All-day` is used for all-day events.                                                                  | `- {{startTime}} - {{endTime}}: {{summary}}`      |
 
 ### Calendar Dots
 
@@ -215,7 +241,7 @@ The plugin offers extensive options organized into the following tabs.
 | **Popup hide delay**                    | Delay in ms before hiding the popup after mouse leaves.                                  | `100`                               |
 | **Popup gap**                           | Gap in pixels between a calendar day and its popup (can be negative).                    | `-2`                                |
 | **Popup font size**                     | Font size of text inside the hover popup.                                                | `13px`                              |
-| **Ignore folders for calendar dots**    | Folder paths to exclude from creating created/modified dots.                             | `[]`                                |
+| **Ignore folders for note dots**        | Folder paths to exclude from creating created/modified dots.                             | `[]`                                |
 | **Ignore folders for asset dots**       | Folder paths to exclude from creating asset dots.                                        | `[]`                                |
 
 ### Weekly Notes
@@ -224,7 +250,7 @@ The plugin offers extensive options organized into the following tabs.
 | :----------------------- | :------------------------------------------------------------------------------------------------------------ | :-------------------------------- |
 | **Enable weekly notes**  | Toggle weekly notes functionality.                                                                            | `true`                              |
 | **Weekly note folder**   | The vault path where weekly notes are stored.                                                                 | `Weekly Notes`                    |
-| **Weekly note format**   | Filename format using placeholders: `YYYY`, `MM`, `PN`, `PW`, `WKP`, `WKC`.                                     | `YYYY-[W]WKC`                     |
+| **Weekly note format**   | Filename format. Placeholders: `YYYY`, `MM`, `PN` (Period), `PW` (Week of Period), `WKP` (Week of Period Year), `WKC` (ISO Week). | `YYYY-[W]WKC`                     |
 | **Weekly note template** | Path to a template file for new weekly notes.                                                                 | `""`                                |
 | **Show weekly note dot** | Show a dot on the week number when a weekly note exists.                                                      | `true`                              |
 | **Weekly Note Dot Color**| Color of the weekly note indicator dot.                                                                       | `rgba(160, 115, 240, 1)`          |
@@ -246,7 +272,7 @@ The plugin offers extensive options organized into the following tabs.
 | **Gradient Midpoint**         | Number of tasks to trigger the mid color.                                | `5`                                             |
 | **Gradient Maxpoint**         | Number of tasks to trigger the end color.                                | `10`                                            |
 
-### General Tab
+### Tabs
 
 | Setting                  | Description                                                                     | Default Value                           |
 | :----------------------- | :------------------------------------------------------------------------------ | :-------------------------------------- |
@@ -340,6 +366,7 @@ Contributions, issues, and feature requests are welcome! Feel free to check the 
 ## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE.md file for details.
+
 
 
 
