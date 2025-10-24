@@ -273,7 +273,7 @@ The plugin offers extensive options organized into the following tabs.
 | **Task indicator style**      | Choose between `none`, `badge`, or `heatmap`.                            | `heatmap`                                       |
 | **Show dot for tasks**        | Show a separate dot for tasks (can be used with other styles).           | `false`                                         |
 | **Task Dot Color**            | The color of the task dot.                                               | `rgba(200, 100, 200, 1)`                        |
-| **Task badge font size**      | Font size for the task count badge.                                      | `9px`                                           |
+| **Task badge font size**      | Font size for the task count badge.                                      | `11px`                                           |
 | **Task badge background color** | Background color for the task count badge.                             | `rgba(100, 149, 237, 0.6)`                      |
 | **Task badge font color**     | Text color for the task count badge.                                     | `rgba(255, 255, 255, 1)`                        |
 | **Heatmap content border width** | Width of the border inside heatmap cells (e.g., `1px`).               | `1px`                                           |
