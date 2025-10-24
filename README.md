@@ -4,11 +4,11 @@ A powerhouse daily and weekly planning dashboard for Obsidian. This plugin combi
 
 Move beyond simple daily notes with a unique **Period/Week** numbering system, interactive **popups**, and a deeply integrated **task manager**.
 
-<img width="458" height="330" alt="image" src="https://github.com/user-attachments/assets/26127fb2-434d-41d0-a6a7-6eea96d8a87c" />
+<img width="434" height="341" alt="image" src="https://github.com/user-attachments/assets/91de85b9-0603-48e7-a2b0-4dbc273cc9da" />
 
 _The main calendar grid with period / week column, dot indicators, and heat map for the number of tasks for a date._
 
-<img width="457" height="950" alt="image" src="https://github.com/user-attachments/assets/c7f8a318-1bb5-4a4e-9d7c-104665070356" />
+<img width="434" height="987" alt="image" src="https://github.com/user-attachments/assets/e1784fc4-f62f-462b-a6b8-4d9021256923" />
 
 _The vertical calendar grid which allows you to scroll up and down to see previous dates and forward dates up to the next year._
 
