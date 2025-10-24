@@ -223,7 +223,18 @@ The plugin offers extensive options organized into the following tabs.
 | **Calendar Events Placeholder**     | Placeholder in daily notes for event insertion (e.g., `%%CALENDAR_EVENTS%%`).                                                                                                          | `%%CALENDAR_EVENTS%%`                           |
 | **Calendar Event Format**           | Template for each event. Use `{{summary}}`, `{{startTime}}`, and `{{endTime}}`. `All-day` is used for all-day events.                                                                  | `- {{startTime}} - {{endTime}}: {{summary}}`      |
 
-### Calendar Dots
+### Popup Indicators
+
+| Setting | Description | Options / Default |
+| --- | --- | --- |
+| **Popup Hover Delay** | How long to wait before showing the note list popup on hover. | Default: `800` (milliseconds) |
+| **Popup Hide Delay** | How long to wait before hiding the popup after the mouse leaves an item. | Default: `50` (milliseconds) |
+| **Popup Gap** | The gap in pixels between a calendar day and its popup list. Can be negative. | Default: `-2` (pixels) |
+| **Popup Font Size** | The font size for the note names inside the calendar popup. | Default: `14px` |
+| **Notes & Assets Popup Trigger** | Choose how popups appear in the Notes and Assets tabs. | - `Hover` (Desktop) / `Long-press` (Mobile) <br> - `Right-click` (Desktop) / `Long-press` (Mobile) |
+
+
+### Dot Indicators
 
 | Setting                                 | Description                                                                              | Default Value                     |
 | :-------------------------------------- | :--------------------------------------------------------------------------------------- | :-------------------------------- |
@@ -272,7 +283,7 @@ The plugin offers extensive options organized into the following tabs.
 | **Gradient Midpoint**         | Number of tasks to trigger the mid color.                                | `5`                                             |
 | **Gradient Maxpoint**         | Number of tasks to trigger the end color.                                | `10`                                            |
 
-### Tabs
+### General Tabs
 
 | Setting                  | Description                                                                     | Default Value                           |
 | :----------------------- | :------------------------------------------------------------------------------ | :-------------------------------------- |
