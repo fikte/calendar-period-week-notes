@@ -12,11 +12,11 @@ _The main calendar grid with period / week column, dot indicators, and heat map 
 
 _The vertical calendar grid which allows you to scroll up and down to see previous dates and forward dates up to the next year._
 
-<img width="456" height="1065" alt="image" src="https://github.com/user-attachments/assets/19f5899c-386c-4a19-9590-f548dffc0f10" />
+<img width="435" height="1153" alt="image" src="https://github.com/user-attachments/assets/6d92b769-c685-4869-8d0f-8b14df235745" />
 
 _The main interface showing the calendar with the calendar week column, dot indicators, and the integrated tabs for ScratchPad, Notes, Tasks, and Assets._
 
-<img width="457" height="337" alt="image" src="https://github.com/user-attachments/assets/cfaf1407-206d-42e8-ae8a-7e62d1764acc" />
+<img width="435" height="339" alt="image" src="https://github.com/user-attachments/assets/1805df7b-9bc2-4254-bb20-48ace45333e7" />
 
 _The main interface showing in light appearance with the calendar week column, heat map for tasks, and the integrated tab buttons for Tasks, ScratchPad, Pinned Notes and Assets._
 
