@@ -1,4 +1,4 @@
-[Contributing to this plugin](https://github.com/fikte/calendar-period-week-notes/edit/main/README.md#contributing-to-calendar-period-week-notes)
+[Contributing to this plugin](https://github.com/fikte/calendar-period-week-notes?tab=readme-ov-file#contributing-to-calendar-period-week-notes)
 
 --- 
 
