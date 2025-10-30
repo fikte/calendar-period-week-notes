@@ -1,0 +1,22 @@
+{
+  "name": "calendar-period-week-notes",
+  "version": "1.3.0",
+  "description": "A calendar based Obsidian plugin.",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "rollup --config -w",
+    "build": "rollup --config"
+  },
+  "keywords": [],
+  "author": "Tim Williams",
+  "license": "ISC",
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^28.0.6",
+    "@rollup/plugin-node-resolve": "^16.0.2",
+    "rollup": "^4.52.4"
+  },
+  "dependencies": {
+    "ical.js": "^2.2.1"
+  }
+}
