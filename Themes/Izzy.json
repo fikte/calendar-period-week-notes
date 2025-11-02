@@ -31,7 +31,7 @@
   "tabTitleBold": false,
   "selectedTabColor": "rgba(255, 20, 147, 1.00)",
   "todayHighlightColorLight": "rgba(255, 105, 180, 0.80)",
-  "todayHighlightColorDark": "rgba(255, 105, 180, 0.80)",
+  "todayHighlightColorDark": "rgba(255, 105, 180, 0.50)",
   "notesHoverColor": "rgba(199, 21, 133, 0.15)",
   "dailyNoteDotColor": "rgba(255, 105, 180, 1.00)",
   "noteCreatedColor": "rgba(173, 216, 230, 0.80)",
@@ -44,7 +44,7 @@
   "dateCellHoverColorDark": "rgba(60, 80, 100, 1)",
   "assetDotColor": "rgba(157, 27, 92, 1.00)",
   "calendarEventDotColor": "rgba(125, 84, 105, 1.00)",
-  "todayHighlightStyle": "circle",
+  "todayHighlightStyle": "cell",
   "todayCircleColorLight": "rgba(255, 105, 180, 0.8)",
   "todayCircleColorDark": "rgba(255, 105, 180, 0.80)",
   "weeklyNoteDotColor": "rgba(255, 20, 147, 1)",
@@ -75,5 +75,10 @@
   "taskGroupColorFuture": "rgba(197, 68, 193, 0.20)",
   "taskGroupColorNoDate": "rgba(218, 112, 214, 0.15)",
   "taskGroupColorTag": "rgba(218, 112, 214, 0.18)",
+  "taskStatusColorOverdue": "rgba(244, 21, 1, 0.50)",
+  "taskStatusColorInProgress": "rgba(251, 188, 5, 0.5)",
+  "taskStatusColorOpen": "rgba(74, 144, 226, 0.50)",
+  "taskStatusColorCompleted": "rgba(126, 211, 33, 0.50)",
+  "taskStatusColorCancelled": "rgba(158, 158, 158, 0.5)",
   "__exportType": "theme"
 }

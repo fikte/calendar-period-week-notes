@@ -44,7 +44,7 @@
   "dateCellHoverColorDark": "rgba(60, 80, 100, 1)",
   "assetDotColor": "rgba(30, 144, 255, 1.00)",
   "calendarEventDotColor": "rgba(173, 216, 230, 1)",
-  "todayHighlightStyle": "circle",
+  "todayHighlightStyle": "cell",
   "todayCircleColorLight": "rgba(255, 105, 180, 0.8)",
   "todayCircleColorDark": "rgba(28, 166, 253, 0.80)",
   "weeklyNoteDotColor": "rgba(255, 20, 147, 1)",
@@ -75,5 +75,10 @@
   "taskGroupColorFuture": "rgba(240, 248, 255, 0.15)",
   "taskGroupColorNoDate": "rgba(211, 211, 211, 0.15)",
   "taskGroupColorTag": "rgba(255, 20, 147, 0.18)",
+  "taskStatusColorOverdue": "rgba(244, 21, 1, 0.50)",
+  "taskStatusColorInProgress": "rgba(251, 188, 5, 0.5)",
+  "taskStatusColorOpen": "rgba(74, 144, 226, 0.50)",
+  "taskStatusColorCompleted": "rgba(126, 211, 33, 0.50)",
+  "taskStatusColorCancelled": "rgba(158, 158, 158, 0.5)",
   "__exportType": "theme"
 }
