@@ -56,7 +56,7 @@ const DEFAULT_SETTINGS = {
     tabDisplayMode: "iconOnly",
     mobileTabDisplayMode: "iconOnly",
     collapsedNoteGroups: {},
-    tabOrder: ["scratch", "notes", "tasks", "assets", "dashboard"],
+    tabOrder: ["scratch", "tasks", "notes", "assets", "dashboard"],
     tabIcons: {
         scratch: "pencil",
         notes: "files",
@@ -65,14 +65,14 @@ const DEFAULT_SETTINGS = {
         assets: "image-file",
         dashboard: "chart-bar-big"
     },
-    assetsLookbackDays: 7,
+    assetsLookbackDays: 120,
     assetsDefaultView: 'grid',
     defaultDashboardView: 'creation',
     taskBarChartDefaultMode: 'percent',
     tabVisibility: {
         scratch: true,
-        notes: true,
         tasks: true,
+        notes: true,
         assets: true,
         dashboard: true
     },
@@ -89,18 +89,18 @@ const DEFAULT_SETTINGS = {
     scratchpad: {
         showPreviewToggle: true,
         showAddTaskButton: true,
-        taskFormat: "- [ ] #Tag | 📅 {friday}"
+        taskFormat: "- [ ] #Tag | 📅 {friday}",
+        hideFrontmatter: true
     },
-
     // Notes Tab
     ignoreFolders: [],
     pinTag: "pin",
     notesViewMode: "recent",
     notesFontSize: "14px",
     notesBold: false,
-    notesOpenAction: "new-tab",
+    notesOpenAction: "current-tab",
     notesLineHeight: 1.2,
-    notesLookbackDays: 7,
+    notesLookbackDays: 120,
     showNoteStatusDots: true,
     showNoteTooltips: true,
     pinnedNotesSortOrder: 'a-z', // can be 'a-z' or 'custom'
@@ -126,7 +126,6 @@ const DEFAULT_SETTINGS = {
     calendarEventDotColor: 'rgba(148, 148, 148, 1)', 
 
     assetIgnoreFolders: [],
-
     showPWColumnSeparator: true,
     pwColumnSeparatorColor: "rgba(128, 128, 128, 0.2)", // Grey separator line
 
@@ -255,19 +254,19 @@ const DEFAULT_SETTINGS = {
 
     //Dashboard Tab
     customHeatmaps: [],
-    creationDashboardOrder: ['allfilesheatmap', 'dailynotesheatmap', 'regularnotesheatmap', 'assetsheatmap'],
+    creationDashboardOrder: ['dailynotesheatmap', 'regularnotesheatmap', 'assetsheatmap', 'allfilesheatmap'],
     creationDashboardWidgets: {
         allfilesheatmap: true,
         dailynotesheatmap: true,
         regularnotesheatmap: true,
         assetsheatmap: true,
     },
-    tasksDashboardOrder: ['today', 'thisweek', 'nextweek', 'next4weeks', 'upcomingoverdue', 'taskstatusoverview', 'taskcompletionheatmap'],
+    tasksDashboardOrder: ['today', 'tomorrow', 'next7days', 'futureNoDue', 'upcomingoverdue', 'taskstatusoverview', 'taskcompletionheatmap'],
     tasksDashboardWidgets: {
         today: true,
-        thisweek: true,
-        nextweek: true,
-        next4weeks: true,
+        tomorrow: true,
+        next7days: true,
+        futureNoDue: true,
         upcomingoverdue: true,
         taskstatusoverview: true,
         taskcompletionheatmap: true,
@@ -275,6 +274,10 @@ const DEFAULT_SETTINGS = {
     collapsedHeatmaps: {},
     smallWidgetStates: {},
     collapsedWidgets: {},
+    isHeatmapGuideCollapsed: true,
+    heatmapLinkConfig: {},
+    heatmapTotalClickOpenAction: 'new-tab',
+    customHeatmaps: [],
 
 };
 
@@ -718,10 +721,12 @@ body .period-month-container.today-style-cell .period-calendar-table tbody tr.cu
   align-items: center;
   justify-content: space-between;
   margin-bottom: 6px;
+  gap: 8px;
 }
 .tab-container {
   display: flex;
   align-items: center;
+  
 }
 .note-tab {
   position: relative;
@@ -1416,13 +1421,13 @@ body.theme-light .search-input-clear-btn .svg-icon {
 
 /* --- Asset Grid Styles --- */
 .note-list-wrapper.assets-grid-view {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 16px;
     padding-top: 8px;
 }
 .asset-grid-item {
-    flex-basis: calc(50% - 8px); 
+    /* flex-basis: calc(50% - 8px); */
     display: flex;
     flex-direction: column;
     cursor: pointer;
@@ -1551,6 +1556,7 @@ body.theme-light .search-input-clear-btn .svg-icon {
 }
 .note-title-path-wrapper,
 .other-notes-popup-item .note-title-path-wrapper {
+    flex-grow: 1;    
     display: flex;
     flex-direction: column;
     min-width: 0; 
@@ -1617,7 +1623,6 @@ body.theme-light .search-input-clear-btn .svg-icon {
 .note-list-wrapper {
   overflow: hidden;
   transition: max-height 0.3s ease-in-out, margin-top 0.3s ease-in-out;
-  max-height: 2000px; /* A large value to accommodate many notes */
   margin-top: 4px;
 }
 .note-group-container.is-collapsed .note-list-wrapper {
@@ -2427,11 +2432,26 @@ body.theme-light .search-input-clear-btn .svg-icon {
     width: 100%;
 }
 
+/* Default state for the total count - no pointer */
 .heatmap-total-count {
+    cursor: default !important;
+    text-decoration: none !important;
     font-size: 0.9em;
     font-weight: normal;
     color: var(--text-muted);
-    
+}
+
+/* This rule ONLY applies when a link exists, adding the hand pointer and underline */
+.heatmap-total-count.is-clickable {
+    cursor: pointer !important;
+    text-decoration: underline !important;
+    text-decoration-style: dotted !important;
+    text-underline-offset: 3px;
+}
+
+/* Optional: Add a hover effect only when it's clickable */
+.heatmap-total-count.is-clickable:hover {
+    color: var(--text-accent);
 }
 
 /* Change cursor to a hand pointer for interactive heatmap cells */
@@ -2607,9 +2627,22 @@ body.theme-dark .heatmap-cell.heatmap-current-week-cell {
 }
 
 .pm-widget-header {
+    cursor: default !important;
     display: flex;
     align-items: center;
     gap: 8px; /* Creates space between the icon and title */
+}
+
+.pm-widget-header .heatmap-collapse-icon,
+.pm-widget-header h3,
+.pm-widget-header .heatmap-total-count.is-clickable {
+  cursor: pointer !important;
+}
+
+.pm-widget-header .heatmap-collapse-icon:hover,
+.pm-widget-header h3:hover,
+.pm-widget-header .heatmap-total-count.is-clickable:hover {
+  color: var(--text-accent);
 }
 
 .heatmap-collapse-icon {
@@ -2713,9 +2746,20 @@ body.theme-dark .heatmap-cell.heatmap-current-week-cell {
 }
 .pm-widget-container.is-summary-widget {
     gap: 0px;
+    min-height: 80px;
+    justify-content: center;
 }
+.pm-widget-container.is-summary-widget .task-group-empty-message {
+    /* Centers the 'No tasks' message perfectly in the middle of the widget */
+    text-align: center;
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .pm-dashboard-grid {
-    align-items: start;
+    align-items: stretch;
 }
 .pm-widget-container.is-summary-widget.is-minimised {
     
@@ -2805,8 +2849,19 @@ body.theme-dark .heatmap-cell.heatmap-current-week-cell {
 
 .task-row .task-text,
 .other-notes-popup-item .task-text {
-    line-height: 1.7; 
+    flex: 1;             /* Modern shorthand for flex-grow, shrink, basis */
+    display: flex;       /* CRITICAL: Makes this a flex container */
+    align-items: center; /* Vertically aligns the text nicely */
+    min-width: 0;
+    line-height: 1.7;
 }
+
+/* Add this rule to handle the paragraph inside */
+.other-notes-popup-item .task-text > p {
+    width: 100%;
+    margin: 0;
+}
+
 
 .other-notes-popup-item .task-checkbox-symbol {
     margin-top: 4px !important;  
@@ -2869,6 +2924,33 @@ body.theme-dark .heatmap-cell.heatmap-current-week-cell {
 .task-checkbox-symbol .task-list-item-checkbox {
     margin: 0;
    
+}
+.asset-grid-preview img {
+    object-fit: contain !important;
+}
+
+.note-group-container {
+  overflow: visible !important;
+  max-height: none !important;
+}
+
+.asset-grid-preview img {
+  object-fit: contain !important;
+}
+.pinned-notes-empty-message {
+    padding: 24px;
+    text-align: center;
+    font-style: italic;
+    color: var(--text-muted);
+    font-size: 0.9em;
+}
+
+.pinned-notes-empty-message code {
+    font-style: normal;
+    font-size: 1.1em;
+}
+body.is-mobile .tabs-content-wrapper {
+    padding-bottom: 0 !important;
 }
 `;
 
@@ -3291,6 +3373,7 @@ class FilterSuggest extends AbstractInputSuggest {
  * The main view class for the plugin, handling all rendering and user interaction.
  */
 class PeriodMonthView extends ItemView {
+        
     constructor(leaf, plugin) {
         super(leaf);
         this.plugin = plugin;
@@ -3303,7 +3386,9 @@ class PeriodMonthView extends ItemView {
         this.dashboardCreationDebounceTimer = null;
         this.dashboardRefreshTimers = new Map();
         this.fileToHeatmapCache = new Map();
-
+        this.resizeDebounceTimer = null;
+        this.statusBarObserver = null;
+    
         //pull down to fresh
         this.taskPullStartY = 0;
         this.taskPullDistance = 0;
@@ -3365,9 +3450,10 @@ class PeriodMonthView extends ItemView {
         this.calendarRefreshDebounceTimer = null;
         this.titleUpdateTimeout = null;
         this.existingWeeklyNotes = new Set();
-        this.dailyRefreshTimeout = null; // Timeout to trigger daily refresh at midnight
+        this.dailyRefreshTimeout = null; 
         this.themeObserver = null;
         this.lastKnownToday = new Date();
+        this.scratchpadFrontmatter = '';
 
         // --- Mobile Keyboard Handling ---
         this.isEditingMobile = false;
@@ -3402,6 +3488,21 @@ class PeriodMonthView extends ItemView {
             if (this.isDraggingNote) {
                 this.isDraggingNote = false;
             }
+        });
+
+        this.registerDomEvent(window, 'resize', () => {
+            // Clear any existing timer to debounce the event
+            if (this.resizeDebounceTimer) {
+                clearTimeout(this.resizeDebounceTimer);
+            }
+            
+            // Set a new timer to run the update after a short delay
+            this.resizeDebounceTimer = window.setTimeout(() => {
+                // Check if the title element exists and then re-render it
+                if (this.monthNameEl) {
+                    this.updateMonthTitle();
+                }
+            }, 100); // A 100ms delay is usually sufficient
         });
     }
 
@@ -3533,28 +3634,62 @@ class PeriodMonthView extends ItemView {
         await this.populateNotes();
     }
 
-    renderTaskSummaryWidget(parent, title, incompleteTasks, completedTasks, overdueTasks = [], noDueTasks = [], widgetKey) {
+    updateDynamicPadding() {
+        if (Platform.isMobile) return; // Don't run this logic on mobile
+
+        const statusBar = document.querySelector('.status-bar');
+        const contentWrapper = this.containerEl.querySelector('.tabs-content-wrapper');
+
+        if (statusBar && contentWrapper) {
+            const statusBarHeight = statusBar.offsetHeight;
+            contentWrapper.style.paddingBottom = `${statusBarHeight}px`;
+        }
+    }
+
+    renderTaskSummaryWidget(parent, title, incompleteTasks, completedTasks, overdueTasks = [], inProgressTasks = [], noDueTasks = [], widgetKey) {
+    
         const widgetContainer = parent.createDiv({ cls: 'pm-widget-container is-summary-widget' });
 
-        // --- State Management ---
-        const states = ['full', 'mini', 'minimised'];
+        // --- State Management (Your code, unchanged) ---
+        const states = ['full', 'mini'];
         let currentState = this.plugin.settings.smallWidgetStates[widgetKey] || 'full';
 
-        // --- UI Elements ---
+        // --- UI Elements (Your code, unchanged) ---
         const header = widgetContainer.createDiv({ cls: 'pm-widget-header' });
         const toggleIcon = header.createDiv({ cls: 'summary-toggle-icon' });
         const titleEl = header.createEl('h3', { text: title });
 
-        // --- Corrected Core Rendering Logic ---
-        const totalTasks = (incompleteTasks?.length || 0) + (completedTasks?.length || 0) + (overdueTasks?.length || 0) + (noDueTasks?.length || 0);
+        // --- Core Rendering Logic (MODIFIED) ---
+        const totalTasks = (incompleteTasks?.length || 0) + (completedTasks?.length || 0) + (overdueTasks?.length || 0) + (inProgressTasks?.length || 0) + (noDueTasks?.length || 0);
+        const isEmpty = totalTasks === 0;
 
-        if (totalTasks === 0) {
+        // --- UI Update and Click Handlers (Your code, unchanged) ---
+        const updateView = () => {
+            widgetContainer.removeClasses(['is-full', 'is-mini']);
+            widgetContainer.addClass(`is-${currentState}`);
+            setIcon(toggleIcon, 'chevron-down');
+
+            if (isEmpty && currentState === 'full') {
+                widgetContainer.style.minHeight = '85px';
+                widgetContainer.style.display = 'flex';
+                widgetContainer.style.justifyContent = 'center';
+                widgetContainer.style.alignItems = 'center';
+            } else {
+                widgetContainer.style.minHeight = '';
+                widgetContainer.style.display = '';
+                widgetContainer.style.justifyContent = '';
+                widgetContainer.style.alignItems = '';
+            }
+        };
+
+        if (isEmpty) {
             widgetContainer.createDiv({ text: 'No tasks in this period.', cls: 'task-group-empty-message' });
         } else {
             const barAndLegendWrapper = widgetContainer.createDiv({ cls: 'bar-and-legend-wrapper' });
             const progressBar = barAndLegendWrapper.createDiv({ cls: 'pm-progress-bar' });
             const legend = barAndLegendWrapper.createDiv({ cls: 'pm-progress-legend' });
 
+            // --- setupSegment function (MODIFIED TO ADD COLORS) ---
             const setupSegment = (tasks, type) => {
                 if (!tasks || tasks.length === 0) return;
 
@@ -3565,13 +3700,37 @@ class PeriodMonthView extends ItemView {
                 segment.style.width = `${(tasks.length / totalTasks) * 100}%`;
                 segment.addClass('is-interactive');
 
-                // Popup logic for each segment
+                // --- THIS IS THE NEW COLOR LOGIC ---
+                let bgColor = '';
+                switch(type) {
+                    case 'overdue':
+                        bgColor = this.plugin.settings.taskStatusColorOverdue;
+                        break;
+                    case 'in-progress':
+                        bgColor = this.plugin.settings.taskStatusColorInProgress;
+                        break;
+                    case 'incomplete':
+                        bgColor = this.plugin.settings.taskStatusColorOpen;
+                        break;
+                    case 'completed':
+                        bgColor = this.plugin.settings.taskStatusColorCompleted;
+                        break;
+                    case 'no-due':
+                        // Using a default grey for no-due as it may not be in settings
+                        bgColor = 'rgba(158, 158, 158, 0.5)'; 
+                        break;
+                }
+                if (bgColor) {
+                    segment.style.backgroundColor = bgColor;
+                }
+                // --- END OF NEW COLOR LOGIC ---
+
+                // Your mouseenter logic, unchanged
                 segment.addEventListener('mouseenter', () => {
                     if (this.isPopupLocked) return;
                     clearTimeout(this.hideTimeout);
                     this.hideFilePopup();
 
-                    // Define these booleans INSIDE the event listener's scope
                     const isCompleted = type === 'completed';
                     const isOverdue = type === 'overdue';
                     const isInProgress = type === 'in-progress';
@@ -3597,12 +3756,13 @@ class PeriodMonthView extends ItemView {
                     }, this.plugin.settings.otherNoteHoverDelay);
                 });
 
+                // Your mouseleave logic, unchanged
                 segment.addEventListener('mouseleave', () => {
                     clearTimeout(this.hoverTimeout);
                     this.hideTimeout = setTimeout(() => this.hideFilePopup(), this.plugin.settings.popupHideDelay);
                 });
 
-                // Legend logic remains the same
+                // Your legend logic, unchanged
                 let legendText = 'To Do';
                 if (widgetKey === 'futureNoDue' && type === 'incomplete') {
                     legendText = 'Future';
@@ -3617,27 +3777,25 @@ class PeriodMonthView extends ItemView {
                 }
 
                 const legendItem = legend.createDiv({ cls: 'legend-item' });
-                legendItem.createDiv({ cls: `legend-color-box ${type}` });
+                // This sets the legend box color via CSS, but the new logic above sets the bar color
+                const legendColorBox = legendItem.createDiv({ cls: `legend-color-box ${type}` });
+                if (bgColor) {
+                    legendColorBox.style.backgroundColor = bgColor;
+                }
                 legendItem.createSpan({ text: legendText });
             };
 
-            // Render segments in the correct visual order
+            // Render segments in the correct visual order (MODIFIED)
             setupSegment(overdueTasks, 'overdue');
             setupSegment(incompleteTasks, 'incomplete');
+            setupSegment(inProgressTasks, 'in-progress');
             setupSegment(noDueTasks, 'no-due');
             setupSegment(completedTasks, 'completed');
         }
 
-        // --- UI Update and Click Handlers (no change) ---
-        const updateView = () => {
-            widgetContainer.removeClasses(['is-full', 'is-mini', 'is-minimised']);
-            widgetContainer.addClass(`is-${currentState}`);
-            setIcon(toggleIcon, 'chevron-down');
-        };
-
+        // Your header click listener, unchanged
         header.addEventListener('click', async () => {
-            const currentIndex = states.indexOf(currentState);
-            currentState = states[(currentIndex + 1) % states.length];
+            currentState = currentState === 'full' ? 'mini' : 'full';
             this.plugin.settings.smallWidgetStates[widgetKey] = currentState;
             await this.plugin.saveSettings();
             updateView();
@@ -3645,6 +3803,15 @@ class PeriodMonthView extends ItemView {
 
         updateView();
     }
+
+
+
+
+    getComputedCssVar(varName) {
+        // this.containerEl is the root element of the view
+        return getComputedStyle(this.containerEl).getPropertyValue(varName).trim();
+    }
+
 
     /**
      * Renders a single, generalized heatmap widget for the dashboard.
@@ -3682,10 +3849,45 @@ class PeriodMonthView extends ItemView {
         const titleEl = header.createEl('h3', { text: title });
 
         // 3. Total Count (moves to the end)
-        header.createDiv({
+        const totalCountEl = header.createDiv({
+            cls: 'heatmap-total-count',
+            text: totalCount.toString()
+        });
+        /*header.createDiv({
             cls: 'heatmap-total-count',
             text: `${totalCount}`
         });
+        */
+
+        let linkPath = '';
+        // Check if it's a custom heatmap
+        if (widgetKey.startsWith('custom-')) {
+            const index = parseInt(widgetKey.split('-')[1], 10);
+            if (!isNaN(index)) {
+                linkPath = this.plugin.settings.customHeatmaps[index]?.linkPath;
+            }
+        } else {
+            // Otherwise, it's a built-in heatmap
+            linkPath = this.plugin.settings.heatmapLinkConfig[widgetKey];
+        }
+        
+        if (linkPath) {
+            totalCountEl.addClass('is-clickable');
+            totalCountEl.setAttribute('aria-label', `Open note: ${linkPath}`);
+
+            totalCountEl.addEventListener('click', async (event) => {
+                event.stopPropagation();
+
+                const file = this.app.vault.getAbstractFileByPath(linkPath);
+                if (file && file instanceof TFile) {
+                    const openInNew = this.plugin.settings.heatmapTotalClickOpenAction === 'new-tab';
+                    const leaf = this.app.workspace.getLeaf(event.shiftKey || openInNew);
+                    await leaf.openFile(file);
+                } else {
+                    new Notice(`Note not found: ${linkPath}`);
+                }
+            });
+        }
 
         const heatmapContainer = widgetContainer.createDiv({ cls: 'heatmap-container' });
 
@@ -3695,14 +3897,13 @@ class PeriodMonthView extends ItemView {
             this.plugin.settings.collapsedHeatmaps[widgetKey] = currentlyCollapsed;
             await this.plugin.saveSettings();
             if (!currentlyCollapsed) {
-                // Use a small timeout to ensure the DOM has updated and the cell is visible
                 setTimeout(() => {
                     const todayCell = heatmapContainer.querySelector('.heatmap-today-cell');
                     if (todayCell) {
                         const scrollPos = todayCell.offsetLeft - (heatmapContainer.offsetWidth / 2) + (todayCell.offsetWidth / 2);
                         heatmapContainer.scrollLeft = scrollPos;
                     }
-                }, 50); // A 50ms delay is usually enough for the DOM to catch up.
+                }, 50);
             }
         });
 
@@ -3744,8 +3945,6 @@ class PeriodMonthView extends ItemView {
 
         while (currentDay.isSameOrBefore(endDate, 'day')) {
             const dayOfWeek = weekStartsOnMonday ? (currentDay.weekday() + 6) % 7 : currentDay.weekday();
-
-            // We capture a clone of the date for this specific cell's scope.
             const cellDate = currentDay.clone();
 
             const mapKey = `${cellDate.year()}-${cellDate.month()}`;
@@ -3771,12 +3970,9 @@ class PeriodMonthView extends ItemView {
             const startOfThisWeek = today.clone().startOf(weekType);
             const endOfThisWeek = today.clone().endOf(weekType);
 
-            // Apply classes using the corrected week boundaries
             if (cellDate.isBetween(startOfThisWeek, endOfThisWeek, 'day', '[]')) {
                 cell.addClass('heatmap-current-week-cell');
             }
-
-            // The 'today' cell check remains the same
             if (cellDate.isSame(today, 'day')) {
                 cell.addClass('heatmap-today-cell');
             }
@@ -3789,60 +3985,79 @@ class PeriodMonthView extends ItemView {
             const count = filesOnDay ? filesOnDay.length : 0;
 
             if (count > 0) {
-                let finalColor = 'transparent';
-                if (Array.isArray(colorSource)) {
-                    let level;
-                    if (count >= 10) level = 4;
-                    else if (count >= 6) level = 3;
-                    else if (count >= 3) level = 2;
-                    else level = 1;
-                    finalColor = colorSource[level - 1];
-                } else {
-                    finalColor = colorSource;
+                let countForColor = count; // Default to total count
+                let colorGradient = colorSource; // Default to provided gradient
+
+                // --- UNIVERSAL FIX ---
+                // Check if this is the special overdue/upcoming widget
+                if (options.overdueMap && options.upcomingMap) {
+                    const overdueTasksOnDay = options.overdueMap.get(dateKey);
+                    if (overdueTasksOnDay && overdueTasksOnDay.length > 0) {
+                        countForColor = overdueTasksOnDay.length;
+                        colorGradient = options.overdueGradient; // Use red gradient
+                    } else {
+                        const upcomingTasksOnDay = options.upcomingMap.get(dateKey);
+                        countForColor = upcomingTasksOnDay ? upcomingTasksOnDay.length : 0;
+                        // Keep default blue gradient
+                    }
                 }
-                cell.style.setProperty('background-color', finalColor, 'important');
+                // For all other heatmaps (like Task Completion), countForColor is already set to `count`
+                
+                if (countForColor > 0) {
+                    let finalColor = 'transparent';
+                    if (Array.isArray(colorGradient) && colorGradient.length > 0) {
+                        let level;
+                        if (countForColor >= 10) level = 4;
+                        else if (countForColor >= 6) level = 3;
+                        else if (countForColor >= 3) level = 2;
+                        else level = 1;
+                        finalColor = colorGradient[level - 1] || colorGradient[colorGradient.length - 1];
+                    }
+                    cell.style.setProperty('background-color', finalColor, 'important');
+                }
 
                 cell.addClass('is-interactive');
 
                 cell.addEventListener('mouseenter', (event) => {
                     if (this.isPopupLocked) return;
-
                     clearTimeout(this.hideTimeout);
                     this.hideFilePopup();
-
                     this.hoverTimeout = setTimeout(() => {
                         const itemsOnDay = dataMap.get(dateKey) || [];
                         if (itemsOnDay.length === 0) return;
-
                         let popupData = {};
-
-                        // Check if the first item looks like a task or a file.
-                        // Task objects have a 'text' property, TFile objects do not.
                         if (itemsOnDay[0].text !== undefined && itemsOnDay[0].lineNumber !== undefined) {
                             // This is a TASK heatmap.
                             popupData = {
                                 tasks: itemsOnDay
                             };
                         } else {
-                            // This is a FILE heatmap. Use the existing logic.
-                            let dailyNote = null;
-                            const otherCreatedFiles = [];
+                            // This is a FILE heatmap. We need to correctly categorize the files.
+                            const dailyNotes = [];
+                            const createdNotes = [];
+                            const assets = [];
+
                             itemsOnDay.forEach(file => {
                                 if (this.isDailyNote(file)) {
-                                    dailyNote = file;
+                                    dailyNotes.push(file);
+                                } else if (file.path && file.path.toLowerCase().endsWith('.md')) {
+                                    // It's a regular markdown note.
+                                    createdNotes.push(file);
                                 } else {
-                                    otherCreatedFiles.push(file);
+                                    // It's not a markdown file, so it must be an asset.
+                                    assets.push(file);
                                 }
                             });
+
+                            // Construct the data object with the correct categories.
                             popupData = {
-                                daily: dailyNote ? [dailyNote] : [],
-                                created: otherCreatedFiles,
+                                daily: dailyNotes,
+                                created: createdNotes,
+                                assets: assets
                             };
                         }
 
-                        // Pass the correctly structured data to the popup function.
                         this.showFilePopup(cell, popupData, cellDate.toDate());
-
                     }, this.plugin.settings.otherNoteHoverDelay);
                 });
 
@@ -3870,6 +4085,8 @@ class PeriodMonthView extends ItemView {
             }
         }, 100);
     }
+
+
 
     setupReorderMode() {
         const isMac = Platform.isMacOS;
@@ -3974,35 +4191,44 @@ class PeriodMonthView extends ItemView {
         this.containerEl.style.setProperty('--calendar-day-number-font-size', dayNumberFontSize);
     }
 
-    async handleFileClick(file, event) {
-        // The Shift key is the ultimate override. If it's pressed, always open in a new leaf.
-        if (event.shiftKey) {
-            await this.app.workspace.openLinkText(file.path, '', true);
-            return;
-        }
+    async handleFileClick(file, event, navState = {}) {
+        if (!file) return;
 
-        // --- If Shift is NOT pressed, proceed with normal logic ---
+        // This logic correctly determines if a new tab should be opened based on your settings.
         const isAsset = file.extension.toLowerCase() !== 'md';
+        const openInNewTabSetting = isAsset
+            ? this.plugin.settings.assetsOpenAction === 'new-tab'
+            : this.plugin.settings.notesOpenAction === 'new-tab';
 
-        if (isAsset) {
-            // It's an asset, so respect the user's default setting for assets.
-            const openInNewTab = this.plugin.settings.assetsOpenAction === 'new-tab';
-            await this.app.workspace.openLinkText(file.path, '', openInNewTab);
-        } else {
-            // It's a note file. Here we must check for an existing open leaf.
-            const markdownLeaves = this.app.workspace.getLeavesOfType("markdown");
-            const existingLeaf = markdownLeaves.find(leaf => leaf.view.file?.path === file.path);
+        const forceNewLeaf = event.shiftKey || openInNewTabSetting;
 
-            if (existingLeaf) {
-                // The note is already open, so just focus on that leaf.
-                this.app.workspace.setActiveLeaf(existingLeaf);
-            } else {
-                // The note is not open, so respect the user's default setting for notes.
-                const openInNewTab = this.plugin.settings.notesOpenAction === 'new-tab';
-                await this.app.workspace.getLeaf(openInNewTab).openFile(file);
-            }
+        // --- FIX #1: Provide the correct source path ---
+        // The sourcePath MUST be the path of the file containing the link.
+        const sourcePath = file.path;
+
+        // --- FIX #2: Construct the correctly structured navigation state ---
+        // The API requires the line number to be inside an 'eState' object.
+        const openViewState = {};
+        if (navState && navState.line !== undefined) {
+            openViewState.eState = {
+                line: navState.line,
+                // 'active: true' ensures the new pane is focused, which is
+                // necessary for scrolling and highlighting to occur.
+                active: true 
+            };
         }
+
+        // This API call now has the correct source path and the correct state structure.
+        await this.app.workspace.openLinkText(
+            file.path,
+            sourcePath,
+            forceNewLeaf,
+            openViewState
+        );
     }
+
+
+
 
     /**
      * Renders a single note item row in a given container.
@@ -4217,9 +4443,8 @@ class PeriodMonthView extends ItemView {
     }
 
     async refreshIcsEvents() {
-        const { requestUrl, Notice } = require('obsidian');
+        const { requestUrl, Notice } = require("obsidian");
 
-        // This check is now redundant since ICAL is bundled, but it's safe to keep.
         if (!ICAL) {
             console.error("ical.js library not bundled correctly.");
             return;
@@ -4230,7 +4455,9 @@ class PeriodMonthView extends ItemView {
 
         const icsUrl = this.plugin.settings.icsUrl;
         if (!icsUrl) {
-            if (this.isCalendarRendered) this.renderCalendar();
+            if (this.isCalendarRendered) {
+                this.renderCalendar();
+            }
             return;
         }
 
@@ -4238,6 +4465,7 @@ class PeriodMonthView extends ItemView {
             const response = await requestUrl({ url: icsUrl });
             const icalData = response.text;
             const calendar = new ICAL.Component(ICAL.parse(icalData));
+
             const icalEndDate = ICAL.Time.fromJSDate(moment().add(2, 'years').toDate());
             const icalStartDate = ICAL.Time.fromJSDate(moment().subtract(1, 'year').toDate());
 
@@ -4245,34 +4473,38 @@ class PeriodMonthView extends ItemView {
             for (const vevent of events) {
                 const event = new ICAL.Event(vevent);
 
-                // Add a check to skip any null or undefined event objects
-                // that result from malformed data in the ICS feed.
                 if (!event) {
                     continue;
                 }
 
                 if (event.recurrenceId) {
-                    this.addParsedEvent({ item: event }, false);
+                    // FIX: Pass 'event' and the correct number of arguments
+                    this.addParsedEvent(event, false);
                 } else if (event.isRecurring()) {
                     const iterator = event.iterator();
                     let next;
-                    while ((next = iterator.next()) && next.compare(icalEndDate) <= 0) {
+                    while (next = iterator.next()) {
+                        if (next.compare(icalEndDate) > 0) break;
                         if (next.compare(icalStartDate) < 0) continue;
 
                         const occurrence = event.getOccurrenceDetails(next);
                         this.addParsedEvent(occurrence, true);
                     }
                 } else {
-                    this.addParsedEvent({ item: event }, false);
+                    // FIX: Pass 'event' and the correct number of arguments
+                    this.addParsedEvent(event, false);
                 }
             }
         } catch (error) {
-            new Notice(`Calendar Period Week Notes - ICS error: ${error.message}`, 10000);
+            new Notice('Calendar Period Week Notes - ICS error: ' + error.message, 10000);
             console.error("A detailed ICS parsing error occurred:", error);
         }
 
-        if (this.isCalendarRendered) this.renderCalendar();
+        if (this.isCalendarRendered) {
+            this.renderCalendar();
+        }
     }
+
 
     /**
      *  Adds a parsed ICAL event occurrence to the events map, handling de-duplication.
@@ -4285,7 +4517,8 @@ class PeriodMonthView extends ItemView {
      * @returns 
      */
     addParsedEvent(occurrence, isRecurringInstance) {
-        const { item } = occurrence;
+        const item = isRecurringInstance ? occurrence.item : occurrence;
+
         if (!item) return;
 
         if (isRecurringInstance) {
@@ -4320,19 +4553,27 @@ class PeriodMonthView extends ItemView {
             endTime: isAllDay ? null : endMoment.format('HH:mm')
         };
 
-        let currentDay = startMoment.clone().startOf('day');
-        while (currentDay.isSameOrBefore(endMoment.startOf('day'))) {
-            const dateKey = currentDay.format('YYYY-MM-DD');
+        // --- FIX FOR MIDNIGHT EVENTS ---
+        // Create a clone of the end date to avoid modifying the original.
+        const loopEndDate = endMoment.clone();
 
+        // If the event ends exactly at midnight, subtract one second for loop boundary calculations.
+        // This prevents the event from "leaking" into the next day.
+        if (!isAllDay && loopEndDate.hour() === 0 && loopEndDate.minute() === 0 && loopEndDate.second() === 0) {
+            loopEndDate.subtract(1, 'second');
+        }
+
+        let currentDay = startMoment.clone().startOf('day');
+        // Use the adjusted loopEndDate for the condition.
+        while (currentDay.isSameOrBefore(loopEndDate.startOf('day'))) {
+            const dateKey = currentDay.format('YYYY-MM-DD');
             if (!this.icsEventsByDate.has(dateKey)) {
                 this.icsEventsByDate.set(dateKey, []);
             }
-
             // Final simple check to prevent adding the exact same object twice in the loop
             if (!this.icsEventsByDate.get(dateKey).some(e => e.uid === eventData.uid && e.summary === eventData.summary)) {
                 this.icsEventsByDate.get(dateKey).push(eventData);
             }
-
             currentDay.add(1, 'day');
         }
     }
@@ -4902,10 +5143,10 @@ class PeriodMonthView extends ItemView {
             scratch: "ScratchPad",
             notes: "Notes",
             pinned: "Pinned",
-            tasks: "Tasks", // This is a fallback
+            tasks: "Tasks", 
             assets: "Assets",
-            fileCreationDashboard: "File Creation Dashboard",
-            tasksDashboard: "Tasks Dashboard"
+            fileCreationDashboard: "Dashboard",
+            tasksDashboard: "Dashboard"
         };
 
         let iconName = '';
@@ -4919,7 +5160,7 @@ class PeriodMonthView extends ItemView {
         else if (key === 'tasks') {
             const groupBy = this.plugin.settings.taskGroupBy;
             iconName = groupBy === 'tag' ? 'circle-check' : icons.tasks;
-            text = groupBy === 'tag' ? "Tasks by Tag" : "Tasks by Date";
+            text = groupBy === 'tag' ? "Tasks" : "Tasks";
         }
         else if (key === 'assets') {
             iconName = this.isAssetsGridView ? 'image' : 'file-image';
@@ -5096,130 +5337,175 @@ class PeriodMonthView extends ItemView {
         }
     }
 
+    getScratchpadParts(fullContent) {
+        // If the setting to hide frontmatter is OFF, return the entire content as the body.
+        if (!this.plugin.settings.scratchpad?.hideFrontmatter) {
+            return { frontmatter: '', body: fullContent };
+        }
+        
+        // This regex finds a valid frontmatter block at the very start of the file.
+        const frontmatterRegex = /^---\s*[\r\n][\s\S]+?[\r\n]\s*---/;
+        const match = fullContent.match(frontmatterRegex);
+
+        if (match) {
+            const frontmatterBlock = match[0];
+            const endOfBlock = fullContent.indexOf(frontmatterBlock) + frontmatterBlock.length;
+
+            // Determine the start of the body by skipping exactly one newline after the block.
+            let bodyStartIndex = endOfBlock;
+            if (fullContent.substring(bodyStartIndex, bodyStartIndex + 2) === '\r\n') {
+                bodyStartIndex += 2;
+            } else if (fullContent.substring(bodyStartIndex, bodyStartIndex + 1) === '\n') {
+                bodyStartIndex += 1;
+            }
+
+            // The frontmatter now correctly includes the separating newline(s).
+            const frontmatter = fullContent.substring(0, bodyStartIndex);
+            // The body is everything after that, with its leading whitespace intact.
+            const body = fullContent.substring(bodyStartIndex);
+            
+            return { frontmatter, body };
+        }
+
+        // If no frontmatter is found, the entire content is the body.
+        return { frontmatter: '', body: fullContent };
+    }
+
     /**
      * Renders the content of the scratchpad, switching between an editor textarea
      * and a rendered Markdown preview based on the current view mode.
      */
     async renderScratchpadContent() {
-        if (!this.scratchWrapperEl) return;
+    if (!this.scratchWrapperEl) return;
 
-        // Preserve focus on the textarea across re-renders.
-        const wasFocused = this.noteTextarea === document.activeElement;
+    // Preserve focus on the textarea across re-renders.
+    const wasFocused = this.noteTextarea === document.activeElement;
 
-        this.scratchWrapperEl.empty();
+    this.scratchWrapperEl.empty();
 
-        // Create a container for action buttons (Preview, Add Task).
-        const actionsContainer = this.scratchWrapperEl.createDiv({
-            cls: "scratchpad-actions-container"
+    // Create a container for action buttons (Preview, Add Task).
+    const actionsContainer = this.scratchWrapperEl.createDiv({ cls: 'scratchpad-actions-container' });
+
+    // Only show the Preview/Edit toggle button if enabled in settings.
+    if (this.plugin.settings.scratchpad?.showPreviewToggle) {
+        this.scratchpadViewToggleBtn = actionsContainer.createEl('button', { cls: 'scratchpad-action-btn' });
+        this.scratchpadViewToggleBtn.addEventListener('click', () => this.toggleScratchpadView());
+    }
+
+    // Only show the Add Task button if enabled in settings.
+    if (this.plugin.settings.scratchpad?.showAddTaskButton) {
+        this.addTaskBtn = actionsContainer.createEl('button', { cls: 'scratchpad-action-btn' });
+        setIcon(this.addTaskBtn, 'plus');
+        this.addTaskBtn.setAttribute('aria-label', 'Add new task');
+        this.addTaskBtn.addEventListener('click', () => this.addNewTaskToScratchpad());
+    }
+
+    if (this.isScratchpadPreview && this.plugin.settings.scratchpad?.showPreviewToggle) {
+        // --- CONFIGURE UI FOR PREVIEW MODE ---
+        if (this.scratchpadViewToggleBtn) {
+            setIcon(this.scratchpadViewToggleBtn, 'edit');
+            this.scratchpadViewToggleBtn.setAttribute('aria-label', 'Edit mode');
+        }
+
+        if (this.addTaskBtn) {
+            this.addTaskBtn.style.display = 'none';
+        }
+
+        // Disable search controls in preview mode.
+        if (this.scratchpadSearchInputEl) this.scratchpadSearchInputEl.disabled = true;
+        if (this.scratchpadSearchControlsEl) {
+            Array.from(this.scratchpadSearchControlsEl.children).forEach(child => {
+                if (child.matches('button')) child.disabled = true;
+            });
+        }
+
+        // Render the content as Markdown.
+        this.scratchWrapperEl.addClass('markdown-preview-view');
+        
+        // Use the pre-processed body content for rendering
+        const markdownContent = this.noteText;
+        const file = this.app.vault.getAbstractFileByPath(this.plugin.settings.fixedNoteFile);
+
+        if (file) {
+            await MarkdownRenderer.render(this.app, markdownContent, this.scratchWrapperEl, file.path, this);
+        }
+
+    } else {
+        // --- CONFIGURE UI FOR EDIT MODE ---
+        if (this.scratchpadViewToggleBtn) {
+            setIcon(this.scratchpadViewToggleBtn, 'eye');
+            this.scratchpadViewToggleBtn.setAttribute('aria-label', 'Preview mode');
+        }
+
+        if (this.addTaskBtn) {
+            this.addTaskBtn.style.display = 'block';
+        }
+
+        // Enable search controls in edit mode.
+        if (this.scratchpadSearchInputEl) this.scratchpadSearchInputEl.disabled = false;
+        if (this.scratchpadSearchControlsEl) {
+            Array.from(this.scratchpadSearchControlsEl.children).forEach(child => {
+                if (child.matches('button')) child.disabled = false;
+            });
+        }
+
+        this.scratchWrapperEl.removeClass('markdown-preview-view');
+
+        // The highlighter is a div that sits behind the textarea to show search matches.
+        this.scratchHighlighterEl = this.scratchWrapperEl.createDiv({ cls: 'scratch-base scratch-highlighter' });
+        this.noteTextarea = this.scratchWrapperEl.createEl('textarea', { cls: 'scratch-base scratch-content' });
+
+        if (this.app.isMobile) {
+            this.noteTextarea.addEventListener('focus', () => {
+                this.calendarWasCollapsedForEditing = true;
+                this.toggleCalendar(true); // Collapse calendar
+                this.noteTextarea.classList.add('is-editing-mobile');
+            });
+
+            this.noteTextarea.addEventListener('blur', (e) => {
+                // If focus moves to the collapse button, don't auto-expand the calendar
+                if (e.relatedTarget === this.collapseBtn) {
+                    this.noteTextarea.classList.remove('is-editing-mobile');
+                    return; 
+                }
+
+                // Otherwise, auto-expand if needed.
+                if (this.calendarWasCollapsedForEditing) {
+                    this.calendarWasCollapsedForEditing = false;
+                    this.toggleCalendar(false); // Expand calendar
+                }
+                this.noteTextarea.classList.remove('is-editing-mobile');
+            });
+        }
+        
+        // Set the textarea value from the pre-processed body content
+        this.noteTextarea.value = this.noteText;
+
+        if (wasFocused) {
+            this.noteTextarea.focus();
+        }
+
+        this.updateScratchpadHighlights();
+        this.updateScratchpadSearchCount();
+
+        // Save content on input.
+        this.noteTextarea.addEventListener('input', async () => {
+            this.noteText = this.noteTextarea.value; // Update the body content property
+            await this.saveFixedNote(this.noteText); // Pass the body to the save function
+            this.updateScratchpadSearchCount();
+            this.updateScratchpadHighlights();
         });
 
-        // Only show the Preview/Edit toggle button if enabled in settings.
-        if (this.plugin.settings.scratchpad?.showPreviewToggle) {
-            this.scratchpadViewToggleBtn = actionsContainer.createEl("button", {
-                cls: "scratchpad-action-btn"
-            });
-            this.scratchpadViewToggleBtn.addEventListener("click", () => this.toggleScratchpadView());
-        }
-
-        // Only show the Add Task button if enabled in settings.
-        if (this.plugin.settings.scratchpad?.showAddTaskButton) {
-            this.addTaskBtn = actionsContainer.createEl("button", {
-                cls: "scratchpad-action-btn"
-            });
-            setIcon(this.addTaskBtn, "plus");
-            this.addTaskBtn.setAttribute("aria-label", "Add new task");
-            this.addTaskBtn.addEventListener("click", () => this.addNewTaskToScratchpad());
-        }
-
-        if (this.isScratchpadPreview && this.plugin.settings.scratchpad?.showPreviewToggle) {
-            // --- CONFIGURE UI FOR PREVIEW MODE ---
-            if (this.scratchpadViewToggleBtn) {
-                setIcon(this.scratchpadViewToggleBtn, "edit"); // Switch to Edit icon
-                this.scratchpadViewToggleBtn.setAttribute("aria-label", "Edit mode");
+        // Synchronize scroll position between textarea and highlighter.
+        this.noteTextarea.addEventListener('scroll', () => {
+            if (this.scratchHighlighterEl) {
+                this.scratchHighlighterEl.scrollTop = this.noteTextarea.scrollTop;
+                this.scratchHighlighterEl.scrollLeft = this.noteTextarea.scrollLeft;
             }
-            if (this.addTaskBtn) this.addTaskBtn.style.display = 'none';
-
-            // Disable search controls in preview mode.
-            if (this.scratchpadSearchInputEl) this.scratchpadSearchInputEl.disabled = true;
-            if (this.scratchpadSearchControlsEl) {
-                Array.from(this.scratchpadSearchControlsEl.children).forEach(child => {
-                    if (child.matches('button')) child.disabled = true;
-                });
-            }
-
-            // Render the content as Markdown.
-            this.scratchWrapperEl.addClass("markdown-preview-view");
-            const markdownContent = await this.loadNote();
-            const file = this.app.vault.getAbstractFileByPath(this.plugin.settings.fixedNoteFile);
-            if (file) {
-                MarkdownRenderer.render(this.app, markdownContent, this.scratchWrapperEl, file.path, this);
-            }
-
-        } else {
-            // --- CONFIGURE UI FOR EDIT MODE ---
-            if (this.scratchpadViewToggleBtn) {
-                setIcon(this.scratchpadViewToggleBtn, "eye"); // Switch to Preview icon
-                this.scratchpadViewToggleBtn.setAttribute("aria-label", "Preview mode");
-            }
-            if (this.addTaskBtn) this.addTaskBtn.style.display = 'block';
-
-            // Enable search controls in edit mode.
-            if (this.scratchpadSearchInputEl) this.scratchpadSearchInputEl.disabled = false;
-            if (this.scratchpadSearchControlsEl) {
-                Array.from(this.scratchpadSearchControlsEl.children).forEach(child => {
-                    if (child.matches('button')) child.disabled = false;
-                });
-            }
-
-            this.scratchWrapperEl.removeClass("markdown-preview-view");
-            // The highlighter is a div that sits behind the textarea to show search matches.
-            this.scratchHighlighterEl = this.scratchWrapperEl.createDiv({ cls: "scratch-base scratch-highlighter" });
-            this.noteTextarea = this.scratchWrapperEl.createEl("textarea", { cls: "scratch-base scratch-content" });
-
-            if (this.app.isMobile) {
-
-                this.noteTextarea.addEventListener('focus', () => {
-                    this.calendarWasCollapsedForEditing = true;
-                    this.toggleCalendar(true);
-                    this.noteTextarea.classList.add('is-editing-mobile');
-                });
-
-                this.noteTextarea.addEventListener('blur', (e) => {
-                    if (e.relatedTarget === this.collapseBtn) {
-                        this.noteTextarea.classList.remove('is-editing-mobile');
-                        return;
-                    }
-
-                    // Otherwise, auto-expand if needed.
-                    if (this.calendarWasCollapsedForEditing) {
-                        this.calendarWasCollapsedForEditing = false;
-                        this.toggleCalendar(false);
-                    }
-                    this.noteTextarea.classList.remove('is-editing-mobile');
-                });
-            }
-
-            this.noteTextarea.value = this.noteText;
-            if (wasFocused) this.noteTextarea.focus();
-            this.updateScratchpadHighlights();
-
-            // Save content on input.
-            this.noteTextarea.addEventListener("input", async () => {
-                this.noteText = this.noteTextarea.value;
-                await this.saveFixedNote(this.noteText);
-                this.updateScratchpadSearchCount();
-                this.updateScratchpadHighlights();
-            });
-
-            // Synchronize scroll position between textarea and highlighter.
-            this.noteTextarea.addEventListener('scroll', () => {
-                if (this.scratchHighlighterEl) {
-                    this.scratchHighlighterEl.scrollTop = this.noteTextarea.scrollTop;
-                    this.scratchHighlighterEl.scrollLeft = this.noteTextarea.scrollLeft;
-                }
-            });
-        }
+        });
     }
+}
+
 
     /**
      * Called when the view is first opened. It loads all initial data and registers
@@ -5236,20 +5522,47 @@ class PeriodMonthView extends ItemView {
         await this.refreshIcsEvents();
         await this.buildWeeklyNotesCache();
         await this.buildHeatmapFileCache();
-        this.noteText = await this.loadNote();
+
+        // Correctly load and parse the scratchpad content on initial open
+        const fullContent = await this.loadNote();
+        const { frontmatter, body } = this.getScratchpadParts(fullContent);
+        this.scratchpadFrontmatter = frontmatter;
+        this.noteText = body; // this.noteText now correctly stores only the body
+
         this.render();
         this.setupReorderMode();
-
         this.registerDomEvent(document, 'keydown', this.handleKeyDown.bind(this));
 
         // --- Register events and intervals ---
         const intervalMs = this.plugin.settings.autoReloadInterval || 5000;
+
+        // CORRECTED: This interval is now safe
         this.registerInterval(setInterval(async () => {
+            // Don't refresh if the user is actively typing in the scratchpad
             if (document.activeElement === this.noteTextarea) return;
-            const latest = await this.loadNote();
-            if (latest !== this.noteText && this.noteTextarea) {
-                this.noteText = latest;
-                this.noteTextarea.value = latest;
+
+            const latestFullContent = await this.loadNote();
+            const currentFullContent = this.scratchpadFrontmatter + this.noteText;
+
+            // Only refresh if the content has actually changed
+            if (latestFullContent !== currentFullContent) {
+                const { frontmatter, body } = this.getScratchpadParts(latestFullContent);
+                this.scratchpadFrontmatter = frontmatter;
+                this.noteText = body;
+
+                // If in EDIT mode, safely update the textarea's value
+                if (this.noteTextarea) {
+                    this.noteTextarea.value = this.noteText;
+                }
+
+                // If in PREVIEW mode, trigger a re-render to show the new content
+                if (this.isScratchpadPreview) {
+                    this.renderScratchpadContent();
+                }
+
+                // Always update dependent UI elements
+                this.updateScratchpadSearchCount();
+                this.updateScratchpadHighlights();
             }
         }, intervalMs));
 
@@ -5282,54 +5595,57 @@ class PeriodMonthView extends ItemView {
             }
         }));
 
-        this.registerEvent(this.app.metadataCache.on('changed', async (file) => {
-            const tasksChanged = await this.updateTasksForFile(file);
-            if (tasksChanged) {
-                this.refreshUI({ updateType: 'tasks' });
-            }
+        this.registerEvent(
+            this.app.metadataCache.on('changed', async (file) => {
+                // First, check if the change affected tasks in the file.
+                const tasksChanged = await this.updateTasksForFile(file);
 
-            if (this.activeTab === 'dashboard' && this.dashboardViewMode === 'creation') {
-                if (this.dashboardCreationDebounceTimer) {
-                    clearTimeout(this.dashboardCreationDebounceTimer);
-                }
+                // --- START: NEW/CORRECTED LOGIC ---
 
-                this.dashboardCreationDebounceTimer = setTimeout(() => {
-                    const widgetGrid = this.dashboardContentEl.querySelector('.pm-dashboard-grid');
-                    if (!widgetGrid) return;
+                // Determine the type of update. If tasks changed, it's a 'tasks' update.
+                // Otherwise, it's a general 'metadata' update (e.g., adding a #pin tag).
+                const updateType = tasksChanged ? 'tasks' : 'metadata';
 
+                // Call the main refresh UI handler, passing the file and the type of update.
+                this.refreshUI({ file, updateType });
 
-                    // 1. Get the heatmaps the file matched BEFORE the change.
-                    const oldMatches = this.fileToHeatmapCache.get(file.path) || new Set();
+                // --- END: NEW/CORRECTED LOGIC ---
 
-                    // 2. Determine the heatmaps the file matches NOW.
-                    const newMatches = new Set();
-                    this.plugin.settings.customHeatmaps.forEach((config, index) => {
-                        if (this._matchesHeatmapRule(file, config)) {
-                            newMatches.add(index);
-                        }
-                    });
-
-                    // 3. Update the cache with the new state.
-                    if (newMatches.size > 0) {
-                        this.fileToHeatmapCache.set(file.path, newMatches);
-                    } else {
-                        this.fileToHeatmapCache.delete(file.path);
+                // The specific logic for dashboard heatmaps can remain, as it's separate.
+                if (this.activeTab === 'dashboard' && this.dashboardViewMode === 'creation') {
+                    if (this.dashboardCreationDebounceTimer) {
+                        clearTimeout(this.dashboardCreationDebounceTimer);
                     }
+                    this.dashboardCreationDebounceTimer = setTimeout(() => {
+                        const widgetGrid = this.dashboardContentEl.querySelector('.pm-dashboard-grid');
+                        if (!widgetGrid) return;
 
-                    // 4. Combine the old and new sets to get every heatmap that needs a refresh.
-                    const allAffected = new Set([...oldMatches, ...newMatches]);
+                        const oldMatches = this.fileToHeatmapCache.get(file.path) || new Set();
+                        const newMatches = new Set();
+                        this.plugin.settings.customHeatmaps.forEach((config, index) => {
+                            if (this.matchesHeatmapRule(file, config)) {
+                                newMatches.add(index);
+                            }
+                        });
 
-                    // 5. Re-render only the affected widgets.
-                    allAffected.forEach(index => {
-                        const config = this.plugin.settings.customHeatmaps[index];
-                        if (config) {
-                            this.renderSingleHeatmap(widgetGrid, config, index);
+                        if (newMatches.size > 0) {
+                            this.fileToHeatmapCache.set(file.path, newMatches);
+                        } else {
+                            this.fileToHeatmapCache.delete(file.path);
                         }
-                    });
 
-                }, 2500); // 2.5-second debounce feels natural for "finished editing".
-            }
-        }));
+                        const allAffected = new Set([...oldMatches, ...newMatches]);
+                        allAffected.forEach(index => {
+                            const config = this.plugin.settings.customHeatmaps[index];
+                            if (config) {
+                                this.renderSingleHeatmap(widgetGrid, config, index);
+                            }
+                        });
+                    }, 2500);
+                }
+            })
+        );
+
 
         // Handles CREATING a new file
         this.registerEvent(this.app.vault.on("create", (file) => {
@@ -5489,6 +5805,18 @@ class PeriodMonthView extends ItemView {
 
         }, { passive: false });
 
+        this.app.workspace.onLayoutReady(() => {
+            const statusBar = document.querySelector('.status-bar');
+            if (statusBar && !Platform.isMobile) {
+                this.statusBarObserver = new ResizeObserver(() => {
+                    this.updateDynamicPadding();
+                });
+
+                this.statusBarObserver.observe(statusBar);
+                this.updateDynamicPadding(); // Run once on initial load
+            }
+        });
+        
         this.registerDomEvent(this.tasksContentEl, 'touchend', async (e) => {
             if (!this.isTaskPulling) return;
             this.isTaskPulling = false;
@@ -5525,14 +5853,30 @@ class PeriodMonthView extends ItemView {
      * Forces a full rebuild of all data maps and a complete re-render of the view.
      * Useful after major setting changes.
      */
+    // In class PeriodMonthView
     async rebuildAndRender() {
+        // --- Existing data map rebuilds ---
         await this.buildCreatedNotesMap();
         await this.buildModifiedNotesMap();
         await this.buildAssetCreationMap();
+        await this.buildAllCreatedNotesMap();
+        await this.buildTasksByDateMap();
+        await this.buildAllTasksList();
         await this.refreshIcsEvents();
         await this.buildWeeklyNotesCache();
+        await this.buildHeatmapFileCache();
+
+        // --- CORRECTED LOGIC ---
+        // Re-load the note from the file and re-process it based on the new setting
+        const fullContent = await this.loadNote();
+        const { frontmatter, body } = this.getScratchpadParts(fullContent);
+        this.scratchpadFrontmatter = frontmatter;
+        this.noteText = body;
+        
+        // Now, trigger the main render function, which will use the updated content
         this.render();
     }
+
 
     async rebuildDashboards() {
         if (!this.dashboardContentEl) {
@@ -5599,8 +5943,23 @@ class PeriodMonthView extends ItemView {
         switch (this.activeTab) {
             case 'scratch':
                 if (file?.path === this.plugin.settings.fixedNoteFile) {
-                    this.noteText = await this.loadNote();
-                    if (this.noteTextarea) this.noteTextarea.value = this.noteText;
+                    // Re-load the full content from the file
+                    const fullContent = await this.loadNote();
+                    
+                    // Re-parse the content to separate frontmatter and body
+                    const { frontmatter, body } = this.getScratchpadParts(fullContent);
+                    
+                    // Update the stored properties
+                    this.scratchpadFrontmatter = frontmatter;
+                    this.noteText = body;
+
+                    // Only update the textarea if it exists and its content has actually changed
+                    if (this.noteTextarea && this.noteTextarea.value !== this.noteText) {
+                        // Preserve the user's cursor position during the update
+                        const cursorPos = this.noteTextarea.selectionStart;
+                        this.noteTextarea.value = this.noteText;
+                        this.noteTextarea.selectionStart = this.noteTextarea.selectionEnd = cursorPos;
+                    }
                 }
                 break;
             case 'notes':
@@ -5983,7 +6342,8 @@ class PeriodMonthView extends ItemView {
             titlePathWrapper.createDiv({ text: noteFile.parent.path, cls: 'note-path' });
         }
 
-        itemEl.addEventListener('click', async () => {
+        /*
+        itemEl.addEventListener('click', async (e) => {
             // Find the specific line where the asset is mentioned
             const cache = this.app.metadataCache.getFileCache(noteFile);
             let targetLine = 0;
@@ -5997,10 +6357,39 @@ class PeriodMonthView extends ItemView {
                     }
                 }
             }
+            const leaves = this.app.workspace.getLeavesOfType("markdown");
+            const existingLeaf = leaves.find(leaf => leaf.view.file?.path === noteFile.path);
 
-            const openInNewTab = this.plugin.settings.notesOpenAction === 'new-tab';
-            const leaf = this.app.workspace.getLeaf(openInNewTab);
-            await leaf.openFile(noteFile, { eState: { line: targetLine } }); // Open and scroll to the line
+            if (existingLeaf) {
+                this.app.workspace.revealLeaf(existingLeaf);
+                // Navigate to the line even if the leaf is already open
+                existingLeaf.view.setEphemeralState({ line: targetLine });
+            } else {
+                const openInNewTab = e.shiftKey || this.plugin.settings.notesOpenAction === 'new-tab';
+                const leaf = this.app.workspace.getLeaf(openInNewTab);
+                await leaf.openFile(noteFile, { eState: { line: targetLine } });
+            }
+            
+            this.hideFilePopup();
+        });
+        */
+        itemEl.addEventListener('click', async (e) => {
+            // Find the specific line where the asset is mentioned
+            const cache = this.app.metadataCache.getFileCache(noteFile);
+            let targetLine = 0;
+            if (cache) {
+                const allLinks = [...(cache.embeds || []), ...(cache.links || [])];
+                for (const ref of allLinks) {
+                    const linkedFile = this.app.metadataCache.getFirstLinkpathDest(ref.link, noteFile.path);
+                    if (linkedFile && linkedFile.path === assetFile.path) {
+                        targetLine = ref.position.start.line;
+                        break;
+                    }
+                }
+            }
+            
+            // Use the centralized handler, passing the line number
+            this.handleFileClick(noteFile, e, { line: targetLine });
             this.hideFilePopup();
         });
     }
@@ -6048,9 +6437,8 @@ class PeriodMonthView extends ItemView {
         // --- 2. File Details Section ---
         contentWrapper.createEl('h6', { text: 'Details', cls: 'popup-section-header' });
         const infoContainer = contentWrapper.createDiv({ cls: 'other-notes-popup-item is-clickable' });
-        infoContainer.addEventListener('click', () => {
-            const openInNewTab = this.plugin.settings.notesOpenAction === 'new-tab';
-            this.app.workspace.getLeaf(openInNewTab).openFile(noteFile);
+        infoContainer.addEventListener('click', (e) => {
+            this.handleFileClick(noteFile, e); // Use the new handler
             this.hideFilePopup();
         });
 
@@ -6170,12 +6558,11 @@ class PeriodMonthView extends ItemView {
         }
 
         // Add a click listener to open the asset file
-        itemEl.addEventListener('click', async () => {
-            const openInNewTab = this.plugin.settings.assetsOpenAction === 'new-tab';
-            const leaf = this.app.workspace.getLeaf(openInNewTab);
-            await leaf.openFile(assetFile);
+        itemEl.addEventListener('click', (e) => {
+            this.handleFileClick(assetFile, e); // Use the new handler
             this.hideFilePopup(); // Close the popup after clicking
         });
+        
     }
 
     async showAssetPopup(targetEl, assetFile) {
@@ -6399,14 +6786,38 @@ class PeriodMonthView extends ItemView {
                 longPressOccurred = false; // Reset for the next interaction
                 return;
             }
-            if (this.isDraggingNote || e.target.closest('.drag-handle')) {
+
+            // Prevent click action if a drag handle was the target
+            if (this.isDraggingNote && e.target.closest('.drag-handle')) {
                 return;
             }
-            this.handleFileClick(file, e);
+            
+            // Use the new centralized handler
+            this.handleFileClick(file, e); 
         });
     }
 
+    groupAssets(assets) {
+        const groups = {};
+        const groupOrderMap = new Map();
 
+        assets.forEach(file => {
+            const monthKey = moment(file.stat.mtime).format('YYYY-MM');
+            if (!groups[monthKey]) {
+                groups[monthKey] = [];
+                groupOrderMap.set(monthKey, {
+                    key: monthKey,
+                    label: moment(file.stat.mtime).format('MMMM YYYY')
+                });
+            }
+            groups[monthKey].push(file);
+        });
+
+        const groupOrder = Array.from(groupOrderMap.values())
+            .sort((a, b) => b.key.localeCompare(a.key)); // Sort descending by "YYYY-MM"
+
+        return { groups, groupOrder };
+    }
 
     /**
      * Renders the list of recent assets in the "Assets" tab.
@@ -6417,7 +6828,7 @@ class PeriodMonthView extends ItemView {
 
         const settings = this.plugin.settings;
         let unusedAssetPaths = new Set();
-        // Always get the unused paths if a filter might need them.
+
         if (settings.showUnusedAssetsIndicator || this.assetsSearchTerm.toLowerCase() === 'status:unlinked') {
             if (!this.isUnusedAssetCacheValid) {
                 this.unusedAssetPathsCache = await this.getUnusedAssetPaths();
@@ -6426,23 +6837,19 @@ class PeriodMonthView extends ItemView {
             unusedAssetPaths = this.unusedAssetPathsCache;
         }
 
-        const cutoff = moment().startOf('day').subtract(settings.assetsLookbackDays - 1, 'days').valueOf();
-        const ignoreFolders = (settings.assetIgnoreFolders || []).map(f => (f.toLowerCase().endsWith('/') ? f.toLowerCase() : f.toLowerCase() + '/'));
-        const hiddenTypes = (settings.hiddenAssetTypes || '').split(',').map(ext => ext.trim().toLowerCase()).filter(ext => ext.length > 0);
+        const cutoff = moment().subtract(settings.assetsLookbackDays, 'days');
+        const ignoreFolders = settings.assetIgnoreFolders.map(f => f.toLowerCase().endsWith('/') ? f.toLowerCase() : f.toLowerCase() + '/');
+        const hiddenTypes = settings.hiddenAssetTypes.split(',').map(ext => ext.trim().toLowerCase()).filter(ext => ext.length > 0);
 
-        const allAssets = this.app.vault.getFiles()
-            .filter(file =>
-                !file.path.toLowerCase().endsWith('.md') &&
-                !hiddenTypes.includes(file.extension.toLowerCase()) &&
-                !ignoreFolders.some(f => file.path.toLowerCase().startsWith(f)) &&
-                (file.stat.mtime >= cutoff || file.stat.ctime >= cutoff)
-            )
-            .sort((a, b) => b.stat.mtime - a.stat.mtime);
+        const allAssets = this.app.vault.getFiles().filter(file => {
+            if (file.path.toLowerCase().endsWith('.md') || hiddenTypes.includes(file.extension.toLowerCase())) return false;
+            if (ignoreFolders.some(f => file.path.toLowerCase().startsWith(f))) return false;
+            return moment(file.stat.mtime).isAfter(cutoff);
+        });
 
         const searchTerm = this.assetsSearchTerm.toLowerCase();
         let filteredAssets;
 
-        // Implement the special filter keyword logic
         if (searchTerm === 'status:unlinked') {
             filteredAssets = allAssets.filter(file => unusedAssetPaths.has(file.path));
         } else if (searchTerm) {
@@ -6451,120 +6858,206 @@ class PeriodMonthView extends ItemView {
             filteredAssets = allAssets;
         }
 
-        const groups = { today: [], yesterday: [], thisWeek: [], lastWeek: [], thisMonth: [], older: [] };
-        const now = moment();
+        filteredAssets.sort((a, b) => b.stat.mtime - a.stat.mtime);
 
-        filteredAssets.forEach(file => {
-            const modTime = moment(file.stat.mtime);
-            if (modTime.isSame(now, 'day')) {
-                groups.today.push(file);
-            } else if (modTime.isSame(now.clone().subtract(1, 'day'), 'day')) {
-                groups.yesterday.push(file);
-            } else if (modTime.isSame(now, 'week')) {
-                groups.thisWeek.push(file);
-            } else if (modTime.isSame(now.clone().subtract(1, 'week'), 'week')) {
-                groups.lastWeek.push(file);
-            } else if (modTime.isSame(now, 'month')) {
-                groups.thisMonth.push(file);
-            } else {
-                groups.older.push(file);
-            }
-        });
+        const groups = {
+            today: [],
+            yesterday: [],
+            thisWeek: [],
+            lastWeek: [],
+        };
 
+        // Initialize the display order with the fixed recent categories.
         const groupOrder = [
             { key: 'today', label: 'Today' },
             { key: 'yesterday', label: 'Yesterday' },
             { key: 'thisWeek', label: 'This Week' },
             { key: 'lastWeek', label: 'Last Week' },
-            { key: 'thisMonth', label: 'This Month' },
-            { key: 'older', label: 'Older' },
         ];
 
+        const now = moment();
+        const startOfThisWeek = now.clone().startOf('week');
+        const startOfLastWeek = now.clone().subtract(1, 'week').startOf('week');
+
+        // Dynamically add the last 12 months to our groups and order.
+        // We start from the current month and go back.
+        for (let i = 0; i < 12; i++) {
+            const month = now.clone().subtract(i, 'months');
+            const monthKey = month.format('YYYY-MM');
+            if (!groups[monthKey]) {
+                groups[monthKey] = [];
+                groupOrder.push({ key: monthKey, label: month.format('MMMM YYYY') });
+            }
+        }
+
+        groups['older'] = []; // Catch-all for anything older than 12 months.
+        groupOrder.push({ key: 'older', label: 'Older' });
+
+        // Iterate through the filtered assets and sort them into the groups.
+        filteredAssets.forEach(file => {
+            const modTime = moment(file.stat.mtime);
+            // Prioritize the special recent groups first.
+            if (modTime.isSame(now, 'day')) {
+                groups.today.push(file);
+            } else if (modTime.isSame(now.clone().subtract(1, 'day'), 'day')) {
+                groups.yesterday.push(file);
+            } else if (modTime.isAfter(startOfThisWeek)) {
+                // More reliable check for This Week
+                groups.thisWeek.push(file);
+            } else if (modTime.isAfter(startOfLastWeek)) {
+                // More reliable check for Last Week
+                groups.lastWeek.push(file);
+            } else {
+                // If it's not in a recent group, find the correct month bucket.
+                const monthKey = modTime.format('YYYY-MM');
+                if (groups[monthKey]) {
+                    groups[monthKey].push(file);
+                } else {
+                    // If it's older than our 12-month window, put it in the older bucket.
+                    groups.older.push(file);
+                }
+            }
+        });
+
         if (filteredAssets.length === 0) {
-            const message = searchTerm === 'status:unlinked' ? 'No unlinked assets found' : 'No assets found';
+            const message = searchTerm === 'status:unlinked' ? 'No unlinked assets found.' : 'No assets found.';
             this.assetsContentEl.createDiv({ text: message, cls: 'task-group-empty-message' });
             return;
         }
 
-        groupOrder.forEach(groupInfo => {
-            const assetsInGroup = groups[groupInfo.key];
-            if (assetsInGroup.length > 0) {
-                const groupContainer = this.assetsContentEl.createDiv({ cls: 'note-group-container' });
-                const isCollapsed = this.collapsedAssetGroups[groupInfo.key];
-                if (isCollapsed) {
-                    groupContainer.addClass('is-collapsed');
-                }
-
-                const header = groupContainer.createDiv({ cls: 'note-group-header' });
-                const headerContent = header.createDiv({ cls: 'note-group-header-content' });
-                const collapseIcon = headerContent.createDiv({ cls: 'note-group-collapse-icon' });
-                setIcon(collapseIcon, 'chevron-down');
-                headerContent.createSpan({ text: groupInfo.label });
-                header.createDiv({ cls: 'note-group-count', text: assetsInGroup.length.toString() });
-
-                header.addEventListener('click', () => {
-                    const isCurrentlyCollapsed = groupContainer.classList.toggle('is-collapsed');
-                    this.collapsedAssetGroups[groupInfo.key] = isCurrentlyCollapsed;
-                    this.plugin.saveSettings();
+        // --- CHANGE 2: Initialize the IntersectionObserver ---
+        this.assetObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const gridItem = entry.target;
+                        const img = gridItem.querySelector('img[data-src]');
+                        if (img) {
+                            img.src = img.dataset.src;
+                            img.removeAttribute('data-src');
+                        }
+                        observer.unobserve(gridItem);
+                    }
                 });
+            }, { 
+                root: this.assetsContentEl,  
+                rootMargin: "100px"  
+            });
 
-                const listWrapper = groupContainer.createDiv({ cls: 'note-list-wrapper' });
+        groupOrder.forEach(groupInfo => {
+    const assetsInGroup = groups[groupInfo.key];  // This line should already exist or add it here if missing
+    
+    if (assetsInGroup.length > 0) {
+        const groupContainer = this.assetsContentEl.createDiv({ cls: 'note-group-container' });
+        
+        // Your existing isCollapsed calculation here (from previous changes)
+        const isMonthlyGroup = /^\d{4}-\d{2}$/.test(groupInfo.key);
+        let isCollapsed;
+        if (isMonthlyGroup) {
+            isCollapsed = this.collapsedAssetGroups[groupInfo.key] !== false;
+        } else {
+            isCollapsed = this.collapsedAssetGroups[groupInfo.key] === true;
+        }
+        if (isCollapsed) groupContainer.addClass('is-collapsed');
+        
+        // Header creation and click handler (unchanged from previous)
+        const header = groupContainer.createDiv({ cls: 'note-group-header' });
+        const headerContent = header.createDiv({ cls: 'note-group-header-content' });
+        const collapseIcon = headerContent.createDiv({ cls: 'note-group-collapse-icon' });
+        setIcon(collapseIcon, 'chevron-down');
+        headerContent.createSpan({ text: groupInfo.label });
+        header.createDiv({ cls: 'note-group-count', text: assetsInGroup.length.toString() });
 
-                if (this.isAssetsGridView) {
-                    listWrapper.addClass('assets-grid-view');
-                    assetsInGroup.forEach(file => {
-                        const item = listWrapper.createDiv({ cls: 'asset-grid-item' });
-                        this.applyPopupTrigger(item, file, 'asset');
-
-                        const preview = item.createDiv({ cls: 'asset-grid-preview' });
-                        if (this.isImageAsset(file)) {
-                            const thumbnail = preview.createEl('img');
-                            thumbnail.src = this.app.vault.getResourcePath(file);
-                        } else {
-                            setIcon(preview, 'file-question');
+        header.addEventListener('click', () => {
+            const isCurrentlyCollapsed = groupContainer.classList.toggle('is-collapsed');
+            this.collapsedAssetGroups[groupInfo.key] = isCurrentlyCollapsed;
+            this.plugin.saveSettings();
+            
+            // NEW: Re-observe lazy-loaded images after expansion (fixes cutoff/blank images)
+            if (!isCurrentlyCollapsed && this.isAssetsGridView) {
+                setTimeout(() => {
+                    const gridItems = groupContainer.querySelectorAll('.asset-grid-item img[data-src]');
+                    gridItems.forEach(img => {
+                        if (img.dataset.src) {  // Only observe unloaded images
+                            this.assetObserver.observe(img.closest('.asset-grid-item'));
                         }
-                        item.createDiv({ text: file.name, cls: 'asset-grid-name' });
                     });
-                } else {
-                    listWrapper.removeClass('assets-grid-view');
-                    assetsInGroup.forEach(file => {
-                        const row = listWrapper.createDiv({ cls: 'note-row' });
-                        this.applyPopupTrigger(row, file, 'asset');
-
-                        const isUnused = unusedAssetPaths.has(file.path);
-                        const titleWrapper = row.createDiv({ cls: 'note-title-wrapper' });
-                        const iconContainer = titleWrapper.createDiv({ cls: 'asset-icon-container' });
-
-                        if (this.isImageAsset(file)) {
-                            const thumbnail = iconContainer.createEl('img', { cls: 'asset-thumbnail' });
-                            thumbnail.src = this.app.vault.getResourcePath(file);
-                        } else {
-                            setIcon(iconContainer, 'file-text');
-                        }
-                        iconContainer.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            this.handleFileClick(file, e);
-                        });
-
-                        if (isUnused && settings.showUnusedAssetsIndicator) {
-                            const actionIconContainer = titleWrapper.createDiv({ cls: 'asset-action-icon' });
-                            setIcon(actionIconContainer, 'trash');
-                            actionIconContainer.addEventListener('click', (e) => {
-                                e.stopPropagation();
-                                this.handleDeleteFile(file);
-                            });
-                        }
-
-                        titleWrapper.createDiv({ text: file.name, cls: 'note-title' });
-
-                        const metaContainer = row.createDiv({ cls: 'note-meta-container' });
-                        metaContainer.createSpan({ text: this.formatFileSize(file.stat.size), cls: 'note-file-size' });
-                        metaContainer.createSpan({ text: this.formatDateTime(new Date(file.stat.mtime)), cls: 'note-mod-date' });
-                    });
-                }
+                }, 150);  // Slightly longer delay for smooth CSS transition
             }
         });
+
+        const listWrapper = groupContainer.createDiv({ cls: 'note-list-wrapper' });
+        
+        if (this.isAssetsGridView) {
+            listWrapper.addClass('assets-grid-view');
+            assetsInGroup.forEach(file => {
+                const item = listWrapper.createDiv({ cls: 'asset-grid-item' });
+                this.applyPopupTrigger(item, file, 'asset');
+                
+                const preview = item.createDiv({ cls: 'asset-grid-preview' });
+                if (this.isImageAsset(file)) {
+                    const thumbnail = preview.createEl('img', { attr: { 'data-src': this.app.vault.getResourcePath(file) } });
+                    thumbnail.alt = file.name;  // For accessibility
+                    // Observer will load this on visibility
+                } else {
+                    setIcon(preview, 'file-question');
+                }
+                item.createDiv({ text: file.name, cls: 'asset-grid-name' });
+                
+                // NEW: Initially observe all new grid items for lazy loading
+                this.assetObserver.observe(item);
+            });
+        } else {
+            // Your list view code unchanged...
+            // Paste your existing list view rendering here (e.g., listWrapper.removeClass('assets-grid-view'); assetsInGroup.forEach(file => { const row = ... }); )
+            listWrapper.removeClass('assets-grid-view');
+            assetsInGroup.forEach(file => {
+                const row = listWrapper.createDiv({ cls: 'note-row' });
+                this.applyPopupTrigger(row, file, 'asset');
+
+                const isUnused = unusedAssetPaths.has(file.path);
+                const titleWrapper = row.createDiv({ cls: 'note-title-wrapper' });
+                const iconContainer = titleWrapper.createDiv({ cls: 'asset-icon-container' });
+
+                if (this.isImageAsset(file)) {
+                    const thumbnail = iconContainer.createEl('img', { cls: 'asset-thumbnail' });
+                    thumbnail.src = this.app.vault.getResourcePath(file);
+                } else {
+                    setIcon(iconContainer, 'file-text');
+                }
+
+                iconContainer.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.handleFileClick(file, e);
+                });
+
+                if (isUnused && settings.showUnusedAssetsIndicator) {
+                    const actionIconContainer = titleWrapper.createDiv({ cls: 'asset-action-icon' });
+                    setIcon(actionIconContainer, 'trash');
+                    actionIconContainer.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.handleDeleteFile(file);
+                    });
+                }
+
+                titleWrapper.createDiv({ text: file.name, cls: 'note-title' });
+
+                const metaContainer = row.createDiv({ cls: 'note-meta-container' });
+                metaContainer.createSpan({ text: this.formatFileSize(file.stat.size), cls: 'note-file-size' });
+                metaContainer.createSpan({ text: this.formatDateTime(new Date(file.stat.mtime)), cls: 'note-mod-date' });
+            });
+        }
     }
+});
+
+
+        this.assetsContentEl.style.opacity = '0';
+        requestAnimationFrame(() => {
+            this.assetsContentEl.style.transition = 'opacity 0.2s';
+            this.assetsContentEl.style.opacity = '1';
+        });
+    }
+
+
 
 
 
@@ -6828,8 +7321,10 @@ class PeriodMonthView extends ItemView {
     }
 
     async onclose() {
+        this.assetObserver?.disconnect();
         this.intersectionObserver?.disconnect();
         if (this.dailyRefreshTimeout) clearTimeout(this.dailyRefreshTimeout);
+        if (this.statusBarObserver) this.statusBarObserver.disconnect();
     }
 
     /**
@@ -6955,7 +7450,12 @@ class PeriodMonthView extends ItemView {
 
             tabElements[key] = tabEl;
 
-            tabEl.addEventListener("click", async () => {
+            tabEl.addEventListener("click", async (e) => {
+                if (key === 'scratch' && e.shiftKey) {
+                    this.openScratchpadFile(true); // Force new tab
+                    return;
+                }
+                
                 if (this.activeTab === key) {
                     // This is a second click on an already active tab, which triggers a special action.
                     if (key === 'scratch') {
@@ -7829,69 +8329,6 @@ class PeriodMonthView extends ItemView {
         }
     }
 
-    renderTaskSummaryBar(container, incompleteTasks, completedTasks, overdueTasks) {
-        const barAndLegendWrapper = container.createDiv({ cls: 'bar-and-legend-wrapper' });
-
-        const totalTasks = (incompleteTasks?.length || 0) + (completedTasks?.length || 0) + (overdueTasks?.length || 0);
-
-        if (totalTasks === 0) {
-            barAndLegendWrapper.createDiv({ text: 'No tasks in this period.', cls: 'task-group-empty-message' });
-            return; // Exit if there's nothing to draw
-        }
-
-        const progressBar = barAndLegendWrapper.createDiv({ cls: 'pm-progress-bar' });
-        const legend = barAndLegendWrapper.createDiv({ cls: 'pm-progress-legend' });
-
-        const setupSegment = (tasks, type) => {
-            if (!tasks || tasks.length === 0) return;
-
-            const isCompleted = type === 'completed';
-            const isOverdue = type === 'overdue';
-
-            const segment = progressBar.createDiv({
-                cls: `pm-progress-segment ${type}`,
-                text: tasks.length,
-            });
-            segment.style.width = `${(tasks.length / totalTasks) * 100}%`;
-            segment.addClass('is-interactive');
-
-            // popup logic
-            segment.addEventListener('mouseenter', () => {
-                if (this.isPopupLocked) return;
-                clearTimeout(this.hideTimeout);
-                this.hideFilePopup();
-
-                const isCompleted = type === 'completed';
-                const isOverdue = type === 'overdue';
-                const isInProgress = type === 'in-progress';
-                const isNoDue = type === 'no-due';
-
-                const popupTitle = `${title} - ${isCompleted ? 'Done' : isOverdue ? 'Overdue' : isInProgress ? 'In Progress' : isNoDue ? 'No Due Date' : 'To Do'}`;
-                this.hoverTimeout = setTimeout(() => {
-                    this.showFilePopup(segment, { tasks: tasks }, popupTitle, this.plugin.settings.otherNoteHoverDelay);
-                }, this.plugin.settings.otherNoteHoverDelay);
-            });
-
-            segment.addEventListener('mouseleave', () => {
-                clearTimeout(this.hoverTimeout);
-                this.hideTimeout = setTimeout(() => this.hideFilePopup(), this.plugin.settings.popupHideDelay);
-            });
-
-            const legendText = isCompleted ? 'Done' : isOverdue ? 'Overdue' : 'To Do';
-            const legendItem = legend.createDiv({ cls: 'legend-item' });
-            legendItem.createDiv({ cls: `legend-color-box ${type}` });
-            legendItem.createSpan({ text: legendText });
-        };
-
-        // Render segments in order: Overdue, Incomplete, Completed
-        setupSegment(overdueTasks, 'overdue');
-        setupSegment(incompleteTasks, 'incomplete');
-        setupSegment(completedTasks, 'completed');
-    }
-
-
-
-
     async getTaskMetrics() {
         const allTasks = this.allTasks || [];
         const now = moment();
@@ -8151,29 +8588,36 @@ class PeriodMonthView extends ItemView {
         return metrics;
     }
 
-
-    async getUpcomingAndOverdueTasksMap() {
-        const upcomingAndOverdueMap = new Map();
-        const allTasks = this.allTasks || [];
+    async getTaskMaps() {
+        const upcomingMap = new Map();
+        const overdueMap = new Map();
+        const allTasks = this.allTasks;
         const now = moment();
 
         for (const task of allTasks) {
-            // We only care about incomplete tasks that have a due date
+            // We only care about incomplete tasks with a due date
             if (task.status !== 'x' && task.status !== '-' && task.dueDate) {
                 const dueDate = moment(task.dueDate);
-                // Include tasks that are overdue or are due in the future
-                if (dueDate.isSameOrAfter(now, 'day') || dueDate.isBefore(now, 'day')) {
-                    const dateKey = dueDate.format('YYYY-MM-DD');
-                    if (!upcomingAndOverdueMap.has(dateKey)) {
-                        upcomingAndOverdueMap.set(dateKey, []);
+                const isOverdue = dueDate.isBefore(now, 'day');
+                const dateKey = dueDate.format('YYYY-MM-DD');
+
+                // Add to the appropriate map
+                if (isOverdue) {
+                    if (!overdueMap.has(dateKey)) {
+                        overdueMap.set(dateKey, []);
                     }
-                    upcomingAndOverdueMap.get(dateKey).push(task);
+                    overdueMap.get(dateKey).push(task);
+                } else if (dueDate.isSameOrAfter(now, 'day')) {
+                    // Only include future tasks in the upcoming map
+                    if (!upcomingMap.has(dateKey)) {
+                        upcomingMap.set(dateKey, []);
+                    }
+                    upcomingMap.get(dateKey).push(task);
                 }
             }
         }
-        return upcomingAndOverdueMap;
+        return { upcomingMap, overdueMap };
     }
-
 
     renderEmptyHeatmapWidget(parent, title, message = 'No files found matching the filter criteria.') {
         const widgetContainer = parent.createDiv({ cls: 'pm-widget-container pm-empty-widget' });
@@ -8193,25 +8637,23 @@ class PeriodMonthView extends ItemView {
         const searchTerm = this.dashboardSearchTerm.toLowerCase();
         const finalOrder = this.getFinalWidgetOrder('tasks');
 
-        // --- 1. NEW Date Range Definitions ---
         const now = moment();
         const startOfToday = now.clone().startOf('day');
         const endOfToday = now.clone().endOf('day');
         const startOfTomorrow = now.clone().add(1, 'day').startOf('day');
         const endOfTomorrow = now.clone().add(1, 'day').endOf('day');
         const startOfNext7Days = now.clone().add(2, 'day').startOf('day');
-        const endOfNext7Days = now.clone().add(8, 'day').endOf('day'); // Today + 1 + 7 = 8
+        const endOfNext7Days = now.clone().add(8, 'day').endOf('day');
 
-        // This initialization is critical and fixes the crash
         const metrics = {
             today: { incomplete: [], completed: [], overdue: [], inProgress: [] },
-            tomorrow: { incomplete: [], completed: [], inProgress: [] },
-            next7days: { incomplete: [], completed: [], inProgress: [] },
+            tomorrow: { incomplete: [], inProgress: [] },
+            next7days: { incomplete: [], inProgress: [] },
             future: { incomplete: [], inProgress: [] },
-            noDue: { incomplete: [], inProgress: [] },
+            noDue: { incomplete: [], inProgress: [] }
         };
 
-        // --- Corrected Task Metric Calculation Loop ---
+        // This loop correctly prioritizes the due date.
         for (const task of this.allTasks) {
             const isCompleted = task.status.toLowerCase() === 'x';
             const isInProgress = task.status === '/';
@@ -8219,69 +8661,77 @@ class PeriodMonthView extends ItemView {
             const completionDate = task.completionDate ? moment(task.completionDate) : null;
 
             if (isCompleted) {
-                if (completionDate && completionDate.isBetween(startOfToday, endOfToday, null, '[]')) {
+                if (this.plugin.settings.showCompletedTasksToday && completionDate && completionDate.isBetween(startOfToday, endOfToday, null, '[]')) {
                     metrics.today.completed.push(task);
                 }
-            } else { // Task is not completed
-                if (!dueDate) {
-                    if (isInProgress) metrics.noDue.inProgress.push(task);
-                    else metrics.noDue.incomplete.push(task);
-                } else if (dueDate.isBefore(startOfToday, 'day')) {
+            } else if (dueDate) { // ---> PRIORITY 1: A due date exists.
+                if (dueDate.isBefore(startOfToday, 'day')) {
                     metrics.today.overdue.push(task);
                 } else if (dueDate.isBetween(startOfToday, endOfToday, null, '[]')) {
-                    if (isInProgress) metrics.today.inProgress.push(task);
-                    else metrics.today.incomplete.push(task);
+                    (isInProgress ? metrics.today.inProgress : metrics.today.incomplete).push(task);
                 } else if (dueDate.isBetween(startOfTomorrow, endOfTomorrow, null, '[]')) {
-                    if (isInProgress) metrics.tomorrow.inProgress.push(task);
-                    else metrics.tomorrow.incomplete.push(task);
+                    (isInProgress ? metrics.tomorrow.inProgress : metrics.tomorrow.incomplete).push(task);
                 } else if (dueDate.isBetween(startOfNext7Days, endOfNext7Days, null, '[]')) {
-                    if (isInProgress) metrics.next7days.inProgress.push(task);
-                    else metrics.next7days.incomplete.push(task);
+                    (isInProgress ? metrics.next7days.inProgress : metrics.next7days.incomplete).push(task);
                 } else if (dueDate.isAfter(endOfNext7Days, 'day')) {
-                    if (isInProgress) metrics.future.inProgress.push(task);
-                    else metrics.future.incomplete.push(task);
+                    (isInProgress ? metrics.future.inProgress : metrics.future.incomplete).push(task);
                 }
+            } else { // ---> PRIORITY 2: No due date exists.
+                (isInProgress ? metrics.noDue.inProgress : metrics.noDue.incomplete).push(task);
             }
         }
 
-        // --- 3. NEW Render Logic for All Widgets ---
+        // This switch block correctly calls the new rendering function.
         for (const widgetKey of finalOrder) {
+            if (!this.plugin.settings.tasksDashboardWidgets[widgetKey]) {
+                continue;
+            }
             const widgetName = DASHBOARDWIDGETS.tasks[widgetKey]?.name || '';
             if (searchTerm && !widgetName.toLowerCase().includes(searchTerm)) {
                 continue;
             }
 
             switch (widgetKey) {
-                // In populateTasksDashboard, inside the switch (widgetKey) block
-
                 case 'today':
-                    this.renderTaskSummaryWidget(widgetGrid, "Today", metrics.today.incomplete, metrics.today.completed, metrics.today.overdue, metrics.today.inProgress, 'today');
+                    this.renderTaskSummaryWidget(widgetGrid, 'Today', metrics.today.incomplete, metrics.today.completed, metrics.today.overdue, metrics.today.inProgress, [], 'today');
                     break;
                 case 'tomorrow':
-                    this.renderTaskSummaryWidget(widgetGrid, "Tomorrow", metrics.tomorrow.incomplete, [], [], metrics.tomorrow.inProgress, 'tomorrow');
+                    this.renderTaskSummaryWidget(widgetGrid, 'Tomorrow', metrics.tomorrow.incomplete, [], [], metrics.tomorrow.inProgress, [], 'tomorrow');
                     break;
                 case 'next7days':
-                    this.renderTaskSummaryWidget(widgetGrid, "Next 7 Days", metrics.next7days.incomplete, [], [], metrics.next7days.inProgress, 'next7days');
+                    this.renderTaskSummaryWidget(widgetGrid, 'Next 7 Days', metrics.next7days.incomplete, [], [], metrics.next7days.inProgress, [], 'next7days');
                     break;
-                case 'futureNoDue':
-                    this.renderTaskSummaryWidget(
-                        widgetGrid,
-                        "Future / No Due",
-                        metrics.future.incomplete,  // Future tasks go into the 'incomplete' slot
-                        [],                          // No completed tasks
-                        [],                          // No overdue tasks
-                        metrics.noDue.incomplete,    // No Due tasks go into the dedicated 'noDue' slot
-                        'futureNoDue'
-                    );
-                    break;
-                case 'upcomingoverdue': {
-                    const widgetContainer = widgetGrid.createDiv({ cls: 'pm-widget-container' });
-                    const upcomingAndOverdueMap = await this.getUpcomingAndOverdueTasksMap();
-                    const gradient = this.createColorGradient(this.plugin.settings.taskHeatmapStartColor);
-                    const futureEndDate = moment().add(12, 'months').endOf('month');
-                    await this.populateSingleHeatmapWidget(widgetContainer, "Upcoming & Overdue Tasks", upcomingAndOverdueMap, gradient, { endDate: futureEndDate }, 'upcomingoverdue');
+                case 'futureNoDue': {
+                    const combinedIncomplete = metrics.future.incomplete || [];
+                    const combinedInProgress = [...(metrics.future.inProgress || []), ...(metrics.noDue.inProgress || [])];
+                    this.renderTaskSummaryWidget(widgetGrid, 'Future / No Due', combinedIncomplete, [], [], combinedInProgress, metrics.noDue.incomplete, 'futureNoDue');
                     break;
                 }
+                case 'upcomingoverdue':
+                    const { upcomingMap, overdueMap } = await this.getTaskMaps();
+                    const totalDataMap = new Map(upcomingMap);
+                    overdueMap.forEach((tasks, date) => {
+                        const existingTasks = totalDataMap.get(date) || [];
+                        totalDataMap.set(date, existingTasks.concat(tasks));
+                    });
+                    const upcomingGradient = this.createColorGradient(this.plugin.settings.taskStatusColorOpen);
+                    const overdueBaseColor = this.getComputedCssVar('--task-color-overdue');
+                    const overdueGradient = this.createColorGradient(overdueBaseColor);
+                    const futureEndDate = moment().add(12, 'months').endOf('month');
+                    await this.populateSingleHeatmapWidget(
+                        widgetGrid.createDiv({ cls: 'pm-widget-container' }),
+                        'Upcoming & Overdue Tasks',
+                        totalDataMap,
+                        upcomingGradient,
+                        {
+                            endDate: futureEndDate,
+                            upcomingMap: upcomingMap,
+                            overdueMap: overdueMap,
+                            overdueGradient: overdueGradient
+                        },
+                        'upcomingoverdue'
+                    );
+                    break;
                 case 'taskcompletionheatmap': {
                     const widgetContainer = widgetGrid.createDiv({ cls: 'pm-widget-container' });
                     const completionMap = new Map();
@@ -8292,7 +8742,7 @@ class PeriodMonthView extends ItemView {
                             completionMap.get(dateKey).push(task);
                         }
                     });
-                    const gradient = this.createColorGradient(this.plugin.settings.taskDotColor);
+                    const gradient = this.createColorGradient(this.plugin.settings.taskStatusColorCompleted);
                     await this.populateSingleHeatmapWidget(widgetContainer, "Task Completion Activity", completionMap, gradient, {}, 'taskcompletionheatmap');
                     break;
                 }
@@ -8303,6 +8753,7 @@ class PeriodMonthView extends ItemView {
             }
         }
     }
+
 
 
     getFinalWidgetOrder(dashboardType) {
@@ -8423,6 +8874,7 @@ class PeriodMonthView extends ItemView {
      * @param {Date} date The date for which the popup is being shown.
      */
     showFilePopup(targetEl, dataByType, dateOrTitle, isMobile = false) {
+    
         this.hideFilePopup();
         this.popupEl = createDiv({ cls: 'other-notes-popup' });
         const { settings } = this.plugin;
@@ -8494,27 +8946,30 @@ class PeriodMonthView extends ItemView {
             if (file.parent && file.parent.path !== '/') {
                 titlePathWrapper.createDiv({ text: file.parent.path, cls: 'note-path' });
             }
-            itemEl.addEventListener('click', () => {
-                this.app.workspace.openLinkText(file.path, '', settings.notesOpenAction === 'new-tab');
+            
+            itemEl.addEventListener('click', (e) => {
+                e.stopPropagation(); 
+                e.stopImmediatePropagation();
+                this.handleFileClick(file, e, {});
                 this.hideFilePopup();
             });
         };
 
-        const addTaskToList = (container, task) => {
+        const addTaskToList = (container, task, view) => {
             const itemEl = container.createDiv({ cls: 'other-notes-popup-item' });
             itemEl.dataset.taskStatus = task.status;
 
             const checkbox = itemEl.createDiv({ cls: 'task-checkbox-symbol' });
-            this._renderTaskSymbol(checkbox, task);
+            view._renderTaskSymbol(checkbox, task);
             checkbox.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 checkbox.disabled = true;
-                await this.toggleTaskCompletion(task);
+                await view.toggleTaskCompletion(task);
             });
 
             const textSpan = itemEl.createSpan({ cls: 'task-text' });
 
-            // Add completed class if task is completed - this matches renderTaskItem
+            // Add completed class if task is completed
             const isCompleted = task.status.toLowerCase() === 'x';
             if (isCompleted) {
                 textSpan.classList.add('completed');
@@ -8523,11 +8978,16 @@ class PeriodMonthView extends ItemView {
             // Render text using MarkdownRenderer
             MarkdownRenderer.render(this.app, task.text, textSpan, task.file.path, this);
 
-            itemEl.addEventListener('click', () => {
-                this.app.workspace.openLinkText(task.file.path, '', false, { eState: { line: task.lineNumber } });
-                this.hideFilePopup();
+             itemEl.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+
+                view.handleFileClick(task.file, e, { line: task.lineNumber });
+                view.hideFilePopup();
             });
         };
+
+
 
         // logic for populating the content
         const allFiles = [...(dataByType.daily || []), ...(dataByType.created || []), ...(dataByType.modified || []), ...(dataByType.assets || [])];
@@ -8550,7 +9010,7 @@ class PeriodMonthView extends ItemView {
                 return dateA - dateB;
             });
 
-            dataByType.tasks.forEach(task => addTaskToList(contentWrapper, task));
+            dataByType.tasks.forEach(task => addTaskToList(contentWrapper, task, this));
         }
         if (hasTasks && hasFiles) {
             contentWrapper.createDiv({ cls: 'popup-separator' });
@@ -8590,6 +9050,10 @@ class PeriodMonthView extends ItemView {
         });
 
         document.body.appendChild(this.popupEl);
+
+        this.popupEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
 
         if (isMobile) {
             const margin = 8;
@@ -8892,44 +9356,88 @@ class PeriodMonthView extends ItemView {
             header.createDiv({ cls: 'note-group-count', text: filteredNotes.length.toString() });
 
             const listWrapper = groupContainer.createDiv({ cls: 'note-list-wrapper' });
-            listWrapper.addEventListener('drop', async (e) => {
-                e.preventDefault();
-                await this.savePinnedOrder(listWrapper);
-            });
 
-            filteredNotes.forEach(file => {
-                this.renderNoteItem(file, listWrapper);
-            });
+            if (filteredNotes.length === 0) {
+                const emptyMessageEl = listWrapper.createDiv({ cls: 'pinned-notes-empty-message' });
+                const pinTag = this.plugin.settings.pinTag || 'pin'; // Safely get the tag
+                emptyMessageEl.innerHTML = `No pinned notes. To pin a note, add the <code>#${pinTag}</code> tag to its properties or body.`;
+            } else {
+                listWrapper.addEventListener('drop', async (e) => {
+                    e.preventDefault();
+                    await this.savePinnedOrder(listWrapper);
+                });
+
+                filteredNotes.forEach(file => this.renderNoteItem(file, listWrapper));
+            }
 
         } else { // recent notes mode
-            const groups = { today: [], yesterday: [], thisWeek: [], lastWeek: [], thisMonth: [], older: [] };
-            const now = moment();
-
-            filteredNotes.forEach(file => {
-                const modTime = moment(file.stat.mtime);
-                if (modTime.isSame(now, 'day')) groups.today.push(file);
-                else if (modTime.isSame(now.clone().subtract(1, 'day'), 'day')) groups.yesterday.push(file);
-                else if (modTime.isSame(now, 'week')) groups.thisWeek.push(file);
-                else if (modTime.isSame(now.clone().subtract(1, 'week'), 'week')) groups.lastWeek.push(file);
-                else if (modTime.isSame(now, 'month')) groups.thisMonth.push(file);
-                else groups.older.push(file);
-            });
-
+            const groups = {
+                today: [],
+                yesterday: [],
+                thisWeek: [],
+                lastWeek: [],
+            };
             const groupOrder = [
                 { key: 'today', label: 'Today' },
                 { key: 'yesterday', label: 'Yesterday' },
                 { key: 'thisWeek', label: 'This Week' },
                 { key: 'lastWeek', label: 'Last Week' },
-                { key: 'thisMonth', label: 'This Month' },
-                { key: 'older', label: 'Older' },
             ];
+            const now = moment();
+            const startOfThisWeek = now.clone().startOf('week');
+            const startOfLastWeek = now.clone().subtract(1, 'week').startOf('week');
 
+            for (let i = 0; i < 12; i++) {
+                const month = now.clone().subtract(i, 'months');
+                const monthKey = month.format('YYYY-MM');
+                if (!groups[monthKey]) {
+                    groups[monthKey] = [];
+                    groupOrder.push({ key: monthKey, label: month.format('MMMM YYYY') });
+                }
+            }
+            groups['older'] = [];
+            groupOrder.push({ key: 'older', label: 'Older' });
+
+            // --- 2. NOTE SORTING LOGIC ---
+            filteredNotes.forEach(file => {
+                const modTime = moment(file.stat.mtime);
+                if (modTime.isSame(now, 'day')) {
+                    groups.today.push(file);
+                } else if (modTime.isSame(now.clone().subtract(1, 'day'), 'day')) {
+                    groups.yesterday.push(file);
+                } else if (modTime.isAfter(startOfThisWeek)) {
+                    groups.thisWeek.push(file);
+                } else if (modTime.isAfter(startOfLastWeek)) {
+                    groups.lastWeek.push(file);
+                } else {
+                    const monthKey = modTime.format('YYYY-MM');
+                    if (groups[monthKey]) {
+                        groups[monthKey].push(file);
+                    } else {
+                        groups.older.push(file);
+                    }
+                }
+            });
+
+            // --- 3. RENDERING WITH DEFAULT COLLAPSE LOGIC ---
             groupOrder.forEach(groupInfo => {
                 const notesInGroup = groups[groupInfo.key];
                 if (notesInGroup.length > 0) {
                     const groupContainer = this.notesContentEl.createDiv({ cls: 'note-group-container' });
-                    const isCollapsed = this.collapsedNoteGroups[groupInfo.key];
-                    if (isCollapsed) groupContainer.addClass('is-collapsed');
+
+                    // Apply the default collapsed state for monthly groups
+                    const isMonthlyGroup = /^\d{4}-\d{2}$/.test(groupInfo.key);
+                    let isCollapsed;
+
+                    if (isMonthlyGroup) {
+                        isCollapsed = this.collapsedNoteGroups[groupInfo.key] !== false;
+                    } else {
+                        isCollapsed = this.collapsedNoteGroups[groupInfo.key] === true;
+                    }
+
+                    if (isCollapsed) {
+                        groupContainer.addClass('is-collapsed');
+                    }
 
                     const header = groupContainer.createDiv({ cls: 'note-group-header' });
                     const headerContent = header.createDiv({ cls: 'note-group-header-content' });
@@ -8945,9 +9453,7 @@ class PeriodMonthView extends ItemView {
                     });
 
                     const listWrapper = groupContainer.createDiv({ cls: 'note-list-wrapper' });
-                    notesInGroup.forEach(file => {
-                        this.renderNoteItem(file, listWrapper);
-                    });
+                    notesInGroup.forEach(file => this.renderNoteItem(file, listWrapper));
                 }
             });
         }
@@ -9398,7 +9904,7 @@ class PeriodMonthView extends ItemView {
     /**
      * Opens the scratchpad note in a new or current tab.
      */
-    async openScratchpadFile() {
+    async openScratchpadFile(forceNewTab = false) {
         const path = this.plugin.settings.fixedNoteFile;
 
         if (this.app.isMobile) {
@@ -9430,23 +9936,36 @@ class PeriodMonthView extends ItemView {
         // If the file doesn't exist, create it.
         if (!file) file = await this.app.vault.create(path, "").catch(() => new Notice(`Failed to create scratchpad: ${path}`));
 
-        if (file instanceof TFile) this.app.workspace.getLeaf(this.plugin.settings.scratchpadOpenAction === 'new-tab').openFile(file);
+        //if (file instanceof TFile) this.app.workspace.getLeaf(this.plugin.settings.scratchpadOpenAction === 'new-tab').openFile(file);
+        if (file instanceof TFile) {
+            const openInNew = forceNewTab || this.plugin.settings.scratchpadOpenAction === 'new-tab';
+            this.app.workspace.getLeaf(openInNew).openFile(file);
+        }
     }
 
     /**
      * Saves text content to the scratchpad note file.
      * @param {string} text The text to save.
      */
-    async saveFixedNote(text) {
+    async saveFixedNote(text) { // 'text' is the body content from the textarea
         const path = this.plugin.settings.fixedNoteFile;
-        const folderPath = path.substring(0, path.lastIndexOf("/"));
-        // Create parent folder if it doesn't exist.
+        if (!path) return; // Safety check
+
+        const folderPath = path.substring(0, path.lastIndexOf('/'));
+
         if (folderPath && !this.app.vault.getAbstractFileByPath(folderPath)) {
             await this.app.vault.createFolder(folderPath).catch(err => console.error("Error creating folder:", err));
         }
+
+        // CORRECTED: Combine the stored frontmatter with the current body text
+        const contentToSave = this.scratchpadFrontmatter + text;
+
         let file = this.app.vault.getAbstractFileByPath(path);
-        if (!file) await this.app.vault.create(path, text);
-        else if (file instanceof TFile) await this.app.vault.modify(file, text);
+        if (!file) {
+            file = await this.app.vault.create(path, contentToSave);
+        } else if (file instanceof TFile) {
+            await this.app.vault.modify(file, contentToSave);
+        }
     }
 
     /**
@@ -9506,7 +10025,7 @@ class PeriodMonthView extends ItemView {
 
             // If including events, proceed with injection
             if (includeEvents) {
-                await new Promise(resolve => setTimeout(resolve, 200)); // Delay
+                await new Promise(resolve => setTimeout(resolve, 1000)); // Delay
 
                 // 1. Check for events in the map
                 const dateKey = moment(date).format("YYYY-MM-DD");
@@ -9793,6 +10312,7 @@ class PeriodSettingsTab extends PluginSettingTab {
         this.colorClipboard = null;
         this.selectedThemeFile = null;
         this.currentThemeDefaults = { ...DEFAULT_SETTINGS };
+    
     }
 
     refreshDisplay() {
@@ -11249,6 +11769,24 @@ class PeriodSettingsTab extends PluginSettingTab {
             }));
 
         new Setting(containerEl).setName("Appearance").setHeading();
+        
+        new Setting(containerEl)
+        .setName('Hide note properties')
+        .setDesc('If enabled, the frontmatter properties text (text between ---) at the top of the note will be hidden from the ScratchPad view.')
+        .addToggle(toggle => {
+            // Ensure the nested object exists to prevent errors
+            if (!this.plugin.settings.scratchpad) {
+                this.plugin.settings.scratchpad = {};
+            }
+            toggle
+                .setValue(this.plugin.settings.scratchpad.hideFrontmatter ?? false)
+                .onChange(async (value) => {
+                    this.plugin.settings.scratchpad.hideFrontmatter = value;
+                    // This helper saves settings and refreshes any open plugin views
+                    await this.saveAndUpdate();
+                });
+        });
+
         new Setting(containerEl).setName("ScratchPad font size").setDesc("Font size for the text inside the ScratchPad editor. Default is 14px.").addText(text => text.setValue(this.plugin.settings.scratchFontSize).onChange(async value => { this.plugin.settings.scratchFontSize = value; await this.saveAndUpdate(); }));
         new Setting(containerEl).setName("Bold ScratchPad text").setDesc("Toggles bold font weight for the text in the ScratchPad.").addToggle(toggle => toggle.setValue(this.plugin.settings.scratchBold).onChange(async value => { this.plugin.settings.scratchBold = value; await this.saveAndUpdate(); }));
         new Setting(containerEl).setName("ScratchPad font family").setDesc("Examples: monospace, Arial, 'Courier New'. Leave blank to use the editor default.").addText(text => text.setValue(this.plugin.settings.scratchFontFamily).onChange(async (value) => { this.plugin.settings.scratchFontFamily = value; await this.saveAndUpdate(); }));
@@ -11260,8 +11798,8 @@ class PeriodSettingsTab extends PluginSettingTab {
         const containerEl = this.contentEl;
         containerEl.createEl("h1", { text: "Notes Tab Settings" });
         new Setting(containerEl).setName("Functionality").setHeading();
-        new Setting(containerEl).setName("Notes tab open behavior").setDesc("Choose how to open notes when clicked from the notes list.").addDropdown(dropdown => dropdown.addOption('new-tab', 'Open in a new tab').addOption('current-tab', 'Open in the current tab').setValue(this.plugin.settings.notesOpenAction).onChange(async (value) => { this.plugin.settings.notesOpenAction = value; await this.saveAndUpdate(); }));
-        new Setting(containerEl).setName("Notes lookback days").setDesc("How many days back the Notes tab should look for created or modified notes. Default is 7.").addText(text => text.setValue(String(this.plugin.settings.notesLookbackDays)).onChange(async value => { this.plugin.settings.notesLookbackDays = Number(value) || 7; await this.saveAndUpdate(); }));
+        new Setting(containerEl).setName("Notes tab open behavior").setDesc("Choose how to open notes when clicked from the notes list. NOTE: Holding the shift key and clicking a note will always open it in a new tab.").addDropdown(dropdown => dropdown.addOption('new-tab', 'Open in a new tab').addOption('current-tab', 'Open in the current tab').setValue(this.plugin.settings.notesOpenAction).onChange(async (value) => { this.plugin.settings.notesOpenAction = value; await this.saveAndUpdate(); }));
+        new Setting(containerEl).setName("Notes lookback days").setDesc("How many days back the Notes tab should look for created or modified notes. Default is 120.").addText(text => text.setValue(String(this.plugin.settings.notesLookbackDays)).onChange(async value => { this.plugin.settings.notesLookbackDays = Number(value) || 7; await this.saveAndUpdate(); }));
 
         new Setting(containerEl).setName("Appearance").setHeading();
         new Setting(containerEl).setName("Show note status dots").setDesc("Show a colored dot next to each note, indicating if it was recently created or modified.").addToggle(toggle => toggle.setValue(this.plugin.settings.showNoteStatusDots).onChange(async value => { this.plugin.settings.showNoteStatusDots = value; await this.saveAndUpdate(); }));
@@ -11345,7 +11883,7 @@ class PeriodSettingsTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName("Assets lookback days")
-            .setDesc("How many days back the Assets tab should look for created or modified notes. Default is 7.")
+            .setDesc("How many days back the Assets tab should look for created or modified notes. Default is 120.")
             .addText(text => text
                 .setValue(String(this.plugin.settings.assetsLookbackDays))
                 .onChange(async value => {
@@ -11544,29 +12082,115 @@ class PeriodSettingsTab extends PluginSettingTab {
         container.createEl('div', { cls: 'setting-spacer' });
         this.renderWidgetSettings(container, 'Tasks Dashboard Widgets (Order and Toggle Display)', 'tasksDashboardWidgets', 'tasksDashboardOrder', DASHBOARDWIDGETS.tasks);
         container.createEl('div', { cls: 'setting-spacer' });
+        
+        
+        new Setting(container).setName("Task Status Colours").setHeading();
+
+        this.createRgbaColorSetting(
+            container,
+            "Cancelled",
+            "Colour for cancelled tasks in widgets.",
+            "taskStatusColorCancelled"
+        );
+
+        this.createRgbaColorSetting(
+            container,
+            "Overdue",
+            "Colour for overdue tasks in widgets and heatmaps.",
+            "taskStatusColorOverdue"
+        );
+       
+        this.createRgbaColorSetting(
+            container,
+            "In Progress",
+            "Colour for in-progress tasks in widgets.",
+            "taskStatusColorInProgress"
+        );
+
+
+        this.createRgbaColorSetting(
+            container,
+            "Open",
+            "Colour for open (to-do) tasks in widgets.",
+            "taskStatusColorOpen"
+        );
+
+         this.createRgbaColorSetting(
+            container,
+            "Completed",
+            "Colour for completed tasks in widgets and heatmaps.",
+            "taskStatusColorCompleted"
+        );
+        
+        container.createEl('div', { cls: 'setting-spacer' });
+        
         this.renderWidgetSettings(container, 'Creation Dashboard Widgets (Order and Toggle Display)', 'creationDashboardWidgets', 'creationDashboardOrder', DASHBOARDWIDGETS.creation);
         container.createEl('div', { cls: 'setting-spacer' });
+        
+        container.createEl('div', { cls: 'setting-spacer' });
+
+        container.createEl('h2', { text: 'Built-in Heatmap Links' });
+        container.createEl('p', { text: 'Set a note path to open when clicking the total count on a built-in heatmap widget. Leave empty to disable.', cls: 'setting-item-description' });
+
+        // Get all built-in creation heatmap widgets
+        const creationWidgets = DASHBOARDWIDGETS.creation;
+
+        for (const widgetKey in creationWidgets) {
+            // Only create settings for widgets that are actually heatmaps
+            if (widgetKey.endsWith('heatmap')) {
+                new Setting(container)
+                    .setName(creationWidgets[widgetKey].name)
+                    .addText(text => {
+                        this.createPathSuggester(text.inputEl, (query) => {
+                            return this.app.vault.getFiles()
+                            .filter(f => !query || f.path.toLowerCase().includes(query.toLowerCase()))
+                            .map(f => f.path);
+                        });
+                        text
+                            .setPlaceholder('Path/to/your/note.md or file.base / file.canvas')
+                            .setValue(this.plugin.settings.heatmapLinkConfig[widgetKey] || '')
+                            .onChange(async (value) => {
+                                this.plugin.settings.heatmapLinkConfig[widgetKey] = value.trim();
+                                await this.plugin.saveSettings();
+                            });
+                    });
+            }
+        }
+
+
+        container.createEl('div', { cls: 'setting-spacer' });
+
         const customHeatmapsContainer = container.createDiv();
 
-        // Call the dedicated function to render the heatmaps into their container
-        this.renderCustomHeatmapsSection(customHeatmapsContainer);
+        // --- Create the Collapsible Guide ---
+        const guideContainer = container.createDiv({ cls: 'note-group-container' });
 
-        // Create a container for the help text
-        const helpContainer = container.createDiv();
-        helpContainer.setAttr('style', `
-            user-select: text; 
-            font-size: 0.9em; 
-            line-height: 1.6; 
-            padding: 15px; 
-            margin: 10px 0 20px 0; 
-            border-radius: 8px; 
-            background-color: var(--background-secondary);
-        `);
+        // Check the saved state and apply 'is-collapsed' class if needed
+        if (this.plugin.settings.isHeatmapGuideCollapsed) {
+            guideContainer.addClass('is-collapsed');
+        }
 
-        helpContainer.innerHTML = `
-           <h1>Custom Heatmap Widget Guide</h1>
+        // 1. Create the clickable header
+        const header = guideContainer.createDiv({ cls: 'note-group-header' });
+        const headerContent = header.createDiv({ cls: 'note-group-header-content' });
+        const collapseIcon = headerContent.createDiv({ cls: 'note-group-collapse-icon' });
+        setIcon(collapseIcon, 'chevron-down');
+        headerContent.createSpan({ text: "Custom Heatmap Widget Guide" });
 
-<p>Use this section to add personalized heatmaps to your <strong>Creation</strong> dashboard. Each heatmap acts as a widget that visually tracks file creation activity based on a set of rules you define.</p>
+        header.addEventListener('click', () => {
+            const isNowCollapsed = guideContainer.classList.toggle('is-collapsed');
+            this.plugin.settings.isHeatmapGuideCollapsed = isNowCollapsed;
+            this.plugin.saveSettings();
+        });
+
+        // 2. Create the content wrapper for the guide text
+        const helpContentWrapper = guideContainer.createDiv({ cls: 'note-list-wrapper' });
+        const helpText = helpContentWrapper.createDiv(); // The actual element for the text
+        helpText.setAttr('style', 'user-select: text; font-size: 0.9em; line-height: 1.6; padding: 15px; margin: 0; border-radius: 8px; background-color: var(--background-secondary);');
+
+        helpText.innerHTML = `
+
+<p>Use the Custom Heatmap section to add personalized heatmaps to your <strong>Creation</strong> dashboard. Each heatmap acts as a widget that visually tracks file creation activity based on a set of rules you define.</p>
 
 <h2>Key Features</h2>
 <ul>
@@ -11634,8 +12258,9 @@ class PeriodSettingsTab extends PluginSettingTab {
     Value: <code>/^(Projects|Areas)\\//</code></li>
 </ul>
 
-
         `;
+
+        this.renderCustomHeatmapsSection(customHeatmapsContainer);
 
     }
 
@@ -11807,6 +12432,24 @@ class PeriodSettingsTab extends PluginSettingTab {
                         }
                     }));
 
+            new Setting(heatmapBox)
+                .setName('Note Link Path')
+                .setDesc('Set a note to open when clicking the total count for this heatmap.')
+                .addText(text => {
+                    this.createPathSuggester(text.inputEl, (query) => {
+                        return this.app.vault.getFiles()
+                            .filter(f => !query || f.path.toLowerCase().includes(query.toLowerCase()))
+                            .map(f => f.path);
+                    });
+                    text
+                        .setPlaceholder('Path/to/summary/note.md or file.base / file.canvas')
+                        .setValue(heatmap.linkPath || '')
+                        .onChange(async (value) => {
+                            heatmap.linkPath = value.trim();
+                            await this.saveAndUpdate();
+                        });
+                });
+
 
             // Add the dropdown for AND/OR logic
             new Setting(heatmapBox)
@@ -11836,7 +12479,7 @@ class PeriodSettingsTab extends PluginSettingTab {
 
             new Setting(heatmapBox)
                 .setName('Enable debug logging')
-                .setDesc('If enabled, the list of files for this heatmap will be printed to the developer console each time the dashboard refreshes. Each file will be listed with details it was matched. An end summary section "--- Debug for Heatmap: Changes ---" will be outputted. NOTE: debug to be toggled off for normal daily use.')
+                .setDesc('If enabled, the list of files for this heatmap will be printed to the developer console each time the dashboard refreshes. Each file will be listed with details if it was matched. An end summary section "--- Debug for Heatmap: Changes ---" will be outputted for files that were matched. NOTE: debug to be toggled off for normal daily use.')
                 .addToggle(toggle => {
                     toggle
                         .setValue(heatmap.debug || false)
@@ -11860,10 +12503,6 @@ class PeriodSettingsTab extends PluginSettingTab {
                     }));
         });
 
-
-
-
-
         // The "Add Custom Heatmap" button now goes inside this section
         new Setting(container)
             .setName("Add new custom heatmap")
@@ -11882,7 +12521,8 @@ class PeriodSettingsTab extends PluginSettingTab {
                         dateSource: 'creationDate',
                         excludeFolders: [],
                         monthsBack: 11,
-                        monthsForward: 0
+                        monthsForward: 0,
+                        linkPath: ''
                     });
                     await this.saveAndUpdate();
 
