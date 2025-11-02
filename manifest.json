@@ -1,7 +1,7 @@
 {
   "id": "calendar-period-week-notes",
   "name": "Calendar Period Week Notes",
-  "version": "1.2.6",
+  "version": "1.3.0",
   "minAppVersion": "0.15.0",
   "description": "A calendar grid plugin with a scratchpad area, notes list, pinned notes, tasks and asset views.",
   "author": "Tim Williams",
