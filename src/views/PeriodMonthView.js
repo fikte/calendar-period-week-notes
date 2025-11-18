@@ -1595,7 +1595,7 @@ export class PeriodMonthView extends ItemView {
                 const weekContent = weekCell.createDiv({ cls: "cpwn-day-content" });
                 weekContent.createDiv({ cls: "cpwn-day-number" }).setText(weekNum.toString());
 
-                weekCell.style.classList.add('cpwn-clickable');
+                weekCell.classList.add('cpwn-clickable');
 
                 if (this.plugin.settings.highlightTodayPWLabel) {
                     for (let d = 0; d < 7; d++) {
