@@ -1,0 +1,49 @@
+{
+    "name": "Created vs Completed Radar",
+    "description": "Compare task creation and completion patterns across weekly periods using a radar chart. The legend is displayed at the bottom for easy reference.",
+    "category": "Task Tracking",
+    "widgetConfig": {
+        "widgetKey": "createdVsCompletedRadar",
+        "widgetName": "Created vs Completed",
+        "size": "medium",
+        "chartType": "radar",
+        "appendTimePeriod": true,
+        "dateRange": {
+            "look": "back",
+            "value": "90",
+            "unit": "days"
+        },
+        "groupBy": "week",
+        "metrics": [
+            {
+                "label": "Created",
+                "type": "created",
+                "color": "rgba(59, 130, 246, 0.6)"
+            },
+            {
+                "label": "Completed",
+                "type": "completed",
+                "color": "rgba(34, 197, 94, 0.6)"
+            }
+        ],
+        "legend": {
+            "display": true,
+            "position": "bottom"
+        }
+    },
+    "previewData": {
+        "labels": ["Sep 1", "Sep 8", "Sep 15", "Sep 22", "Sep 29", "Oct 6", "Oct 13", "Oct 20", "Oct 27", "Nov 3"],
+        "datasets": [
+            {
+                "label": "Created",
+                "data": [12, 8, 15, 18, 10, 14, 9, 16, 11, 13],
+                "color": "rgba(59, 130, 246, 0.6)"
+            },
+            {
+                "label": "Completed",
+                "data": [8, 6, 12, 14, 8, 11, 7, 13, 9, 10],
+                "color": "rgba(34, 197, 94, 0.6)"
+            }
+        ]
+    }
+}

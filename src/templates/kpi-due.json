@@ -1,0 +1,44 @@
+{
+  "name": "KPI Stat - Due Tasks",
+  "description": "A simple kpi stat widget which shows the count for the metric type. Recommended config to use is with no name / chevron in a minin widget size to align 4 kpi stats on a single line.",
+  "category": "Task Tracking",
+  "widgetConfig": {
+        "widgetName": "Due",
+        "size": "mini",
+        "chartType": "kpi",
+        "appendTimePeriod": false,
+        "dateRange": {
+            "look": "all",
+            "value": "30",
+            "unit": "days",
+            "forward": {
+            "value": "30",
+            "unit": "days"
+            },
+            "startDate": ""
+        },
+        "groupBy": "week",
+        "metrics": [
+            {
+                "label": "Due",
+                "type": "due",
+                "color": "rgba(74, 144, 226, 1)"
+            }
+        ],
+        "legend": {
+            "display": false,
+            "position": "bottom"
+        },
+        "overrideShowTitle": false,
+        "overrideShowChevron": false
+    },
+    "previewData": {
+        "datasets": [
+        {
+            "label": "Due",
+            "data": [23],
+            "color": "rgba(74, 144, 226, 1)"
+      }
+    ]
+  }
+}

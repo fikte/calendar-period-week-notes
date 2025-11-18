@@ -1,0 +1,69 @@
+{
+    "name": "Task Status Overview",
+    "description": "Shows the distribution of tasks by status: Completed, Created, Overdue, Due and In Progress in a pie chart. The legend is displayed on the right side for clarity.",
+    "category": "Task Status",
+    "widgetConfig": {
+        "widgetKey": "taskStatusPie",
+        "widgetName": "Task Status",
+        "size": "medium",
+        "chartType": "pie",
+        "appendTimePeriod": false,
+        "dateRange": {
+            "look": "back",
+            "value": "30",
+            "unit": "days"
+        },
+        "groupBy": "day",
+            "metrics": [
+            {
+            "label": "Overdue",
+            "type": "overdue",
+            "color": "rgba(239, 68, 68, 0.50)"
+            },
+            {
+            "label": "In Progress",
+            "type": "in-progress",
+            "color": "rgba(251, 188, 5, 0.50)"
+            },
+            {
+            "label": "Due",
+            "type": "due",
+            "color": "rgba(74, 144, 226, 0.5)"
+            },
+            {
+            "label": "Someday",
+            "type": "someday",
+            "color": "rgba(158, 158, 158, 0.5)"
+            }
+        ],
+        "legend": {
+            "display": true,
+            "position": "right"
+        }
+    },
+    "previewData": {
+        "labels": ["Overdue", "In-Progress", "Due", "Someday"],
+        "datasets": [
+            {
+                "label": "Overdue",
+                "data": [45],
+                "color": "rgba(239, 68, 68, 0.50)"
+            },
+            {
+                "label": "In-Progress",
+                "data": [35],
+                "color": "rgba(251, 188, 5, 0.50)"
+            },
+            {
+                "label": "Due",
+                "data": [8],
+                "color": "rgba(74, 144, 226, 0.5)"
+            },
+            {
+                "label": "Someday",
+                "data": [12],
+                "color": "rgba(158, 158, 158, 0.5)"
+            }
+        ]
+    }
+}

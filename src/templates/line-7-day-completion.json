@@ -1,0 +1,34 @@
+{
+    "name": "7-Day Completion Trend",
+    "description": "A 7 day lookback of your completed tasks displayed in a line chart. The legend is displayed at the bottom for easy reference.",
+    "widgetConfig": {
+        "widgetName": "Weekly Completions",
+        "size": "medium",
+        "chartType": "line",
+        "metrics": [
+            {
+            "label": "Completed",
+            "type": "completed",
+            "color": "rgba(126, 211, 33, 0.50)"
+            }
+        ],
+        "dateRange": {
+            "look": "back",
+            "unit": "days",
+            "value": "7"
+        },
+        "groupBy": "day",
+        "axisLabels": {
+            "x": "",
+            "y": ""
+        },
+        "legend": {
+            "display": true,
+            "position": "bottom"
+        }
+    },
+    "previewData": {
+        "labels": ["Nov 1", "Nov 2", "Nov 3", "Nov 4", "Nov 5", "Nov 6", "Nov 7"],
+        "values": [3, 5, 2, 7, 4, 6, 8]
+    }
+}
