@@ -1,25 +1,18 @@
 # Obsidian Calendar Period Week Notes
-
-v1.3.0 adds a new **Dashboard Tab with Task / File Creation Widgets and Heatmaps**. See screenshots and read more about this major new feature below. 
-
 ---
 A powerhouse daily and weekly planning plugin for Obsidian which combines a highly customizable calendar with an integrated tabbed interface for your scratchpad, recent notes, tasks, assets and a dashboard containing a number of widgets giving you a complete overview of your vault at a glance.
 
 Move beyond simple daily notes with a unique **Period/Week** system for those who have their financial year mapped out over 13 periods of 4 weeks, (or simply use the standard calendar week numbering), interactive **popups**, and a deeply integrated **task manager**.
 
-<img width="434" height="341" alt="image" src="https://github.com/user-attachments/assets/91de85b9-0603-48e7-a2b0-4dbc273cc9da" />
+<img width="441" height="347" alt="image" src="https://github.com/user-attachments/assets/5a2502e1-245f-4cb6-b132-f4e62fb399e1" />
 
 _The main calendar grid with period / week column, dot indicators, and heat map for the number of tasks for a date._
 
-<img width="434" height="987" alt="image" src="https://github.com/user-attachments/assets/e1784fc4-f62f-462b-a6b8-4d9021256923" />
+<img width="442" height="698" alt="image" src="https://github.com/user-attachments/assets/93e819fc-0509-4ecf-b43c-485fbd4bb2fd" />
 
 _The vertical calendar grid which allows you to scroll up and down to see previous dates and forward dates up to the next year._
 
-<img width="435" height="1153" alt="image" src="https://github.com/user-attachments/assets/6d92b769-c685-4869-8d0f-8b14df235745" />
-
-_The main interface showing the calendar with the calendar week column, dot indicators, and the integrated tabs for ScratchPad, Notes, Tasks, and Assets._
-
-<img width="435" height="339" alt="image" src="https://github.com/user-attachments/assets/1805df7b-9bc2-4254-bb20-48ace45333e7" />
+<img width="437" height="345" alt="image" src="https://github.com/user-attachments/assets/5a0a02cd-7d41-4e7a-ab36-c4d00cd1027f" />
 
 _The main interface showing in light appearance with the calendar week column, heat map for tasks, and the integrated tab buttons for Tasks, ScratchPad, Pinned Notes and Assets._
 
@@ -35,6 +28,17 @@ _Some of the available 16 themes or make your own theme and share with others fr
 <img width="483" height="1211" alt="image" src="https://github.com/user-attachments/assets/8ccc2fa1-33ca-4f91-be65-ebe7fd78c4dc" />
 
 _NEW: Dashboard Task Tab showing summary and heatmap of tasks acrosss your notes._ 
+
+<img width="439" height="385" alt="image" src="https://github.com/user-attachments/assets/6e20fb5e-213e-4bef-856f-944ac5bdd124" />
+
+<img width="436" height="753" alt="image" src="https://github.com/user-attachments/assets/ec70d10b-ce38-4c89-88af-b1684ac1d898" />
+
+<img width="436" height="252" alt="image" src="https://github.com/user-attachments/assets/1f7da08d-c67d-4d2b-912c-506f63d7331b" />
+
+<img width="437" height="298" alt="image" src="https://github.com/user-attachments/assets/d3bc45e5-9893-4470-8655-1c4a889a4412" />
+
+NEW: Dashboard Task Tab showing custom charts: kpi stat widgets, cumulative chart to track task completion/project completion which can be based on tag. Radar completion chart, pie chart and simple line chart examples. Create your own with style with colours, show hide legends, show hide toggles, show / hide chart titles and even create section headers to group charts - which you can easily show / hide by clicking the widget name or chevron. Easily order in the settings too by dragging and dropping where you want a widget displayed. Four widget sizes to choose from, mini, small, full and full tall. 
+
 
 <img width="484" height="1196" alt="image" src="https://github.com/user-attachments/assets/1d403326-dc32-4d47-95c2-87b9ddd3a259" />
 
