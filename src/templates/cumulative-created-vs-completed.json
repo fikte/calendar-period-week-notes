@@ -1,0 +1,57 @@
+{
+    "name": "Created vs Completed",
+    "description": "A cumulative line chart to compare tasks created and completed over time looking back 90 days and forward for 14 days. The legend is displayed at the bottom for easy reference.",
+    "category": "Task Tracking",
+    "widgetConfig": {
+        "widgetName": "Created vs Completed",
+        "size": "medium",
+        "chartType": "cumulative",
+        "appendTimePeriod": false,
+        "dateRange": {
+            "look": "custom",
+            "value": "90",
+            "unit": "days",
+            "forward": {
+            "value": "14",
+            "unit": "days"
+            },
+            "startDate": ""
+        },
+        "groupBy": "week",
+        "metrics": [
+            {
+                "label": "Created",
+                "type": "created",
+                "color": "rgba(59, 130, 246, 0.8)"
+            },
+            {
+                "label": "Completed",
+                "type": "completed",
+                "color": "rgba(34, 197, 94, 0.8)"
+            }
+        ],
+        "legend": {
+            "display": true,
+            "position": "bottom"
+        },
+        "todayMarker": {
+            "show": true,
+            "color": "rgba(134, 169, 222, 0.75)"
+        }
+    },
+    "previewData": {
+        "labels": ["Aug", "Sep", "Sep", "Oct", "Oct", "Nov", "Nov"],
+        "datasets": [
+            {
+                "label": "Created",
+                "data": [32, 45, 58, 72, 89, 105, 129],
+                "color": "rgba(59, 130, 246, 0.8)"
+            },
+            {
+                "label": "Completed",
+                "data": [15, 28, 42, 58, 73, 88, 97],
+                "color": "rgba(34, 197, 94, 0.8)"
+            }
+        ]
+    }
+}
