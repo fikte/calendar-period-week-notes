@@ -1,0 +1,4031 @@
+body.theme-light {
+    --cpwn-month-color-themed: var(--cpwn-month-color-light);
+    --cpwn-today-circle-color-themed: var(--cpwn-today-circle-color-light);
+    --cpwn-today-highlight-color-themed: var(--cpwn-today-highlight-color-light);
+    --cpwn-date-cell-hover-color-themed: var(--cpwn-date-cell-hover-color-light);
+    --cpwn-pw-column-font-color-themed: var(--cpwn-pw-column-font-color-light);
+    --cpwn-week-number-font-color-themed: var(--cpwn-week-number-font-color-light);
+    --cpwn-day-header-font-color-themed: var(--cpwn-day-header-font-color-light);
+    --cpwn-day-cell-font-color-themed: var(--cpwn-day-cell-font-color-light);
+    --cpwn-other-month-font-color-themed: var(--cpwn-other-month-font-color-light);
+    --cpwn-weekend-shade-color-themed: var(--cpwn-weekend-shade-color-light);
+    --cpwn-row-highlight-color-themed: var(--cpwn-row-highlight-color-light);
+    --cpwn-year-color-themed: var(--cpwn-year-color-light);
+    --cpwn-current-label-highlight-color-themed: var(--cpwn-current-highlight-label-color-light); 
+
+}
+body.theme-dark {
+    --cpwn-month-color-themed: var(--cpwn-month-color-dark);
+    --cpwn-today-circle-color-themed: var(--cpwn-today-circle-color-dark);
+    --cpwn-today-highlight-color-themed: var(--cpwn-today-highlight-color-dark);
+    --cpwn-date-cell-hover-color-themed: var(--cpwn-date-cell-hover-color-dark);
+    --cpwn-pw-column-font-color-themed: var(--cpwn-pw-column-font-color-dark);
+    --cpwn-week-number-font-color-themed: var(--cpwn-week-number-font-color-dark);
+    --cpwn-day-header-font-color-themed: var(--cpwn-day-header-font-color-dark);
+    --cpwn-day-cell-font-color-themed: var(--cpwn-day-cell-font-color-dark);
+    --cpwn-other-month-font-color-themed: var(--cpwn-other-month-font-color-dark);
+    --cpwn-weekend-shade-color-themed: var(--cpwn-weekend-shade-color-dark);
+    --cpwn-row-highlight-color-themed: var(--cpwn-row-highlight-color-dark);
+    --cpwn-year-color-themed: var(--cpwn-year-color-dark);
+    --cpwn-current-label-highlight-color-themed: var(--cpwn-current-highlight-label-color-dark); 
+}
+
+/* Style for the "Month" part (uses existing --cpwn-month-color-themed variable) */
+.cpwn-month-title-month {
+    color: var(--cpwn-month-color-themed);
+}
+
+/* Style for the "Year" part (uses the new variable) */
+.cpwn-month-title-year {
+    color: var(--cpwn-year-color-themed);
+}
+
+/* 4. Ensure individual date hover appears ON TOP of other highlights */
+.cpwn-period-calendar-table td:hover td:not(.cpwn-pw-label-cell):not(.cpwn-week-number-cell):hover .cpwn-day-content {
+    background-color: var(--cpwn-date-cell-hover-color-themed) !important;
+}
+
+.cpwn-period-calendar-table td.row-hover:not(.cpwn-pw-label-cell):not(.cpwn-week-number-cell) {
+    background-color: var(--cpwn-row-highlight-color-themed);
+}
+
+/* Day header row font color */
+.cpwn-period-calendar-table thead th {
+    color: var(--cpwn-day-header-font-color-themed);
+}
+
+/* Period/Week column font color */
+.cpwn-period-calendar-table .cpwn-pw-label-cell,
+.cpwn-period-calendar-table .cpwn-pw-label-cell .cpwn-day-number {
+    font-weight: var(--cpwn-pw-column-font-weight);
+    font-size: var(--cpwn-header-font-size);
+    color: var(--cpwn-pw-column-font-color-themed);
+}
+
+/* Highlight today's P/W column with today color */
+.cpwn-period-calendar-table .cpwn-pw-label-cell.today-pw-label .cpwn-day-number,
+.cpwn-period-calendar-table .cpwn-week-number-cell.today-pw-label .cpwn-day-number {
+    color: var(--cpwn-current-label-highlight-color-themed);
+    
+}
+
+/* Highlight today's day column header with today color */
+.cpwn-period-calendar-table thead th.cpwn-today-day-header {
+    color: var(--cpwn-current-label-highlight-color-themed);    
+}
+
+/* Week number column font color */
+.cpwn-period-calendar-table .cpwn-week-number-cell,
+.cpwn-period-calendar-table .cpwn-week-number-cell .cpwn-day-number {
+    font-weight: var(--cpwn-pw-column-font-weight);
+    font-size: var(--cpwn-header-font-size);
+    color: var(--cpwn-week-number-font-color-themed);
+}
+
+/* -- Main Layout -- */
+.cpwn-period-month-container {
+  
+  display: flex;
+  flex-direction: column;
+
+  flex-grow: 1; 
+
+width: 100%;
+  padding-top: 6px;
+  overflow: hidden;
+}
+
+.cpwn-month-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.1rem 0.25rem;
+  margin-bottom: 0.5rem; /* Specific margin for spacing */
+}
+
+.cpwn-month-header-title {
+    font-size: var(--cpwn-main-month-year-title-font-size);
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.cpwn-month-title-month {
+    font-weight: var(--cpwn-main-month-title-weight);
+}
+
+.cpwn-month-title-year {
+    font-weight: var(--cpwn-main-year-title-weight);
+}
+
+.cpwn-month-header-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.cpwn-month-header-nav button {
+  height: var(--cpwn-nav-button-height);
+  min-height: var(--cpwn-nav-button-height);
+  padding: 0; /* Remove horizontal padding */
+  width: var(--cpwn-nav-button-height); /* Make the button square */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* Accent color for the locked popup button on desktop */
+.cpwn-month-header-nav button.cpwn-popup-locked .svg-icon {
+    color: var(--interactive-accent);
+}
+
+/* Specific override for mobile to ensure accent color is applied */
+body.is-mobile .cpwn-month-header-nav button.cpwn-popup-locked .svg-icon {
+    color: var(--interactive-accent);
+}
+
+/* -- Chevron Button Animation -- */
+.cpwn-month-header-nav button[aria-label="Toggle calendar visibility"] .svg-icon {
+  transition: transform 0.3s ease-in-out;
+}
+
+.cpwn-period-month-container.cpwn-calendar-collapsed .cpwn-month-header-nav button[aria-label="Toggle calendar visibility"] .svg-icon {
+  transform: rotate(180deg);
+}
+
+body.is-mobile .cpwn-month-header-nav button .svg-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--cpwn-icon-color);
+  flex-shrink: 0;
+}
+
+.is-mobile .workspace-leaf-content[data-type="period-month-view"] {
+    height: calc(100% - var(--mobile-toolbar-height));
+}
+
+.is-mobile .workspace-leaf-content[data-type="period-month-view"] .view-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%; /* Ensures this container has a height to give to its children */
+}
+
+/* -- Calendar Collapse Animation -- */
+.cpwn-calendar-table-wrapper {
+  flex-shrink: 0;
+  max-height: 500px; 
+  transition: max-height 0.3s ease-in-out, margin-bottom 0.3s ease-in-out;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.cpwn-period-month-container.cpwn-calendar-collapsed .cpwn-calendar-table-wrapper {
+  max-height: 0;
+  margin-bottom: 0;
+}
+
+/* -- Calendar Table -- */
+.cpwn-period-calendar-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.cpwn-period-calendar-table th, .cpwn-period-calendar-table td {
+  text-align: center;
+  vertical-align: middle;
+  padding: 0;
+  font-size: var(--cpwn-header-font-size);
+}
+
+.cpwn-period-calendar-table th {
+    vertical-align: middle;
+}
+
+.cpwn-period-calendar-table th {
+  font-weight: var(--cpwn-header-row-font-weight);
+  height: 2.5em;
+}
+
+.cpwn-period-calendar-table tbody td {
+ cursor: pointer;
+ overflow: visible; 
+ position: relative;
+}
+
+.cpwn-period-month-container:not(.hide-grid) .cpwn-period-calendar-table td {
+    border: var(--cpwn-calendar-grid-gap-width) solid var(--background-modifier-border);
+}
+
+/* -- Rounded Row Highlight -- */
+.cpwn-period-calendar-table .current-week-row td:first-child {
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+}
+
+.cpwn-period-calendar-table .current-week-row td:last-child {
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+.cpwn-period-calendar-table tbody td:not(.cpwn-pw-label-cell):not(.cpwn-week-number-cell):hover .cpwn-day-content {
+  background-color: var(--cpwn-date-cell-hover-color-themed);
+  border-radius: 6px;
+  transition: background-color 0.15s ease;
+}
+
+body .cpwn-period-month-container.today-style-cell .cpwn-today-cell .cpwn-day-content {
+  background-color: var(--cpwn-today-highlight-color-themed);
+  border-radius: 6px;
+}
+
+body .cpwn-period-month-container.today-style-cell .cpwn-period-calendar-table tbody tr.current-week-row td.cpwn-today-cell .cpwn-day-content {
+    background-color: var(--cpwn-today-highlight-color-themed) !important;
+}
+
+.cpwn-period-month-container.today-style-circle .cpwn-today-cell .cpwn-day-number {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: var(--cpwn-today-circle-color-themed);
+    z-index: 2;
+    border-radius: 50%;
+    width: var(--cpwn-today-highlight-size);
+    height: var(--cpwn-today-highlight-size);
+    display: flex;
+    align-items: center; 
+    justify-content: center;
+}
+
+.cpwn-period-month-container.today-style-number .cpwn-today-cell .cpwn-day-number {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: var(--cpwn-today-circle-color-themed);
+    border-radius: 6px; 
+    padding: 0px 10px; /* Minimal padding for a tight fit */
+    display: flex;
+    align-items: center; 
+    z-index: 2; /* Ensures it's drawn on top of the heatmap */
+}
+
+.cpwn-period-calendar-table td .cpwn-day-content.cpwn-heatmap-cell {
+    background-color: var(--cpwn-heatmap-color) !important;
+}
+
+.cpwn-period-calendar-table .cpwn-pw-label-cell,
+.cpwn-period-calendar-table .cpwn-week-number-cell {
+  font-weight: var(--cpwn-pw-column-font-weight);
+  font-size: var(--cpwn-header-font-size);
+  position: relative;
+}
+
+/* -- Period/Week Column Separator Line -- */
+.cpwn-period-calendar-table tbody td.first-date-column::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background-color: var(--cpwn-pw-separator-color);
+    z-index: 1;
+}
+
+.cpwn-week-dots-container {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+/* -- Calendar Dots Color Variables -- */
+.cpwn-calendar-dot {
+    width: var(--cpwn-calendar-dot-size);
+    height: var(--cpwn-calendar-dot-size);
+    border-radius: 50%;
+}
+
+.cpwn-ics-event-dot {
+    background-color: var(--cpwn-calendar-event-dot-color);
+}
+
+/* -- Calendar Layout Styles -- */
+.cpwn-period-month-container.layout-spacious .cpwn-day-content {
+    height: 3.8em;
+}
+
+.cpwn-period-month-container.layout-normal .cpwn-day-content {
+    height: 3.0em;
+}
+
+.cpwn-period-month-container.layout-condensed .cpwn-day-content {
+    height: 2.8em; /* Even smaller height */
+    
+}
+
+/* The weekly dot now just sets the color and re-uses .cpwn-calendar-dot for its size */
+.cpwn-weekly-note-dot {
+    background-color: var(--cpwn-weekly-note-dot-color);
+}
+
+/* -- Calendar Day Content & Dots -- */
+.cpwn-day-content {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+/* 2. The Day Number */
+.cpwn-day-number {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1; /* Sits on top of the highlight circle */
+    font-size: var(--cpwn-calendar-day-number-font-size);
+    color: var(--cpwn-day-cell-font-color-themed);
+    cursor: pointer;
+}
+
+/* 3. The Dots Container (with dynamic bottom positioning) */
+.cpwn-dots-container, .cpwn-week-dots-container {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    justify-content: center;
+    gap: 3px;
+    z-index: 2; /* Sits on top of the day number */
+}
+
+/* These layout-specific classes now have full control and will work correctly. */
+.cpwn-dots-container.layout-condensed,
+.cpwn-week-dots-container.layout-condensed {
+    top: 26px; 
+}
+
+.cpwn-dots-container.layout-normal,
+.cpwn-week-dots-container.layout-normal {
+    top: 28px; 
+}
+
+.cpwn-dots-container.layout-spacious,
+.cpwn-week-dots-container.layout-spacious {
+    top: 34px; 
+}
+
+/* 4. Ensure other layered items are also positioned absolutely */
+.cpwn-badge-container {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    z-index: 3; /* Sits at the very top */
+}
+
+
+.cpwn-day-header-cell, .cpwn-pw-cell, .cpwn-week-number-cell {
+    /* Uses the general font size for labels */
+    font-size: var(--cpwn-calendar-label-font-size); 
+}
+
+.cpwn-day-number-other-month {
+    color: var(--cpwn-other-month-font-color-themed) !important;
+}
+
+.cpwn-period-calendar-table th, .cpwn-period-calendar-table .cpwn-pw-cell, .cpwn-period-calendar-table .cpwn-week-number-cell {
+    font-size: var(--cpwn-calendar-label-font-size); 
+}
+
+/* -- Calendar Layout Styles -- */
+.cpwn-period-month-container.layout-spacious .cpwn-dots-container  {
+    padding-bottom: 10px; /* Creates space from the bottom edge */
+}
+
+.cpwn-period-month-container.layout-spacious .cpwn-dots-container:empty {
+    padding-top: var(--cpwn-calendar-dot-size);
+}
+
+.cpwn-period-month-container.layout-normal .cpwn-dots-container  {
+    padding-bottom: 6px; /* Creates space from the bottom edge */
+}
+
+.cpwn-period-month-container.layout-condensed .cpwn-dots-container  {
+    padding-bottom: 4px; /* Creates space from the bottom edge */
+}
+
+.cpwn-task-count-badge {
+    position: absolute;
+    top: 2px;
+    right: 3px;
+    z-index: 3;
+    width: 1.6em;
+    height: 1.6em;
+    border-radius: 50%;
+    background-color: var(--cpwn-task-badge-color);
+    color: var(--cpwn-task-badge-font-color);
+    font-size: var(--cpwn-task-badge-font-size);
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1; /* Prevents text from shifting vertically */
+}
+
+.cpwn-calendar-dot {
+  width: var(--cpwn-calendar-dot-size);
+  height: var(--cpwn-calendar-dot-size);
+  border-radius: 50%;
+}
+
+.cpwn-other-note-dot { background-color: var(--cpwn-other-note-dot-color); }
+.cpwn-modified-file-dot { background-color: var(--cpwn-calendar-modified-dot-color); }
+.cpwn-asset-dot { background-color: var(--cpwn-asset-dot-color); }
+.cpwn-task-dot { background-color: var(--cpwn-task-dot-color); } 
+.cpwn-period-month-daily-note-dot { background-color: var(--cpwn-daily-note-dot-color, var(--text-accent)); }
+.cpwn-period-month-daily-note-dot-other-month { opacity: 0.4; }
+
+/* -- Tabs & Search Header -- */
+.cpwn-tabs-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-bottom: 60px;
+}
+
+
+.cpwn-note-tab-header {
+  display: flex;
+  flex-shrink: 0;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  gap: 8px;
+}
+
+.cpwn-tab-container {
+  display: flex;
+  align-items: center;
+}
+
+.cpwn-note-tab {
+  position: relative;
+  flex: 0 1 auto;
+  text-align: center;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  font-size: var(--cpwn-tab-title-font-size);
+  font-weight: var(--cpwn-tab-title-bold);
+  white-space: nowrap;
+}
+
+.cpwn-note-tab:hover { background-color: var(--background-modifier-hover); }
+.cpwn-note-tab.active {
+  border-bottom-color: var(--cpwn-selected-tab-color);
+}
+
+.cpwn-note-tab.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.cpwn-note-tab.drag-over-indicator-before::before,
+.cpwn-note-tab.drag-over-indicator-after::after {
+  content: '';
+  position: absolute;
+  top: 10%;
+  bottom: 10%;
+  width: 2px;
+  background-color: var(--cpwn-selected-tab-color);
+}
+
+.cpwn-note-tab.drag-over-indicator-before::before { left: 0; }
+.cpwn-note-tab.drag-over-indicator-after::after { right: 0; }
+.cpwn-search-wrapper {
+  flex-grow: 1;
+  display: flex;
+  justify-content: flex-end;
+  padding-right: 8px;
+}
+
+/* -- Mobile-Specific Tab Compaction -- */
+body.is-mobile .cpwn-note-tab {
+    padding: 0.5rem 0.6rem; /* Reduced horizontal padding */
+    gap: 5px; /* Reduced gap between icon and text */
+}
+
+body.is-mobile .cpwn-tab-icon {
+    width: 18px; /* Smaller icon width */
+    height: 18px; /* Smaller icon height */
+}
+
+body.is-mobile .cpwn-pm-search-input {
+    flex-grow: 1; /* Allow search input to take more space */
+}
+
+/* -- Unified Search Input -- */
+.cpwn-pm-search-container {
+    display: flex;
+    align-items: center;
+    position: relative;
+    width: 100%;
+}
+
+.cpwn-pm-search-input {
+    background-color: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    color: var(--cpwn-text-normal);
+    width: 100%;
+    padding: 4px 28px 4px 8px;
+    box-sizing: border-box;
+    line-height: var(--cpwn-line-height-normal);
+}
+
+.cpwn-pm-search-input:focus {
+    border-color: var(--interactive-accent);
+    box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+
+/* -- Scratchpad Content & Buttons -- */
+.cpwn-scratchpad-wrapper {
+   flex: 1 1 auto;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.cpwn-scratch-content:focus {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* This is the visual cutout */
+/*.cpwn-scratchpad-wrapper::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 56px;
+  height: 64px;
+  background-color: var(--background-secondary);
+  z-index: 3;
+  border-bottom-left-radius: var(--cpwn-radius-m);
+}*/
+
+.cpwn-scratchpad-wrapper.markdown-preview-view {
+  overflow-wrap: break-word;
+  word-wrap: break-word; 
+  word-break: break-all;
+  align-content: start; 
+padding: 15px;
+}
+
+.cpwn-scratchpad-wrapper.markdown-preview-view p {
+  margin-block-start: 0 !important;
+  margin-block-end: 0.5em !important; 
+}
+
+.cpwn-scratchpad-actions-container {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cpwn-scratchpad-action-btn {
+  cursor: pointer;
+  background-color: var(--background-modifier-hover);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: 4px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cpwn-scratchpad-action-btn .svg-icon {
+    width: 16px;
+    height: 16px;
+}
+
+.cpwn-cratchpad-action-btn:hover {
+  background-color: var(--background-modifier-border);
+}
+
+/* -- Scratchpad Textarea & Highlighter -- */
+.cpwn-scratch-base {
+  margin: 0;
+  padding: 0.75rem 0.75rem 0.5rem 0.5rem;
+  border: none;
+  font-family: var(--cpwn-scratch-font-family);
+  font-size: var(--cpwn-scratch-font-size);
+  font-weight: var(--cpwn-scratch-bold);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  grid-area: 1 / 1;
+  overflow: auto;
+}
+
+.cpwn-scratch-highlighter {
+  z-index: 1;
+  color: transparent;
+  pointer-events: none;
+}
+
+.cpwn-scratch-highlighter mark {
+  color: transparent;
+  background-color: var(--cpwn-scratchpad-highlight-color);
+  border-radius: 3px;
+}
+
+.cpwn-scratch-content {
+  z-index: 2;
+  background-color: transparent;
+  resize: none;
+}
+
+.cpwn-scratch-content:hover {
+  background-color: transparent !important;
+}
+
+.cpwn-scratch-content::selection {
+  background-color: var(--cpwn-scratchpad-highlight-color) !important;
+}
+
+/* -- Notes & Tasks List Styles -- */
+.cpwn-notes-container, .cpwn-tasks-container {
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 4px;
+  display: flex;         
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cpwn-note-row, .cpwn-task-row {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  position: relative;
+}
+
+.cpwn-note-row {
+  gap: 1em;
+}
+
+.cpwn-task-row {
+  gap: 0.5em;
+}
+
+.cpwn-task-row .cpwn-task-text > p {
+    margin: 0;
+    padding: 0;
+}
+
+.cpwn-task-text .cpwn-task-completed-text {
+    text-decoration: line-through;
+    opacity: 0.6;
+    color: var(--text-muted);
+}
+
+
+#notes-list-view .cpwn-note-row:hover,
+#asset-list-view .cpwn-note-row:hover,
+#pinned-notes-list .cpwn-note-row:hover,
+.cpwn-tasks-container .cpwn-task-row:hover,
+#notes-list-view .cpwn-note-row:focus,
+#asset-list-view .cpwn-note-row:focus,
+#pinned-notes-list .cpwn-note-row:focus,
+.cpwn-tasks-container .cpwn-task-row:focus {
+    background-color: var(--cpwn-notes-hover-color);
+}
+
+
+.cpwn-note-status-dot { 
+  width: 8px; 
+  height: 8px; 
+  border-radius: 50%; 
+  flex-shrink: 0; 
+}
+
+.cpwn-note-status-dot-created { background-color: var(--cpwn-note-created-color); }
+.cpwn-note-status-dot-modified { background-color: var(--cpwn-note-modified-color); }
+.cpwn-note-row .cpwn-note-title-wrapper { 
+  display: flex; 
+  align-items: flex-start;
+  gap: 6px; 
+  flex: 1; 
+  min-width: 0; 
+}
+
+.cpwn-note-row .cpwn-note-title { 
+  white-space: nowrap; 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+  font-size: var(--cpwn-notes-font-size); 
+  font-weight: var(--cpwn-notes-bold); 
+}
+
+.cpwn-note-row .note-meta-container {
+  display: flex;
+  align-items: center;
+  gap: 1em;
+  flex-shrink: 0;
+  margin-left: 1em;
+}
+
+.cpwn-note-row .note-file-size {
+  font-size: 0.8em;
+  color: var(--text-muted);
+  width: 65px;
+  text-align: right;
+}
+
+.cpwn-note-row .note-mod-date { 
+  white-space: nowrap; 
+  font-size: 0.8em; 
+  color: var(--text-muted);
+  width: 85px;
+  text-align: right 
+}
+
+/* -- Tasks Specific Styles -- */
+.cpwn-task-group-container {
+  margin-bottom: 10px;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+/* -- Popups & Tooltips -- */
+/* Common base styles for popups */
+.cpwn-other-notes-popup, .cpwn-custom-suggestion-container {
+    position: absolute;
+    z-index: 100;
+    background-color: var(--background-secondary);
+    border: 1px solid #4a4a4a;
+    border-radius: 15px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    min-width: 450px;
+    max-width: 658px;
+}
+
+/* Main popup specific styles */
+.cpwn-other-notes-popup {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Hide overflow on the main container */
+    max-height: 250px; /* Increased slightly for mobile header */
+}
+
+/* Popup header */
+.cpwn-popup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--background-modifier-border);
+    flex-shrink: 0; /* Prevent header from shrinking */
+    cursor: pointer;
+    gap: 10px;
+}
+
+.cpwn-popup-header-title {
+    font-weight: normal;
+    color: var(--text-muted);
+    flex-grow: 1; /* Allow title to take available space */
+    flex-shrink: 1; /* Allow title to shrink if needed */
+    min-width: 0; /* Important for text-overflow to work with flex items */
+    white-space: nowrap; /* Prevent title from wrapping */
+    overflow: hidden; /* Hide overflow */
+    text-overflow: ellipsis; /* Add ellipsis for long titles */
+    font-size: var(--cpwn-other-note-popup-font-size);
+    /* max-width: 420px;  */
+    
+}
+
+.cpwn-popup-close-btn {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    /* Default for DARK theme: Light grey circle */
+    background-color: #9c9b9b; 
+    /* Default for DARK theme: Dark 'x' icon */
+    color: #383838; 
+    transition: background-color 0.1s ease-in-out, color 0.1s ease-in-out;
+}
+
+.cpwn-popup-close-btn:hover {
+    /* Hover for DARK theme: Even lighter circle */
+    background-color: #f5f5f5;
+}
+
+/* -- Light Theme Overrides -- */
+body.theme-light .cpwn-popup-close-btn {
+    /* Default for LIGHT theme: Dark grey circle */
+    background-color: #5c5c5c;
+    /* Default for LIGHT theme: White 'x' icon */
+    color: #ffffff;
+}
+
+body.theme-light .cpwn-popup-close-btn:hover {
+    /* Hover for LIGHT theme: Even darker circle */
+    background-color: #383838;
+}
+
+.cpwn-popup-close-btn .svg-icon {
+    width: 14px;
+    height: 14px;
+}
+
+/* Content wrapper for scrolling and padding */
+.cpwn-popup-content-wrapper {
+    padding: 8px;
+    overflow-y: auto;
+}
+
+/* Suggestion container specific styles */
+.cpwn-custom-suggestion-container {
+    z-index: 999;
+    margin-top: 4px;
+    padding: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.cpwn-other-notes-popup-item {
+  display: flex; 
+  align-items: flex-start; 
+  gap: 8px; 
+  padding: 12px 2px 8px 2px; 
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer; 
+  white-space: normal;
+  word-break: break-word; 
+  text-overflow: ellipsis; 
+  font-size: var(--cpwn-other-note-popup-font-size);
+}
+
+.cpwn-other-notes-popup-item .cpwn-popup-file-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-left: calc(8px); /* Push dot over by checkbox width + small gap */
+}
+
+.cpwn-other-notes-popup-item:hover { 
+  background-color: var(--background-modifier-hover); 
+}
+
+.cpwn-other-notes-popup-item .svg-icon {
+  flex-shrink: 0;
+  width: 1.2em;
+  height: 1.2em;
+}
+
+.cpwn-note-row .cpwn-note-status-dot,
+.cpwn-other-notes-popup-item .cpwn-popup-file-dot,
+.cpwn-other-notes-popup-item .cpwn-popup-asset-thumbnail {
+    margin-top: 5px; 
+    align-self: flex-start; 
+}
+
+.cpwn-note-row:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+.cpwn-other-notes-popup-item p {
+    margin: 0;
+}
+.cpwn-popup-file-dot { 
+  width: 8px; 
+  height: 8px; 
+  border-radius: 50%; 
+  flex-shrink: 0; 
+}
+
+.cpwn-custom-suggestion-item { 
+  padding: 8px 12px; 
+  cursor: pointer; 
+  font-size: var(--cpwn-font-ui-small); 
+}
+
+.cpwn-custom-suggestion-item:hover { 
+  background-color: var(--background-modifier-hover); 
+}
+
+.cpwn-setting-item-control { 
+  position: relative; 
+}
+
+body:has(.cpwn-note-title-wrapper:hover) .tooltip, 
+body:has(.cpwn-note-title-cell:hover) .tooltip,
+body:has(.cpwn-task-text:hover) .tooltip {
+  text-align: left; 
+  padding: 6px 10px; 
+  white-space: pre-wrap; 
+  max-width: 400px; 
+  transition-delay: 0.5s !important; 
+  background-color: var(--background-secondary); 
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2); 
+  border-radius: 15px; 
+  border: 1px solid #4a4a4a; 
+  font-size: var(--cpwn-other-note-popup-font-size); 
+  color: var(--cpwn-text-normal); 
+  font-weight: normal;
+}
+
+/* -- Vertical View -- */
+.cpwn-vertical-calendar-scroller { 
+  flex: 1; 
+  overflow-y: auto; 
+}
+
+.cpwn-vertical-month-wrapper { 
+  margin-bottom: 2rem; 
+}
+
+.cpwn-vertical-month-title {
+  font-size: var(--cpwn-main-month-year-title-font-size);
+  font-weight: var(--cpwn-main-month-title-weight);
+  background-color: var(--background-secondary);
+  color: var(--cpwn-month-color-themed);
+  position: sticky; 
+  top: 0; 
+  z-index: 10;
+  margin: 0.6rem 0; 
+  height: 2rem; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  cursor: pointer;
+}
+
+.cpwn-theme-light .cpwn-vertical-month-title {
+    color: var(--cpwn-month-color-themed);
+    background-color: var(--cpwn-background-primary);
+}
+
+.cpwn-theme-dark .cpwn-vertical-month-title {
+    color: var(--cpwn-month-color-themed);
+    background-color: var(--background-secondary);
+   /* color: var(--cpwn-text-normal);  Ensure text is readable */
+}
+
+.cpwn-period-month-container.cpwn-vertical-view-active .cpwn-tabs-content-wrapper { display: none; }
+.cpwn-period-month-container:not(.cpwn-vertical-view-active) .cpwn-vertical-calendar-scroller { display: none; }
+/* -- Mobile-Specific Overrides -- */
+.is-mobile .notes-table { 
+  width: 100%; 
+  border-collapse: collapse; 
+  table-layout: fixed; 
+}
+
+.is-mobile .notes-table-row { 
+  cursor: pointer; 
+  border-bottom: 1px solid var(--background-modifier-border); 
+}
+
+.is-mobile .notes-table .cpwn-note-title-cell, .is-mobile .notes-table .note-date-cell { 
+  padding: 0.6rem 0.5rem; 
+  vertical-align: top; 
+}
+
+.is-mobile .notes-table .cpwn-note-title-cell { 
+  display: flex; 
+  align-items: center; 
+  gap: 8px; 
+  white-space: normal; 
+  word-break: break-word; 
+  font-size: var(--cpwn-notes-font-size); 
+  font-weight: var(--cpwn-notes-bold); 
+}
+
+.is-mobile .notes-table .note-date-cell { 
+  width: 85px; 
+  text-align: right; 
+  white-space: nowrap; 
+  font-size: 0.8em; 
+  color: var(--text-muted); 
+}
+
+.is-mobile .cpwn-period-calendar-table th, .is-mobile .cpwn-period-calendar-table .cpwn-pw-label-cell { 
+  /*font-size: 12px; */
+  font-size: calc(var(--cpwn-calendar-label-font-size) * 0.9);
+  padding: 0; 
+}
+
+.is-mobile .cpwn-period-calendar-table .cpwn-day-number { 
+    font-size: calc(var(--cpwn-calendar-day-number-font-size) * 0.9);
+}
+
+.cpwn-period-calendar-table .cpwn-pw-label-cell .cpwn-day-number,
+.cpwn-period-calendar-table .cpwn-week-number-cell .cpwn-day-number {
+    font-size: inherit; /* Inherit the correct font size from the parent cell */
+}
+
+/* Default row height */
+.cpwn-period-calendar-table tbody tr {
+    height: 36px;
+    min-height: 36px;
+}
+
+.cpwn-period-calendar-table tbody td {
+    min-height: 36px;
+}
+
+/* Adjust row height for condensed layout */
+.cpwn-period-month-container.layout-condensed .cpwn-period-calendar-table tbody tr {
+    height: 30px;
+    min-height: 30px;
+}
+
+.cpwn-period-month-container.layout-condensed .cpwn-period-calendar-table tbody td {
+    min-height: 30px;
+}
+
+/* Adjust row height for spacious layout */
+.cpwn-period-month-container.layout-spacious .cpwn-period-calendar-table tbody tr {
+    height: 40px;
+    min-height: 40px;
+}
+
+.cpwn-period-month-container.layout-spacious .cpwn-period-calendar-table tbody td {
+    min-height: 40px;
+}
+
+/* -- Misc -- */
+.cpwn-period-month-container .svg-icon {
+  color: var(--cpwn-icon-color, currentColor);
+}
+
+/* -- Unified clear button for all search inputs -- */
+.cpwn-search-input-clear-btn {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    visibility: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background-color 0.1s ease-in-out;
+    background-color: #9c9b9b;
+    /* Color is now set directly on the icon rule below */
+}
+
+.cpwn-search-input-clear-btn:hover {
+    background-color: #f5f5f5;
+}
+
+.cpwn-search-input-clear-btn .svg-icon {
+    width: 13px;
+    height: 13px;
+    /* FIX: Force the icon color to be dark */
+    color: #383838 !important;
+}
+
+/* -- Light Theme Overrides -- */
+body.theme-light .cpwn-search-input-clear-btn {
+    background-color: #5c5c5c;
+}
+
+body.theme-light .cpwn-search-input-clear-btn:hover {
+    background-color: #383838;
+}
+
+body.theme-light .cpwn-search-input-clear-btn .svg-icon {
+    /* FIX: Force the icon color to be white in the light theme */
+    color: #ffffff !important;
+}
+
+/* -- Task Header Icons -- */
+.cpwn-task-group-header .icon {
+  display: flex;
+  align-items: center;
+}
+
+/* -- Tab Icons -- */
+.cpwn-tab-icon {
+  width: 1.2em;
+  height: 1.2em;
+}
+.cpwn-note-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+/* -- Asset List Styles -- */
+.cpwn-asset-thumbnail, .cpwn-popup-asset-thumbnail {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-s);
+  object-fit: cover;
+}
+
+.cpwn-popup-asset-thumbnail {
+  width: 22px;
+  height: 22px;
+}
+
+.cpwn-asset-icon-container, .cpwn-asset-thumbnail-container {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  margin-right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cpwn-asset-icon-container .svg-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.cpwn-asset-action-icon {
+  position: relative;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 6px;
+}
+
+.cpwn-asset-action-icon > div {
+  position: absolute;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.cpwn-asset-action-icon .svg-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.cpwn-asset-action-icon div:nth-child(2) {
+  opacity: 0;
+}
+
+.cpwn-note-row:hover .cpwn-asset-action-icon div:nth-child(1) {
+  opacity: 0;
+}
+
+.cpwn-note-row:hover .cpwn-asset-action-icon div:nth-child(2) {
+  opacity: 1;
+}
+
+.cpwn-asset-action-icon:hover .svg-icon {
+    color: var(--cpwn-text-error);
+}
+
+/* -- Asset Grid Styles -- */
+.cpwn-note-list-wrapper.assets-grid-view {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 16px;
+    padding-top: 8px;
+}
+
+.cpwn-asset-grid-item {
+    /* flex-basis: calc(50% - 8px); */
+    display: flex;
+    flex-direction: column;
+    cursor: pointer;
+    border-radius: 12px;
+    background-color: var(--background-secondary);
+    overflow: hidden;
+    border: 1px solid var(--background-modifier-border);
+    padding: 8px;
+    box-sizing: border-box; /* THIS IS THE CRITICAL MISSING LINE */
+}
+
+.cpwn-asset-grid-preview {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    background-color: var(--background-modifier-hover);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden; 
+    border-radius: 8px;  
+}
+
+.cpwn-asset-grid-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.cpwn-asset-grid-name {
+    padding: 8px 4px 0; /* Adjusted padding */
+    margin-top: 8px; /* Adds space between the image and text */
+    font-size: 0.9em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+.cpwn-asset-grid-item:hover {
+  background-color: var(--cpwn-notes-hover-color);
+  border-color: rgba(200, 200, 200, 0.75); /* A lighter, semi-transparent gray */
+}
+
+/* -- Settings Tabs -- */
+.cpwn-period-settings-container {
+  display: flex;
+  height: 100%;
+}
+
+/* Base style for all navigation buttons in the settings panel */
+.cpwn-period-settings-nav button {
+    transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+}
+
+/* Highlight style for the currently active settings tab button */
+.cpwn-period-settings-nav button.is-active {
+    background-color: var(--interactive-accent);
+    color: var(--cpwn-text-on-accent); /* Standard Obsidian variable for contrast */
+}
+
+.cpwn-period-settings-container .setting-item-heading {
+    color: var(--cpwn-text-normal);
+}
+
+.cpwn-period-settings-nav {
+  display: flex;
+  flex-direction: column;
+  padding-right: 1.5rem;
+  border-right: 1px solid var(--background-modifier-border);
+  width: 160px;
+  flex-shrink: 0;
+  gap: 4px;
+}
+
+.cpwn-period-settings-nav-button {
+      background: none;
+      border: none;
+      text-align: left;
+      padding: 0.75rem 0.5rem;
+      margin-bottom: 0.25rem;
+      cursor: pointer;
+      border-radius: var(--radius-m);
+      color: var(--text-muted);
+      font-size: var(--cpwn-font-ui-small);
+}
+
+.cpwn-period-settings-nav-button:hover {
+      background-color: var(--background-modifier-hover);
+      color: var(--cpwn-text-normal);
+}
+
+.cpwn-period-settings-nav-button.is-active {
+      background-color: var(--interactive-accent);
+      color: var(--cpwn-text-on-accent);
+      font-weight: bold;
+}
+
+.cpwn-period-settings-content {
+      flex-grow: 1;
+      padding-left: 1.5rem;
+      overflow-y: auto;
+}
+
+.cpwn-period-settings-content > :first-child {
+    /* Remove the browser's default top margin from the header */
+    margin-top: 0;
+    padding-top: 6px; 
+}
+
+.cpwn-popup-section-header {
+    font-size: 0.8em;
+    font-weight: bold;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    margin: 10px 8px 4px;
+    padding: 0;
+}
+
+.cpwn-popup-separator {
+    border-bottom: 1px solid var(--background-modifier-border);
+    margin: 6px 8px;
+}
+
+.cpwn-other-notes-popup .cpwn-popup-section-header:first-child {
+    margin-top: 4px;
+}
+
+.cpwn-note-group-header {
+    font-size: 0.85em;
+    font-weight: bold;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    padding: 12px 4px 4px;
+}
+
+.cpwn-note-title-path-wrapper,
+.cpwn-other-notes-popup-item .cpwn-note-title-path-wrapper {
+    flex-grow: 1;    
+    display: flex;
+    flex-direction: column;
+    min-width: 0; 
+}
+
+.cpwn-note-row .cpwn-note-path,
+.cpwn-other-notes-popup-item .cpwn-note-path {
+    font-size: 0.8em;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+}
+
+.cpwn-other-notes-popup-item .note-icon {
+    flex-shrink: 0;
+    margin-left: 8px; /* Match checkbox width + small gap */
+}
+
+/* -- Note Group Collapse Styles -- */
+.cpwn-note-group-container {
+  border: 1px solid var(--background-modifier-border); /* Adds a subtle, theme-aware border */
+  border-radius: var(--radius-l); /* Rounds the corners of the card */
+  padding: 0 8px 8px; /* Adds some internal spacing for the note list */
+  margin-bottom: 12px; /* Increases space between cards */
+}
+
+.cpwn-note-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.85em;
+  font-weight: bold;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  padding: 12px 4px 4px;
+}
+
+.cpwn-note-group-header:hover {
+  color: var(--cpwn-text-normal);
+}
+
+.cpwn-note-group-header-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cpwn-note-group-count {
+  font-size: 0.9em;
+  background-color: var(--background-modifier-border);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.cpwn-note-group-collapse-icon .svg-icon {
+  transition: transform 0.2s ease-in-out;
+  width: 16px;
+  height: 16px;
+}
+
+.cpwn-note-group-container.cpwn-is-collapsed .cpwn-note-group-collapse-icon .svg-icon {
+  transform: rotate(-90deg);
+}
+
+.cpwn-note-list-wrapper {
+  overflow: hidden;
+  transition: max-height 0.3s ease-in-out, margin-top 0.3s ease-in-out;
+  margin-top: 4px;
+}
+
+.cpwn-note-group-container.cpwn-is-collapsed .cpwn-note-list-wrapper {
+  max-height: 0;
+  margin-top: 0;
+}
+
+/* -- Pull to Refresh Indicator -- */
+.cpwn-pm-refresh-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--cpwn-icon-color);
+    z-index: 5;
+    opacity: 0;
+    transform: translateY(-50px) scale(0.7);
+    transition: transform 0.3s, opacity 0.3s;
+}
+
+.cpwn-pm-refresh-indicator.is-pulling {
+    opacity: 0.8;
+}
+
+.cpwn-pm-refresh-indicator.is-ready {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.cpwn-pm-refresh-indicator.is-refreshing .svg-icon {
+    animation: spin 1.2s linear infinite;
+}
+
+/* Re-use the spin animation from the refresh button */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* -- Mobile Keyboard Handling -- */
+.cpwn-scratch-content.is-editing-mobile {
+    padding-bottom: 45vh; /* 45% of the visible screen height */
+}
+
+/* ==========================================================================
+   WEEKEND/WEEK HIGHLIGHTING LOGIC
+   ========================================================================== */
+
+/* 1. Neutralize weekend shade inside the current week row */
+.cpwn-period-calendar-table tbody tr.current-week-row {
+  --cpwn-weekend-shade-color-themed: transparent;
+}
+
+/* 2. Regular weekend shading for SUNDAY-START weeks */
+.cpwn-period-month-container:not(.monday-start).weekend-shading-enabled:not(.has-pw-column):not(.has-week-numbers)
+  .cpwn-period-calendar-table tbody tr:not(.current-week-row) td:nth-child(1),
+.cpwn-period-month-container:not(.monday-start).weekend-shading-enabled:not(.has-pw-column):not(.has-week-numbers)
+  .cpwn-period-calendar-table tbody tr:not(.current-week-row) td:nth-child(7),
+.cpwn-period-month-container:not(.monday-start).weekend-shading-enabled.has-pw-column:not(.has-week-numbers)
+  .cpwn-period-calendar-table tbody tr:not(.current-week-row) td:nth-child(2),
+.cpwn-period-month-container:not(.monday-start).weekend-shading-enabled.has-pw-column:not(.has-week-numbers)
+  .cpwn-period-calendar-table tbody tr:not(.current-week-row) td:nth-child(8),
+.cpwn-period-month-container:not(.monday-start).weekend-shading-enabled.has-week-numbers:not(.has-pw-column)
+  .cpwn-period-calendar-table tbody tr:not(.current-week-row) td:nth-child(2),
+.cpwn-period-month-container:not(.monday-start).weekend-shading-enabled.has-week-numbers:not(.has-pw-column)
+  .cpwn-period-calendar-table tbody tr:not(.current-week-row) td:nth-child(8),
+.cpwn-period-month-container:not(.monday-start).weekend-shading-enabled.has-pw-column.has-week-numbers
+  .cpwn-period-calendar-table tbody tr:not(.current-week-row) td:nth-child(3),
+.cpwn-period-month-container:not(.monday-start).weekend-shading-enabled.has-pw-column.has-week-numbers
+  .cpwn-period-calendar-table tbody tr:not(.current-week-row) td:nth-child(9) {
+  background-color: var(--cpwn-weekend-shade-color-themed);
+}
+
+/* 3. Weekend shading for MONDAY-START weeks */
+.cpwn-period-month-container.monday-start.weekend-shading-enabled:not(.has-pw-column):not(.has-week-numbers)
+  .cpwn-period-calendar-table tbody tr:not(.current-week-row) td:nth-child(6),
+.cpwn-period-month-container.monday-start.weekend-shading-enabled:not(.has-pw-column):not(.has-week-numbers)
+  .cpwn-period-calendar-table tbody tr:not(.current-week-row) td:nth-child(7),
+.cpwn-period-month-container.monday-start.weekend-shading-enabled.has-pw-column:not(.has-week-numbers)
+  .cpwn-period-calendar-table tbody tr:not(.current-week-row) td:nth-child(7),
+.cpwn-period-month-container.monday-start.weekend-shading-enabled.has-pw-column:not(.has-week-numbers)
+  .cpwn-period-calendar-table tbody tr:not(.current-week-row) td:nth-child(8),
+.cpwn-period-month-container.monday-start.weekend-shading-enabled.has-week-numbers:not(.has-pw-column)
+  .cpwn-period-calendar-table tbody tr:not(.current-week-row) td:nth-child(7),
+.cpwn-period-month-container.monday-start.weekend-shading-enabled.has-week-numbers:not(.has-pw-column)
+  .cpwn-period-calendar-table tbody tr:not(.current-week-row) td:nth-child(8),
+.cpwn-period-month-container.monday-start.weekend-shading-enabled.has-pw-column.has-week-numbers
+  .cpwn-period-calendar-table tbody tr:not(.current-week-row) td:nth-child(8),
+.cpwn-period-month-container.monday-start.weekend-shading-enabled.has-pw-column.has-week-numbers
+  .cpwn-period-calendar-table tbody tr:not(.current-week-row) td:nth-child(9) {
+  background-color: var(--cpwn-weekend-shade-color-themed);
+}
+
+/* 4. Make day-content transparent by default */
+.cpwn-period-calendar-table .cpwn-day-content {
+  background: transparent !important;
+}
+
+/* 5. If a cell uses border styling (today/tasks), keep its background transparent */
+.cpwn-period-calendar-table .cpwn-day-content[style*="border"] {
+  background: transparent !important;
+}
+
+/* This rule highlights the header cell itself and should work as intended. */
+.cpwn-period-calendar-table th.column-hover {
+    background: var(--cpwn-row-highlight-color-themed);
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+}
+
+/* This rule now targets the <td> element directly, just like the working row hover,
+   instead of the .cpwn-day-content div inside it. */
+.cpwn-period-calendar-table td.column-hover {
+    background: var(--cpwn-row-highlight-color-themed);
+}
+
+/* Ensures individual date hover is always on top */
+.cpwn-period-calendar-table td:not(.cpwn-pw-label-cell):not(.cpwn-week-number-cell):hover .cpwn-day-content {
+    background-color: var(--cpwn-date-cell-hover-color-themed) !important;
+}
+
+/* 1. Base style for the permanent current week highlight */
+.cpwn-period-calendar-table tr.current-week-row .cpwn-day-content {
+    background-color: var(--cpwn-row-highlight-color-themed);
+}
+
+.cpwn-period-calendar-table tr.current-week-row td {
+    background-color: var(--cpwn-row-highlight-color-themed);
+}
+.cpwn-period-calendar-table tr.row-hover:not(.current-week-row) td {
+    background-color: var(--cpwn-row-highlight-color-themed);
+}
+
+.cpwn-tab-order-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.cpwn-draggable-item {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  background-color: var(--background-secondary-alt);
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  cursor: grab;
+}
+
+.cpwn-draggable-item.dragging {
+  opacity: 0.5;
+  background-color: var(--background-modifier-hover);
+}
+
+.cpwn-drag-handle {
+  margin-right: 12px;
+  color: var(--text-muted);
+}
+
+.cpwn-setting-spacer {
+  height: 20px; /* Or use margin-top, e.g., margin-top: 20px; */
+}
+
+.cpwn-note-group-header-content {
+  cursor: pointer;
+}
+
+.cpwn-pinned-sort-indicator {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  font-weight: normal;
+  margin-left: 6px;
+  /* Prevents the indicator from being selected as text when clicking */
+  user-select: none; 
+}
+
+/* Hide drag handles by default in main UI */
+.cpwn-note-row .cpwn-drag-handle {
+    display: none;
+    margin-right: 8px;
+    color: var(--text-muted);
+    cursor: grab;
+}
+
+/* Show drag handles when reorder mode is active */
+.cpwn-pinned-notes-reorder-mode .cpwn-note-row .cpwn-drag-handle {
+    display: flex;
+    align-items: center;
+}
+
+/* Visual feedback during drag */
+.cpwn-note-row.dragging {
+    opacity: 0.5;
+    background-color: var(--background-modifier-hover);
+}
+
+/* == -- Theme Settings Tab Layout -- */
+/* Main container for each task group row */
+.cpwn-preview.cpwn-task-group {
+    display: flex;
+    justify-content: space-between; /* Pushes the title and count apart */
+    align-items: center;
+    padding: 10px 14px; /* Adjust padding to match main UI */
+    margin-bottom: 8px; /* Space between rows */
+    border-radius: 8px; /* Slightly more rounded corners */
+}
+
+/* Wrapper for the icon and title to keep them together */
+.cpwn-preview-task-content-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px; /* Space between the icon and the title text */
+}
+
+/* Style for the icon itself */
+.cpwn-preview-task-icon .svg-icon {
+    width: 18px; /* Match icon size from main UI */
+    height: 18px;
+    stroke-width: 2.25; /* A good balance of boldness */
+}
+
+/* Style for the title text (e.g., "Overdue") */
+.cpwn-preview-task-title {
+    font-size: var(--cpwn-task-heading-font-size);
+}
+
+.cpwn-theme-list-item:focus {
+    border: 1px solid var(--interactive-accent);
+    box-shadow: 0 0 5px var(--interactive-accent);
+    outline: none; /* Prevents the default browser outline */
+}
+
+/* 1. Main container for the entire Themes tab layout */
+.cpwn-theme-settings-container {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start; /* CRITICAL: Aligns the tops of both columns */
+}
+
+/* 2. Left column containing the list of themes */
+.cpwn-theme-list-container {
+    flex: 1;
+}
+
+/* 3. Right column containing the live preview */
+.cpwn-theme-preview-wrapper {
+    flex: 2;
+    position: sticky; /* Keeps preview visible on scroll */
+    top: 20px;
+    padding-left: 20px;
+    border-left: 1px solid var(--background-modifier-border);
+}
+
+/* 4. Align the titles of both columns */
+.cpwn-theme-list-container > h3,
+.cpwn-theme-preview-wrapper > h3 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    font-weight: 600;
+}
+
+/* 5. Fix the large gap above the "October 2025" title */
+.cpwn-theme-preview-pane .cpwn-preview-section-header {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+.cpwn-theme-preview-pane .cpwn-preview-section-header h3 {
+    margin-top: 0 !important;
+}
+
+/* Reduce the space below the task list wrapper in the preview */
+.cpwn-theme-preview-pane .cpwn-preview-section-wrapper {
+  margin-bottom: 8px; /* Default is likely 20px or more */
+}
+
+/* Reduce the space above the "DOT COLOR KEY" title */
+.cpwn-theme-preview-pane .cpwn-preview-dot-key-container {
+  margin-top: 10px; /* Default is likely 15px or more */
+}
+
+/* 6. General wrapper for sections inside the preview */
+.cpwn-preview-section-wrapper {
+    margin-bottom: 15px;
+    padding: 10px;
+    border-radius: 6px;
+}
+
+/* 7. NEW: Two-column layout for the dot color key */
+.cpwn-preview-dot-key-container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* Creates two equal columns */
+    gap: 0 20px; /* 0px vertical gap, 20px horizontal gap */
+    margin-top: 15px;
+    padding-top: 0;
+    border-top: none !important; /* Explicitly removes the horizontal line */
+}
+
+.cpwn-preview-dot-key-container h5 {
+    grid-column: 1 / -1; /* Makes the "DOT COLOR KEY" title span both columns */
+    margin-bottom: 10px;
+}
+
+/* Styling for the list of theme files */
+.cpwn-theme-list-item {
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-bottom: 4px;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.cpwn-theme-list-item:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+.cpwn-theme-list-item.is-active {
+    background-color: var(--interactive-accent);
+    color: var(--cpwn-text-on-accent);
+    font-weight: 600;
+}
+
+/* -- Theme Preview -- */
+/* Tab buttons for light/dark mode */
+.cpwn-theme-preview-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+.cpwn-theme-preview-tabs button { padding: 6px 12px; border: none; border-radius: var(--radius-m); cursor: pointer; background-color: var(--background-modifier-hover); color: var(--text-muted); transition: background-color 0.2s ease; }
+.cpwn-theme-preview-tabs button.is-active { background-color: var(--interactive-accent); color: var(--cpwn-text-on-accent); font-weight: 600; }
+
+/* Main preview pane layout */
+.cpwn-theme-preview-pane { padding: 15px; border-radius: 8px; border: 1px solid var(--background-modifier-border); }
+
+/* Inner wrappers for sections */
+.cpwn-preview-section-wrapper { padding: 10px; border-radius: 6px; margin-bottom: 20px; }
+
+/* Base styles for the preview grid container */
+.cpwn-preview-calendar-grid {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+
+.cpwn-preview-calendar-grid th {
+    font-weight: 600;
+    padding-bottom: 8px;
+}
+
+.cpwn-preview-calendar-grid td {
+    vertical-align: middle;
+    text-align: center;
+    height: 45px; /* Give the cell a fixed height */
+}
+
+.cpwn-preview-day-content {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.cpwn-preview-day-number {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1; /* Sits above the highlight */
+    
+    font-weight: 500;
+    font-size: 13px;
+}
+
+/* Style for the "today" highlight in the preview */
+.cpwn-preview-day-number.today {
+    width: 2.2em;
+    height: 2.2em;
+    border-radius: 50%; /* Or 6px for a squircle */
+    
+    /* Use flex to center the number text INSIDE the highlight */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cpwn-preview-dots-container {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 30px; 
+    display: flex;
+    gap: 3px;
+    z-index: 2; /* Sits on top of the highlight */
+}
+
+/* Style for the individual dots in the preview */
+.cpwn-preview-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+}
+
+/* Tasks layout styles */
+.cpwn-preview.cpwn-task-group { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-radius: 6px; font-weight: 500; margin-bottom: 6px; }
+
+.is-mobile .cpwn-period-calendar-table tbody td.first-date-column::before {
+    display: none;
+}
+.is-mobile .cpwn-period-calendar-table tbody tr {
+    height: auto;
+}
+
+.cpwn-applied-theme-indicator .cpwn-setting-item-name {
+    color: var(--cpwn-text-normal) !important;
+}
+    
+.cpwn-applied-theme-indicator .cpwn-setting-item-description {
+    color: var(--text-muted) !important;
+}
+
+.cpwn-preview-dot-key-container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* Creates two equal columns */
+    gap: 0 20px; /* 0px vertical gap, 20px horizontal gap */
+    margin-top: 15px;
+    padding-top: 0;
+    border-top: none !important; /* Ensures the line is removed */
+}
+
+.cpwn-preview-dot-key-container h5 {
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.cpwn-preview-dot-key-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.cpwn-preview-dot-key-swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+/* Organizes the header into a flexible container */
+.cpwn-popup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Creates a vertical stack for the title and path */
+.cpwn-popup-title-container {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Prevents long text from breaking the layout */
+    margin-right: 10px; /* Adds space between the text and the close button */
+}
+
+/* Styles the new path element */
+.cpwn-popup-header-path {
+    font-size: 0.8em; /* Smaller font for the path */
+    color: var(--text-muted); /* Uses the theme's muted text color */
+    white-space: nowrap; /* Prevents the path from wrapping */
+    overflow: hidden;
+    text-overflow: ellipsis; /* Adds "..." to very long paths */
+}
+
+/* In the File Info section, allow the path text to wrap */
+.cpwn-other-notes-popup-item .cpwn-note-title-path-wrapper .cpwn-note-path {
+    white-space: normal; /* Allows text to wrap */
+    word-break: break-all; /* Breaks long paths without spaces */
+}
+
+/* Styles the container for the 'No backlinks' message and delete button */
+.cpwn-other-notes-popup-item-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: var(--background-secondary-alt); /* A subtle background to distinguish it */
+    border-radius: 6px;
+    margin-top: 4px;
+}
+
+/*
+ * Styles the "Delete File" button to be less intrusive.
+ * It uses theme variables for a consistent look and feel.
+ */
+.cpwn-other-notes-popup-item-actions button.mod-danger {
+    background-color: var(--background-modifier-hover);
+    border: 1px solid var(--background-modifier-border);
+    color: var(--text-muted);
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 5px;
+    margin-left: 16px; /* Adds space between the message and the button */
+    transition: all 0.2s ease-in-out;
+}
+
+/* Adds a more prominent style when hovering over the delete button */
+.cpwn-other-notes-popup-item-actions button.mod-danger:hover {
+    background-color: var(--interactive-accent);
+    color: var(--cpwn-text-on-accent);
+    border-color: var(--interactive-accent);
+}
+
+/*
+ * Styles the wrapper for the icon and the "No backlinks" text.
+ * This ensures the icon and text are aligned and spaced correctly.
+ */
+.cpwn-other-notes-popup-item-actions > div {
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Adds space between the icon and the text */
+    color: var(--text-muted); /* Uses a more subtle text color */
+}
+
+/* Ensures the full file path in the info section can wrap to multiple lines */
+.cpwn-other-notes-popup-item .cpwn-note-title-path-wrapper .cpwn-note-path {
+    white-space: normal;
+    word-break: break-all;
+}
+
+/* Standard clickable cursor for the file info section */
+.cpwn-other-notes-popup-item.is-clickable {
+    cursor: pointer;
+}
+
+/* Disable hover and pointer for calendar events */
+.cpwn-other-notes-popup-item.cpwn-is-calendar-event {
+    cursor: default; /* Change from pointer to default cursor */
+}
+
+.cpwn-other-notes-popup-item.cpwn-is-calendar-event:hover {
+    background-color: transparent; /* Prevent hover background change */
+}
+
+/* Keep hover for regular notes/assets */
+.cpwn-other-notes-popup-item:not(.cpwn-is-calendar-event):hover {
+    background-color: var(--background-modifier-hover);
+}
+
+.cpwn-popup-asset-thumbnail {
+    width: 22px;
+    height: 22px;
+    object-fit: cover;
+    border-radius: 4px;
+    margin-right: 8px; /* Adds space between thumbnail and text */
+}
+
+/* Adjust the main item layout to use flexbox */
+.cpwn-other-notes-popup-item {
+    display: flex;
+    align-items: center;
+}
+
+/* -- Mobile-Specific Popup Styles -- */
+@media only screen and (max-width: 600px) {
+    .cpwn-other-notes-popup {
+        /* 
+         * Sizing:
+         * - Make it 90% of the viewport width.
+         * - Unset the fixed min-width from the desktop rule.
+         * - Ensure it doesn't get wider than 450px.
+        */
+        width: 90vw !important;
+        min-width: unset !important;
+        max-width: 450px !important;
+        
+        /* Positioning: Fix it to the bottom of the screen. */
+        position: fixed !important;
+        bottom: calc(8px + env(safe-area-inset-bottom)) !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        
+        /* Appearance: Style it like a modern mobile bottom sheet. */
+        max-height: 50vh !important; /* Prevents it from covering the whole screen. */
+        border-radius: 12px 12px 12px 12px !important; /* Rounds only the top corners. */
+        box-shadow: 0 -4px 16px rgba(0,0,0,0.2) !important; /* Shadow to lift it off the page. */
+        
+        /* Reset any desktop positioning styles. */
+        top: auto !important; 
+        margin: 0 !important;
+    }
+
+    /* Ensure the scrollable content area has appropriate padding. */
+    .cpwn-popup-content-wrapper {
+        padding: 8px 12px !important;
+    }
+}
+
+.cpwn-other-notes-popup.is-mobile-popup {
+    border-radius: 12px 12px 0 0; /* Rounded top corners */
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.2); /* Shadow at the top */
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+/* -- Popup Actions -- */
+.cpwn-popup-actions-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 8px;
+    margin-top: 4px;
+    border-top: 1px solid var(--background-modifier-border);
+    background-color: transparent !important;
+}
+
+.cpwn-popup-info-message {
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Space between icon and text */
+    font-size: 12px;
+    color: var(--text-muted);
+    /* Ensure it also has no background */
+    background-color: transparent !important;
+}
+
+.cpwn-other-notes-popup-item {
+    background-color: transparent;
+}
+
+/* Style for the icon button itself */
+.cpwn-popup-action-icon-btn {
+    cursor: pointer;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background-color 0.2s ease;
+}
+
+.cpwn-popup-action-icon-btn .svg-icon {
+    width: 16px;
+    height: 16px;
+    color: var(--text-muted);
+}
+
+.cpwn-popup-action-icon-btn:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+/* Specific danger state for delete */
+.cpwn-popup-action-icon-btn.mod-danger:hover {
+    background-color: var(--cpwn-color-red);
+}
+
+.cpwn-popup-action-icon-btn.mod-danger:hover .svg-icon {
+    color: var(--cpwn-text-on-accent);
+}
+
+/* Style the header when reorder mode is active to give user feedback */
+.cpwn-reorder-mode-active .cpwn-note-group-header-content {
+    background-color: var(--interactive-accent);
+    color: var(--cpwn-text-on-accent);
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+}
+
+/* By default, hide the drag handles on all note rows */
+.cpwn-note-row .cpwn-drag-handle {
+    display: none;
+}
+
+/* Only show the drag handle when the container is in reorder mode */
+.cpwn-reorder-mode-active .cpwn-note-row .cpwn-drag-handle {
+    display: flex;
+}
+
+/* -- Main Tab Scroller -- */
+.cpwn-pm-tab-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto; /* Enables vertical scrolling when content overflows */
+}
+
+/* -- Base Widget Container -- */
+/* Defines the appearance and INTERNAL spacing of all widgets */
+/* -- Main Dashboard Grid Layout -- */
+.cpwn-pm-dashboard-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px; /* The space BETWEEN widgets */
+
+    /* -- side gaps -- */
+    padding: 0 4px; /* 16px padding on the left and right */
+    box-sizing: border-box;
+}
+
+/* -- Base Widget Container Style -- */
+/* This style applies to ALL widgets, both built-in and custom */
+.cpwn-pm-widget-container {
+    box-sizing: border-box;
+    background-color: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+}
+
+.cpwn-pm-widget-mini {
+    width: calc(25% - 6px); /* 1/4 width, accounting for 16px gap */
+}
+
+.cpwn-pm-widget-small-medium { /* Use 'small-medium' as the key */
+    width: calc((100% - 16px) / 3); /* (2 * 8px = 16px) */
+}
+
+/* For 'small' widgets like Today, Tomorrow, Next 7, and Future/No Due */
+.cpwn-pm-widget-small {
+    /* calc() subtracts half the gap to ensure two widgets fit perfectly on one row */
+    width: calc(50% - 4px);
+}
+
+/* For 'medium' full-width widgets like heatmaps */
+.cpwn-pm-widget-medium {
+    width: 100%;
+}
+
+/* For 'large' full-width, extra-tall widgets like Task Status Overview */
+.cpwn-pm-widget-large {
+    width: 100%;
+    /* min-height: 250px; */ /* Ensures a taller appearance */
+    
+}
+
+.cpwn-pm-widget-container .cpwn-heatmap-container {
+    overflow-x: auto;
+}
+
+/* -- Responsive styles for mobile -- */
+@media (max-width: 768px) {
+    /* On small screens, make all widgets stack vertically at full width */
+    /* .cpwn-pm-widget-small,
+    .cpwn-pm-widget-medium,
+    .cpwn-pm-widget-large {
+        width: 100%;
+    }*/
+}
+        
+/* -- Grid Item Sizing -- */
+/* This is the key rule: It makes any widget that is NOT a half-width summary widget span the full two columns. */
+.cpwn-pm-dashboard-grid > .cpwn-pm-widget-container:not(.is.cpwn-summary-widget) {
+    grid-column: span 2;
+}
+
+/* -- Widget Header -- */
+.cpwn-pm-widget-container h3 {
+    margin: 0 0 8px 0;
+    font-size: 0.8em;
+    font-weight: bold;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+}
+
+/* Overdue Task Styling */
+.cpwn-pm-progress-segment.overdue {
+    background-color: var(--cpwn-task-color-overdue);
+}
+
+.cpwn-legend-color-box.overdue {
+    background-color: var(--cpwn-task-color-overdue);
+}
+
+.cpwn-pm-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--font-ui-small);
+    margin: 0 8px; 
+}
+
+.cpwn-pm-legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.cpwn-pm-widget--pie .cpwn-pm-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cpwn-pm-widget--pie .cpwn-pm-legend-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+/* Heatmap Widget Styles */
+.cpwn-pm-dashboard-grid .cpwn-heatmap-container {
+    display: flex;
+    gap: 0px;
+    overflow-x: auto;
+    padding: 4px 2px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+.cpwn-pm-dashboard-grid .cpwn-heatmap-container {
+  gap: 0 !important;
+  padding-left: 0 !important;
+}
+
+.cpwn-pm-dashboard-grid .cpwn-heatmap-day-labels {
+  padding-right: 4px;   /* gives breathing room but keeps background under it */
+}
+
+.cpwn-pm-dashboard-grid .cpwn-heatmap-container::-webkit-scrollbar {
+    display: none;
+}
+
+.cpwn-pm-dashboard-grid .cpwn-heatmap-day-labels {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background-color: var(--background-secondary);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 24px 8px 4px 0;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.cpwn-pm-dashboard-grid .cpwn-heatmap-day-labels span {
+    line-height: 1;
+}
+
+.cpwn-pm-dashboard-grid .cpwn-heatmap-grid {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: auto repeat(7, 1fr);
+    grid-auto-columns: minmax(14px, 1fr);
+    gap: 4px;
+    overflow: visible;
+}
+
+.cpwn-pm-dashboard-grid .cpwn-heatmap-month-label {
+    white-space: nowrap;
+    font-size: 12px;
+    color: var(--text-muted);
+    align-self: end;
+    min-width: 60px; 
+    text-align: center;
+    transition: all 0.1s ease-in-out;
+}
+
+.cpwn-pm-dashboard-grid .cpwn-heatmap-cell {
+    aspect-ratio: 1 / 1;
+    border-radius: 3px;
+    background-color: var(--background-modifier-border);
+    cursor: pointer;
+}
+
+.cpwn-pm-dashboard-grid .cpwn-heatmap-current-month-label .cpwn-heatmap-month-prefix,
+.cpwn-pm-dashboard-grid .cpwn-heatmap-current-month-label .cpwn-heatmap-date-suffix {
+    color: var(--text-accent);
+    font-weight: 700; /* Bolder font weight to make it stand out */
+}
+
+.cpwn-pm-dashboard-grid .cpwn-heatmap-cell.level-1 { background-color: #4A271E; }
+.cpwn-pm-dashboard-grid .cpwn-heatmap-cell.level-2 { background-color: #D35400; }
+.cpwn-pm-dashboard-grid .cpwn-heatmap-cell.level-3 { background-color: #F39C12; }
+.cpwn-pm-dashboard-grid .cpwn-heatmap-cell.level-4 { background-color: #FFB74D; }
+
+.cpwn-heatmap-month-label-container {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    white-space: nowrap;
+
+    font-size: 0.8em;
+    color: var(--text-muted);
+    
+    /* -- FIX: Use a fixed width to prevent any layout shift -- */
+    width: 80px !important; /* Adjust if needed, but this is a safe value */
+    position: static !important;
+    left: auto !important;
+    transform: none; /* translateX(-50%);*/
+}
+
+.cpwn-heatmap-month-prefix {
+    display: inline-block;
+}
+
+.cpwn-heatmap-date-suffix {
+    display: inline-block;
+    padding-left: 0.25em;
+    color: var(--text-muted);
+    min-width: 2.8em; /* Reserve enough space for "23rd" etc. */
+}
+
+/* -- NEW: Bounding box highlight for the hovered cell -- */
+.cpwn-heatmap-cell.is-hovered {
+    box-shadow: 0 0 0 2px var(--interactive-accent);
+    border-radius: 4px; /* Matches your existing cell style */
+    position: relative; /* Ensures the shadow is drawn correctly */
+    z-index: 1; /* Lifts the cell slightly to ensure the shadow is visible */
+}
+
+/* Default state for the total count - no pointer */
+.cpwn-heatmap-total-count {
+    cursor: default !important;
+    text-decoration: none !important;
+    font-size: 0.9em;
+    font-weight: normal;
+    color: var(--text-muted);
+}
+
+/* This rule ONLY applies when a link exists, adding the hand pointer and underline */
+.cpwn-heatmap-total-count.is-clickable {
+    cursor: pointer !important;
+    text-decoration: underline !important;
+    text-decoration-style: dotted !important;
+    text-underline-offset: 3px;
+}
+
+/* Optional: Add a hover effect only when it's clickable */
+.cpwn-heatmap-total-count.is-clickable:hover {
+    color: var(--text-accent);
+}
+
+/* Change cursor to a hand pointer for interactive heatmap cells */
+.cpwn-heatmap-cell.is-interactive:hover {
+    cursor: pointer;
+}
+
+/* Task Bar Chart Widgets */
+.cpwn-pm-bar-chart-widget {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.cpwn-pm-bar-label {
+    grid-column: 1;
+    font-size: 0.9em;
+    font-weight: 500;
+}
+
+.cpwn-pm-bar-display-value {
+    grid-column: 2;
+    justify-self: end;
+    font-size: 0.9em;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+.cpwn-pm-bar-track {
+    grid-column: 1 / 3;
+    grid-row: 2;
+    height: 8px;
+    background-color: var(--background-modifier-border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 4px;
+}
+
+.cpwn-pm-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s ease-in-out;
+}
+
+/* Dashboard Heatmap Highlights */
+.cpwn-heatmap-cell.cpwn-heatmap-today-cell {
+    border: 1px solid var(--interactive-accent);
+    border-radius: 2px;
+}
+
+.cpwn-content-heatmap-cell-box {
+    border-radius: 8px;
+    box-sizing: border-box;
+}
+
+.cpwn-heatmap-cell.cpwn-heatmap-current-week-cell {
+    background-color: rgba(128, 128, 128, 0.1) !important;
+    border-radius: 2px;
+}
+
+body.theme-dark .cpwn-heatmap-cell.cpwn-heatmap-current-week-cell {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.cpwn-heatmap-day-labels .cpwn-heatmap-today-label,
+.cpwn-heatmap-month-label.cpwn-heatmap-current-month-label {
+    color: var(--text-accent);
+    font-weight: 700;
+}
+
+.cpwn-pm-draggable-widget-list {
+    contain: layout style paint;
+    will-change: transform;
+}
+
+.cpwn-pm-draggable-widget-item.dragging {
+    opacity: 0.5;
+    transform: rotate(2deg);
+    transition: none;
+}
+
+
+.cpwn-preview-task-title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-height: 30px;
+}
+
+.cpwn-preview-task-icon {
+    flex-shrink: 0;
+}
+
+.cpwn-preview-task-title {
+    flex: 1;
+}
+
+.cpwn-preview-collapse-icon {
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+
+/* Progress Bar Widgets */
+.cpwn-pm-progress-bar {
+    display: flex;
+    width: 100%;
+    height: 24px;
+    border-radius: 6px;
+    overflow: hidden;
+    background-color: var(--background-modifier-border);
+}
+
+.cpwn-pm-progress-segment {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 0.9em;
+    transition: width 0.3s ease-in-out;
+}
+
+.cpwn-pm-progress-segment.incomplete {
+    background-color: var(--cpwn-task-color-open);
+}
+
+.cpwn-pm-progress-segment.completed {
+    background-color: var(--cpwn-task-color-completed);
+}
+
+.cpwn-pm-progress-legend {
+    display: flex;
+    gap: 16px;
+    margin-top: 8px;
+    font-size: 0.8em;
+}
+
+.cpwn-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.cpwn-legend-color-box {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+}
+
+.cpwn-legend-color-box.incomplete {
+    background-color: var(--cpwn-task-color-open);
+}
+
+.cpwn-legend-color-box.completed {
+    background-color: var(--cpwn-task-color-completed);
+}
+
+/* Draggable List for Settings */
+.cpwn-pm-draggable-widget-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.cpwn-pm-draggable-widget-item {
+    display: flex;
+    align-items: center;
+    background-color: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    user-select: none;
+}
+
+.cpwn-pm-drag-handle {
+    padding: 10px;
+    cursor: grab;
+    color: var(--cpwn-text-faint);
+}
+
+.cpwn-pm-setting-wrapper {
+    flex-grow: 1;
+}
+
+.cpwn-pm-setting-wrapper .setting-item {
+    padding: 8px 0;
+    border: none;
+}
+
+.cpwn-pm-setting-wrapper .setting-item-info {
+    width: 100%;
+}
+
+.cpwn-pm-draggable-widget-item.dragging {
+    opacity: 0.5;
+    background: var(--cpwn-background-modifier-accent);
+}
+
+.cpwn-pm-drag-placeholder {
+    background-color: var(--background-modifier-hover);
+    border: 2px dashed var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    margin: 5px 0;
+}
+
+.cpwn-pm-progress-segment.is-interactive:hover {
+    cursor: pointer;
+    filter: brightness(1.2); /* Optional: makes the bar slightly brighter on hover */
+}
+
+.cpwn-pm-heatmap-config-box {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-l); /* Uses Obsidian's large radius for a nice card look */
+  padding: 16px;
+  margin-bottom: 20px;
+  background-color: var(--background-secondary); /* A slightly different background to stand out */
+}
+
+/* Add a title style for inside the box */
+.cpwn-pm-heatmap-config-box h2 {
+  margin-top: 10px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: none;
+}
+
+.cpwn-pm-folder-exclusion-container {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.cpwn-pm-widget-header {
+    cursor: default !important;
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Creates space between the icon and title */
+}
+
+.cpwn-pm-widget-header .cpwn-heatmap-collapse-icon,
+.cpwn-pm-widget-header h3,
+.cpwn-pm-widget-header .cpwn-heatmap-total-count.is-clickable {
+  cursor: pointer !important;
+}
+
+.cpwn-pm-widget-header .cpwn-heatmap-collapse-icon:hover,
+.cpwn-pm-widget-header h3:hover,
+.cpwn-pm-widget-header .cpwn-heatmap-total-count.is-clickable:hover {
+  color: var(--text-accent);
+}
+
+.cpwn-heatmap-collapse-icon {
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: transform 0.2s ease-in-out;
+    display: flex;
+    align-items: center;
+    margin-top: -8px; 
+}
+
+.cpwn-pm-widget-container.cpwn-is-collapsed .cpwn-heatmap-collapse-icon {
+    transform: rotate(-90deg);
+}
+
+.cpwn-pm-widget-container.cpwn-is-collapsed .cpwn-heatmap-container {
+    display: none;
+}
+
+.cpwn-pm-widget-header h3 {
+    cursor: pointer;
+    /* THE FIX: Pushes the title to the left, leaving space on the right */
+    margin-right: auto; 
+}
+
+/* -- New styles for 2-state summary widgets -- */
+.cpwn-pm-widget-container.is.cpwn-summary-widget .cpwn-pm-widget-header {
+    display: flex;
+    /* This is the key: it forces all items to align to their vertical centers. */
+    align-items: center; 
+    gap: 6px;
+    cursor: pointer;
+    margin-bottom: 4px;
+}
+
+.cpwn-summary-toggle-icon {
+    color: var(--text-muted);
+    transition: transform 0.2s ease-in-out;
+    /* We also make the icon a flex container to center the SVG within it */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* A fixed size helps maintain consistent spacing */
+    width: 18px;
+    height: 18px;
+    margin-top: -8px;
+}
+
+.cpwn-is-mini .cpwn-pm-progress-legend {
+    display: none;
+}
+
+.cpwn-is-mini .cpwn-summary-toggle-icon {
+    transform: rotate(-90deg); /* Points Left */
+}
+
+.cpwn-is-minimised .bar-and.cpwn-legend-wrapper {
+    display: none;
+}
+
+.cpwn-is-minimised .cpwn-summary-toggle-icon {
+    transform: rotate(180deg); /* Points Up */
+}
+
+/* -- Styles for Collapsible Widgets -- */
+.cpwn-pm-widget-header {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    justify-content: space-between; 
+}
+
+.cpwn-widget-toggle-icon {
+    color: var(--text-muted);
+    transition: transform 0.2s ease-in-out;
+}
+
+.cpwn-is-collapsed .cpwn-widget-content-wrapper {
+    display: none;
+}
+
+.cpwn-pm-widget-container.collapsed .cpwn-widget-toggle-icon {
+    transform: rotate(-90deg); /* Points left */
+}
+
+.cpwn-pm-composite-bar-wrapper {
+    margin-bottom: 8px;
+}
+
+.cpwn-pm-composite-bar-label {
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    color: var(--text-muted);
+}
+
+.cpwn-pm-widget-container.is.cpwn-summary-widget {
+    gap: 0px;
+    min-height: 80px;
+    justify-content: center;
+}
+
+.cpwn-pm-widget-container.is.cpwn-summary-widget .cpwn-task-group-empty-message {
+    /* Centers the 'No tasks' message perfectly in the middle of the widget */
+    text-align: center;
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cpwn-pm-dashboard-grid {
+    align-items: stretch;
+}
+
+.cpwn-pm-widget-container.is.cpwn-summary-widget.cpwn-is-minimised {
+    padding-bottom: 4px;
+    gap: 0;
+}
+
+.cpwn-pm-widget-container.is.cpwn-summary-widget.cpwn-is-minimised .cpwn-pm-widget-header {
+    margin-bottom: 0;
+}
+
+.cpwn-pm-widget-container.cpwn-is-collapsed {
+    padding-bottom: 4px;
+}
+
+.cpwn-pm-widget-container.cpwn-is-collapsed .cpwn-pm-widget-header {
+    margin-bottom: 0;
+}
+
+.cpwn-pm-progress-segment.in-progress {
+    background-color: var(--task-color-inprogress);
+}
+.cpwn-legend-color-box.in-progress {
+    background-color: var(--task-color-inprogress);
+}
+
+.cpwn-pm-progress-segment.no-due {
+    background-color: var(--background-modifier-border);
+    color: var(--text-muted);
+}
+
+.cpwn-legend-color-box.no-due {
+    background-color: var(--background-modifier-border);
+}
+
+/* -- Task Group Collapse Styles -- */
+.cpwn-task-row {
+    display: flex;
+    align-items: center;
+    padding: 12px 10px 8px 5px;  /* Increase from 4px to 10px for top/bottom padding */
+}
+
+.cpwn-task-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  font-size: var(--cpwn-task-heading-font-size);
+}
+
+.cpwn-task-group-header-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cpwn-task-group-collapse-icon .svg-icon {
+  transition: transform 0.3s ease-in-out;
+}
+
+.cpwn-task-group-container.cpwn-is-collapsed .cpwn-task-group-collapse-icon .svg-icon {
+  transform: rotate(-180deg);
+}
+
+.cpwn-task-list-wrapper {
+  transition: height 0.35s ease-in-out, opacity 0.35s ease-in-out;
+  overflow: hidden;
+  opacity: 1;
+  height: var(--cpwn-task-list-height, auto);
+}
+
+.cpwn-task-group-container.cpwn-is-collapsed .cpwn-task-list-wrapper {
+  height: 0;
+  opacity: 0;
+}
+
+.cpwn-task-group-empty-message {
+  font-style: italic;
+  color: var(--text-muted);
+  padding: 4px 0;
+  font-size: 0.9em;
+}
+
+.cpwn-task-row .cpwn-task-text {
+  flex-grow: 1;
+  font-size: var(--cpwn-task-text-font-size);
+}
+
+/* When truncation is enabled, apply nowrap */
+.cpwn-tasks-container.truncate-mode .cpwn-task-row .cpwn-task-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* When full text mode is enabled, ensure wrapping */
+.cpwn-tasks-container.show-full-text .cpwn-task-row .cpwn-task-text {
+    white-space: normal;
+    word-break: break-word;
+}
+
+.cpwn-task-row .cpwn-task-text,
+.cpwn-other-notes-popup-item .cpwn-task-text {
+    flex: 1;             /* Modern shorthand for flex-grow, shrink, basis */
+    display: flex;       /* CRITICAL: Makes this a flex container */
+    align-items: center; /* Vertically aligns the text nicely */
+    min-width: 0;
+    line-height: 1.7;
+    white-space: normal;  
+    word-break: break-word;
+}
+
+/* Add this rule to handle the paragraph inside */
+.cpwn-other-notes-popup-item .cpwn-task-text > p {
+    width: 100%;
+    margin: 0;
+}
+
+.cpwn-other-notes-popup-item .cpwn-task-checkbox-symbol {
+    margin-top: 4px !important;  
+    align-self: flex-start;     
+}
+
+.cpwn-task-text.completed {
+    opacity: 0.6;
+    color: var(--text-muted);
+}
+    
+.cpwn-tasks-container.show-full-text .cpwn-task-row {
+  align-items: flex-start;
+}
+
+.cpwn-tasks-container.show-full-text .cpwn-task-text {
+  white-space: normal;
+  word-break: break-word;
+}
+
+.cpwn-tasks-container.show-full-text .cpwn-task-row .cpwn-task-checkbox {
+  margin-top: 2px;
+}
+
+/* Container for task checkbox */
+.cpwn-task-checkbox-symbol {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.4em;
+    height: 1.4em;
+    position: relative;
+    flex-shrink: 0;
+    margin: 2px 0 0 0;
+    padding: 0;
+}
+
+/* Hide everything except the checkbox */
+.cpwn-task-checkbox-symbol .cpwn-task-list-item {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: contents;
+    align-items: center;
+    justify-content: center;
+}
+
+.cpwn-task-checkbox-symbol li.cpwn-task-list-item {
+    all: unset;
+    display: contents; /* Makes it not generate a box */
+    margin: 0 !important;
+    padding: 0 !important;
+    list-style: none;
+}
+
+/* Hide the text content after the checkbox */
+.cpwn-task-checkbox-symbol .cpwn-task-list-item-checkbox ~ * {
+    display: none;
+}
+
+.cpwn-task-checkbox-symbol .cpwn-task-list-item-checkbox {
+    margin: 0;
+   
+}
+.cpwn-asset-grid-preview img {
+    object-fit: contain !important;
+}
+
+.cpwn-note-group-container {
+  overflow: visible !important;
+  max-height: none !important;
+}
+
+.cpwn-asset-grid-preview img {
+  object-fit: contain !important;
+}
+.cpwn-pinned-notes-empty-message {
+    padding: 24px;
+    text-align: center;
+    font-style: italic;
+    color: var(--text-muted);
+    font-size: 0.9em;
+}
+
+.cpwn-pinned-notes-empty-message code {
+    font-style: normal;
+    font-size: 1.1em;
+}
+body.is-mobile .cpwn-tabs-content-wrapper {
+    padding-bottom: 0 !important;
+}
+
+.cpwn-pm-stat-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem 1rem;
+    text-align: center;
+}
+
+.cpwn-pm-stat-card-value {
+    font-size: 2.5rem;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--cpwn-text-normal);
+}
+
+.cpwn-pm-stat-card-label {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+}
+
+/* -- KPI Stat Card -- */
+.cpwn-pm-kpi-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
+.cpwn-pm-kpi-value {
+    font-size: 3.5rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--cpwn-text-normal);
+}
+
+.cpwn-pm-widget-title {
+    margin: 0 0 16px 0;
+    font-size: 0.9em;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+
+/* -- Axis Labels -- */
+.cpwn-pm-axis-label {
+    position: absolute;
+    color: var(--cpwn-text-faint);
+    font-size: 12px;
+}
+
+.cpwn-pm-axis-label.x-axis {
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.cpwn-pm-axis-label.y-axis {
+    position: absolute;
+    top: 50%;
+    left: -20px;
+    transform: translateY(-50%) rotate(-90deg);  
+    color: var(--cpwn-text-faint);
+    font-size: 12px;
+}
+
+/* For Line Charts ONLY */
+.cpwn-pm-css-chart-container.cpwn-chart-type-line {
+    position: relative; 
+}
+
+.cpwn-chart-type-line .cpwn-pm-axis-label.y-axis {
+    left: -35px;         /* Position outside the reserved margin */
+    top: 50%;
+    transform: translateY(-50%) rotate(-90deg);
+}
+
+.cpwn-chart-type-line .cpwn-pm-axis-label.x-axis {
+    bottom: -28px;       /* Position outside the reserved margin */
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+/* For Cumulative Charts ONLY */
+.cpwn-pm-css-chart-container.cpwn-chart-type-cumulative {
+    position: relative;
+}
+
+.cpwn-chart-type-cumulative .cpwn-pm-axis-label.y-axis {
+    left: -35px;
+    top: 50%;
+    transform: translateY(-50%) rotate(-90deg);
+}
+
+.cpwn-chart-type-cumulative .cpwn-pm-axis-label.x-axis {
+    bottom: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+/* Ensure chart SVG/divs respect the new padding */
+.cpwn-pm-line-chart, .cpwn-pm-bar-chart {
+    width: 100%;
+    height: 100%;
+}
+
+.cpwn-pm-line-chart .hover-line {
+    stroke: var(--cpwn-text-faint);
+    stroke-width: 1px;
+    stroke-dasharray: 3, 3;
+    pointer-events: none;
+}
+
+.cpwn-pm-line-chart .hover-point {
+    fill: var(--cpwn-background-primary);
+    stroke-width: 2;
+    pointer-events: none;
+}
+
+/* -- START: Nicer Tooltip Styling -- */
+.cpwn-pm-line-chart .tooltip-group {
+    pointer-events: none;
+}
+
+.cpwn-pm-line-chart .tooltip-rect {
+    fill: #1C1C1E; /* Dark background like in the image */
+    stroke: rgba(255, 255, 255, 0.1); /* Subtle border */
+    rx: 6;
+    ry: 6;
+    opacity: 0.95;
+}
+
+.cpwn-pm-line-chart .tooltip-text {
+    font-family: var(--cpwn-font-interface);
+    font-size: var(--cpwn-font-ui-small) !important;
+    fill: #FFFFFF; /* White text */
+}
+
+.cpwn-pm-line-chart .tooltip-value-label {
+    fill: #EAEAEA; /* Light grey for the label part */
+    font-weight: 500;
+}
+
+.cpwn-pm-line-chart .tooltip-value {
+    fill: #FFFFFF; /* White for the value part */
+    font-weight: 700; /* Bolder value */
+}
+    
+/* Line Chart (SVG) Styles */
+.cpwn-pm-line-chart {
+    width: 100%;
+    height: 100%;
+}
+
+.cpwn-pm-line-chart .grid-line {
+    stroke: var(--background-modifier-border);
+    stroke-width: 1;
+    stroke-dasharray: 2, 2;
+}
+
+.cpwn-pm-line-chart .cpwn-axis-label {
+    font-size: 14px;
+    fill: var(--text-muted);
+}
+
+.cpwn-pm-line-chart .line-path {
+    fill: none;
+    stroke-width: 3.5; /* Slightly thicker line */
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.cpwn-pm-line-chart .line-path-projection-line {
+    fill: none;
+    stroke-width: 1.75px; 
+    stroke-dasharray: 5,5;
+    transition: stroke-width 0.2s ease-in-out;
+
+}
+
+.cpwn-pm-line-chart .data-point {
+    stroke-width: 2;
+}
+
+/* -- Widget Builder Modal -- */
+.cpwn-pm-widget-builder-modal .cpwn-modal-content {
+    padding-bottom: 50px; /* Space for fixed footer buttons */
+}
+
+.cpwn-pm-widget-empty-full {
+    min-height: 85px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.cpwn-pm-flex-setting .cpwn-setting-item-control {
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+}
+
+.cpwn-pm-flex-setting .cpwn-setting-item-control .cpwn-setting-item-control {
+    flex-grow: 1;
+}
+
+.cpwn-pm-flex-setting .cpwn-setting-item-control input[type="text"] {
+    width: 60px;
+    text-align: center;
+}
+.cpwn-pm-date-range-extras {
+    padding-left: 20px;
+    border-left: 2px solid var(--background-modifier-border);
+    margin-left: 10px;
+}
+
+/* -- Dashboard Widget Styles -- */
+.cpwn-widget-header {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.cpwn-widget-title {
+    margin-right: auto;
+    /* This is the key fix: It removes extra vertical space around the text,
+       allowing for precise alignment with the icon. */
+    line-height: 1;
+    font-size: 0.8em;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+
+/* -- Toggle/Collapse Icon -- */
+.cpwn-widget-toggle-icon {
+    color: var(--text-muted);
+    transition: transform 0.2s ease-in-out;
+    /* This ensures the SVG icon inside is perfectly centered. */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+
+.cpwn-widget-toggle-icon .svg-icon {
+    width: 18px;
+    height: 18px;
+    transition: transform 0.2s ease-in-out;
+}
+
+.cpwn-widget-container.collapsed .cpwn-widget-toggle-icon {
+    transform: rotate(-90deg);
+}
+
+.cpwn-widget-content {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    min-height: 0;
+    
+    transition: max-height 0.3s ease-out, opacity 0.2s ease-in-out, padding 0.3s ease-out;
+}
+
+.cpwn-pm-widget-header {
+    cursor: pointer;
+}
+
+.cpwn-summary-toggle-icon:hover {
+    color: var(--interactive-accent);
+}
+
+.cpwn-pm-section-collapse-icon:hover {
+    color: var(--interactive-accent);
+}  
+.cpwn-pm-section-name:hover {
+    color: var(--interactive-accent);
+} 
+
+/* This is the new footer container that holds the axis label and legend. */
+.cpwn-pm-chart-footer {
+    display: flex;
+    flex-direction: column; /* Stacks children vertically */
+    align-items: center;    /* Centers them horizontally */
+    gap: 0px;               /* Space between axis label and legend */
+    margin-top: 0px;
+    padding-top: 0px;       /* Space between chart and footer content */
+    flex-shrink: 0;         /* Prevents footer from shrinking */
+}
+
+/* A new, non-conflicting class for the axis label in the footer. */
+.cpwn-pm-axis-label-footer {
+    color: var(--cpwn-text-faint);
+    font-size: 12px;
+}
+
+.cpwn-axis-label.cpwn-year-label {
+    font-size: 0.8em;
+    fill: var(--text-muted);
+}
+
+/* Ensure the legend wraps nicely and is centered. */
+.cpwn-pm-chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px 16px; /* 8px vertical gap, 16px horizontal gap */
+    width: 100%;
+}
+
+.cpwn-pm-widget-container.collapsed .cpwn-widget-content {
+    max-height: 0;
+    opacity: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.cpwn-widget-content canvas {
+    max-width: 100%;
+    height: auto !important;
+}
+
+/* -- Custom Chart Legend -- */
+.cpwn-pm.cpwn-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--cpwn-font-ui-small);
+    margin: 0 8px; 
+}
+
+.cpwn-pm.cpwn-legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+/* -- Padding Removal -- */
+.cpwn-widget-content {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+.cpwn-pm-axis-label.x-axis {
+    color: var(--cpwn-text-faint);
+    font-size: 12px;
+}
+
+/* -- Custom Color Picker Setting -- */
+.cpwn-pm-color-setting-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+}
+
+.cpwn-pm-color-swatch {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 0px;
+    cursor: pointer;
+    flex-shrink: 0;
+    background-color: transparent;
+    -webkit-appearance: none; /* Remove default system styling */
+    -moz-appearance: none;
+    appearance: none;
+    border-radius: 50%; /* This makes it a circle */
+    cursor: pointer;
+}
+
+.cpwn-pm-opacity-slider {
+    flex-grow: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: var(--background-modifier-border);
+    outline: none;
+    border-radius: 2px;
+}
+
+.cpwn-pm-opacity-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--cpwn-text-on-accent);
+    cursor: pointer;
+    border-radius: 50%;
+    border: 2px solid var(--background-secondary);
+}
+
+.cpwn-pm-opacity-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: var(--cpwn-text-on-accent);
+    cursor: pointer;
+    border-radius: 50%;
+    border: 2px solid var(--background-secondary);
+}
+
+.cpwn-pm-color-actions .cpwn-setting-item-control {
+    justify-content: flex-end;
+}
+
+.cpwn-pm-color-setting-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-grow: 1;
+}
+
+.cpwn-pm-opacity-slider {
+    width: 100%;
+}
+
+/* This targets the internal color picker UI provided by the browser */
+.cpwn-pm-color-swatch::-webkit-color-swatch {
+    border-radius: 50%;
+    border: none;
+}
+.cpwn-pm-color-swatch::-moz-color-swatch {
+    border-radius: 50%;
+    border: none;
+}
+
+.cpwn-pm-inline-color-picker input[type="color"] {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid var(--background-modifier-border);
+    cursor: pointer;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-color: transparent;
+    padding: 0;
+    margin-left: 8px; /* Add some space from the previous control */
+}
+
+.cpwn-pm-inline-color-picker input[type="color"]::-webkit-color-swatch {
+    border-radius: 50%;
+    border: none;
+}
+
+.cpwn-pm-inline-color-picker input[type="color"]::-moz-color-swatch {
+    border-radius: 50%;
+    border: none;
+}
+
+.cpwn-widget-title:hover {
+    color: var(--text-accent);  
+}
+
+/* ==========================================================================
+   Project Metrics: Universal Tooltip for All Charts
+   ========================================================================== */
+
+/* This is the main container for the tooltip, created in the document body. */
+.cpwn-pm-chart-tooltip {
+    position: fixed; /* Positions relative to the viewport, not a parent container */
+    z-index: 99999 !important; /* Ensures it's on top of all other elements */
+    
+    /* Appearance */
+    background-color: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border-hover);
+    border-radius: 8px;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+    
+    /* Hide it by default */
+    opacity: 0;
+    pointer-events: none; /* Prevents the tooltip from interfering with mouse events */
+    
+    /* Smooth transition for appearing/disappearing */
+    transition: opacity 0.2s, transform 0.2s;
+    
+    /* Prevents content from breaking onto new lines */
+    white-space: nowrap;
+    
+    /* Remove padding to allow for internal structured content */
+    padding: 0;
+    overflow: hidden; /* Ensures the border-radius is applied to the content */
+}
+
+/* Title section of the tooltip */
+.cpwn-pm-chart-tooltip .cpwn-pm-tooltip-title {
+    font-weight: bold;
+    font-size: var(--cpwn-font-ui-small) !important; /* Larger font size */
+    padding: 10px 14px !important; /* More padding */
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* Content section of the tooltip */
+.cpwn-pm-chart-tooltip .cpwn-pm-tooltip-content {
+    font-size: var(--cpwn-font-ui-small) !important;
+    padding: 10px 14px !important;
+    display: flex;
+    flex-direction: column;
+    gap: 6px !important;
+}
+
+/* An individual item within the tooltip's content */
+.cpwn-pm-chart-tooltip .cpwn-pm-tooltip-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* The small color swatch next to the text */
+.cpwn-pm-chart-tooltip .cpwn-pm-tooltip-color {
+    width: 14px !important;
+    height: 14px !important;
+    border-radius: 2px;
+}
+
+/* ==========================================================================
+   Project Metrics: Pie Chart Widget
+   ========================================================================== */
+.cpwn-pm-widget-pie {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 12px;
+    box-sizing: border-box;
+}
+
+.cpwn-pm-widget-pie .cpwn-pm-pie-chart-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
+/* Pie Chart Size Differentiation */
+.cpwn-pm-widget-medium .cpwn-pm-widget-pie {
+    min-height: 175px; /* Default for medium */
+}
+.cpwn-pm-widget-medium .cpwn-pm-widget-pie .cpwn-pm-pie-chart {
+    min-height: 150px;
+    max-height: 175px;
+}
+
+.cpwn-pm-widget-large .cpwn-pm-widget-pie {
+    min-height: 260px; /* Taller for large */
+}
+
+/* Make sure the pie itself scales appropriately */
+.cpwn-pm-widget-large .cpwn-pm-widget-pie .cpwn-pm-pie-chart {
+    min-height: 220px;
+    max-height: 220px;
+}
+
+/* -- LAYOUTS -- */
+/* Side-by-side for 'right' legend */
+.cpwn-pm-widget-pie.cpwn-legend-right .cpwn-pm-pie-chart-wrapper {
+    flex-direction: row;
+}
+
+/* Side-by-side for 'right' legend */
+.cpwn-pm-widget-pie.cpwn-legend-left .cpwn-pm-pie-chart-wrapper {
+    flex-direction: row-reverse;
+}
+
+/* Stacked for 'top' or 'bottom' legend */
+.cpwn-pm-widget-pie.cpwn-legend-top .cpwn-pm-pie-chart-wrapper {
+    flex-direction: column-reverse;
+}
+.cpwn-pm-widget-pie.cpwn-legend-bottom .cpwn-pm-pie-chart-wrapper {
+    flex-direction: column;
+}
+
+/* -- SIZING -- */
+.cpwn-pm-widget-pie .cpwn-pm-pie-chart {
+    flex: 1 1 60%;
+    aspect-ratio: 1 / 1;
+    min-width: 50px;
+    min-height: 50px;
+}
+
+.cpwn-pm-widget-pie .cpwn-pm-pie-chart svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.cpwn-pm-widget-pie .cpwn-pm-chart-legend {
+    flex: 1 1 40%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 20px;
+}
+
+/* -- Items inside legend -- */
+.cpwn-pm-widget-pie .cpwn-pm.cpwn-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cpwn-pm-widget-pie .cpwn-pm.cpwn-legend-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Project Metrics: Radar Chart Widget
+   ========================================================================== */
+.cpwn-pm-radar-chart {
+  width: 100%;
+  height: 100%;
+}
+
+.cpwn-pm-radar-chart .grid-line {
+  opacity: 1;
+}
+
+.cpwn-pm-radar-chart .cpwn-axis-label {
+  font-size: 12px;
+  fill: var(--text-muted);
+}
+
+.cpwn-pm-radar-chart path {
+  transition: opacity 0.2s ease;
+}
+
+.cpwn-pm-radar-chart path:hover {
+  opacity: 0.4;
+}
+
+.cpwn-pm-radar-chart line {
+    opacity: 0.2;  /* Makes solid lines brighter */
+    stroke: var--text-muted;
+    stroke-width: 1;
+}
+
+/* ==========================================================================
+   Project Metrics: Vertical Bar Chart Widget
+   ========================================================================== */
+/* -- Final Bar Chart Widget CSS -- */
+
+/* Base container for the entire chart */
+.cpwn-pm-css-chart-container.cpwn-chart-type-bar-horizontal {
+    padding: 10px; /* Optional: Add some padding around the whole widget */
+}
+
+/* Main flex container for the list of bars or groups */
+.cpwn-pm-bar-chart-horizontal {
+    display: flex;
+    flex-direction: column;
+    gap: 0; /* Gaps are handled by margins for better control */
+}
+
+/* Container for each group section */
+.cpwn-pm-bar-chart-group {
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* Remove border and extra margin from the very last group */
+.cpwn-pm-bar-chart-group:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+/* Group label text (e.g., "Angela") */
+.cpwn-pm-bar-chart-group-label {
+    font-size: 1em;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+/* Main container for a single metric's bar and labels */
+.cpwn-pm-task-status-widget {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 4px; /* Space between metrics within a group */
+}
+
+.cpwn-pm-bar-chart-group .cpwn-pm-task-status-widget:last-of-type {
+    margin-bottom: 0; /* No margin on the last metric in a group */
+}
+
+/* Row containing the text label and value */
+.cpwn-pm-task-status-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px; /* Space between the text and the bar below it */
+}
+
+/* Text label for the metric (e.g., "Created", "Completed") */
+.cpwn-pm-task-status-label {
+    font-size: 0.9em;
+    color: var(--text-muted);
+}
+
+/* Numeric value for the metric */
+.cpwn-pm-task-status-value {
+    font-size: 0.9em;
+    color: var(--cpwn-text-normal);
+    font-weight: 500;
+}
+
+/* Container for the bar elements */
+.cpwn-pm-task-status-bar-container {
+    width: 100%;
+}
+
+/* The background track of the bar */
+.cpwn-pm-task-status-bar-track {
+    width: 100%;
+    height: 6px; /* Sets the thickness of the bar */
+    background-color: var(--background-secondary-alt);
+    border-radius: 3px;
+    overflow: hidden; /* Ensures the fill stays within the rounded corners */
+}
+
+/* The colored "fill" part of the bar */
+.cpwn-pm-task-status-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.4s ease-in-out; /* Smooth animation for width changes */
+}
+
+/* Add to your styles.css file */
+.cpwn-pm-settings-sub-nav {
+    display: flex;
+    gap: 8px; /* Adds space between tab buttons */
+    margin-bottom: 15px;
+}
+.cpwn-pm-settings-sub-nav button.is-active {
+    background-color: var(--interactive-accent);
+    color: var(--cpwn-text-on-accent);
+}
+
+.cpwn-template-picker-modal {
+    width: 520px;
+    max-width: 90vw;
+    max-height: 60vh;
+}
+
+.cpwn-template-picker-modal .cpwn-modal-content {
+    overflow-x: hidden;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.cpwn-template-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.cpwn-template-card {
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    padding: 16px;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.cpwn-template-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.cpwn-template-preview {
+    margin-bottom: 12px;
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--background-secondary);
+    border-radius: 4px;
+}
+
+.cpwn-mini-chart {
+    max-width: 100%;
+}
+
+.cpwn-template-card h3 {
+    margin: 0 0 8px 0;
+}
+
+.cpwn-template-desc {
+    font-size: 0.9em;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+}
+
+.cpwn-pm-custom-widget-icon {
+    display: inline-flex;
+    align-items: center;
+    margin-right: 8px;
+    margin-left: 8px;
+    opacity: 0.6;
+}
+
+.cpwn-pm-custom-widget-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+.cpwn-pm-kpi-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center; /* Or 'flex-start' if you prefer left-alignment */
+    gap: 10px; /* Adjust the space between the icon and the number */
+}
+
+.cpwn-pm-kpi-icon .svg-icon { /* Target the icon that Obsidian creates */
+    display: flex;
+    width: 28px; /* Adjust size as needed */
+    height: 28px;
+    align-items: center;
+    color: var(--text-muted); /* Or let it inherit color */
+}
+
+.cpwn-pm-kpi-value {
+    font-size: 2.5em; /* Example size */
+    font-weight: bold;
+}
+
+
+
+
+/* ============================== */
+/* SECTION HEADERS - SETTINGS VIEW */
+/* ============================== */
+
+/* Section header item in settings list */
+.cpwn-pm-section-header-item {
+    background-color: var(--background-secondary-alt);
+    border-left: 3px solid var(--interactive-accent);
+}
+
+/* Indented widget items in settings list */
+.cpwn-pm-indented-item {
+    margin-left: 30px;
+    border-left: 2px solid var(--background-modifier-border);
+    padding-left: 10px;
+}
+
+/* Icon preview in settings */
+.cpwn-pm-section-icon-preview {
+    display: inline-flex;
+    align-items: center;
+}
+
+/* ============================== */
+/* SECTION HEADERS - DASHBOARD VIEW */
+/* ============================== */
+
+/* Section header in the actual dashboard */
+.cpwn-pm-section-header {
+    width: 100% !important;
+    grid-column: 1 / -1 !important; /* Spans all columns in the grid */
+    display: flex;
+    align-items: center;
+    gap: 0px;
+    padding: 2px 2px;
+    cursor: pointer;
+    border-radius: 6px;
+    margin-bottom: 0px;
+    background-color: var(--background-secondary);
+    transition: background-color 0.2s ease;
+}
+
+.cpwn-pm-section-header.is-aligned-right {
+    flex-direction: row-reverse;
+}
+.cpwn-pm-section-header-title {
+    flex-grow: 1; /* Allows the title to fill the available space */
+}
+
+.cpwn-pm-section-header:hover {
+    background-color: var(--background-secondary-alt);
+}
+
+
+.cpwn-pm-section-collapse-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    align-self: center;
+}
+
+.cpwn-pm-section-collapse-icon svg {
+    width: 18px;
+    height: 18px;
+    transition: transform 0.2s ease-in-out;
+}
+
+.cpwn-pm-section-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    margin-right: 8px;
+}
+
+.cpwn-pm-section-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+.cpwn-pm-section-name {
+    /* flex-grow: 1; */
+    flex-shrink: 0;
+}
+
+
+
+
+/* Container & Layout */
+.cpwn-container-with-statusbar {
+    padding-bottom: var(--status-bar-height);
+}
+
+/* Progress Segments */
+.cpwn-pm-progress-segment {
+    background-color: var(--cpwn-segment-bg-color);
+    width: var(--cpwn-segment-width);
+}
+
+/* Calendar Grid */
+.cpwn-calendar-label-row {
+    grid-row: 1;
+}
+
+.cpwn-calendar-day-cell {
+    box-sizing: border-box;
+    grid-column: var(--col-index);
+    grid-row: var(--row-index);
+}
+
+/* Heatmap */
+.cpwn-heatmap-cell {
+    background-color: var(--cpwn-heatmap-color);
+    border: var(--heatmap-border);
+    box-sizing: border-box;
+}
+
+/* Note Dots */
+.cpwn-daily-note-dot {
+    background-color: var(--daily-note-color);
+}
+
+.cpwn-weekly-note-dot {
+    background-color: var(--weekly-note-color);
+}
+
+/* Section Headers */
+.cpwn-section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    justify-content: flex-start;
+}
+
+.cpwn-section-header-center {
+    justify-content: center;
+}
+
+.cpwn-section-header-right {
+    justify-content: flex-end;
+}
+
+.cpwn-section-icon-left {
+    flex-direction: row-reverse;
+}
+
+/* Section Name/Title */
+.cpwn-section-name {
+    flex-grow: 1;
+    text-align: var(--text-align);
+    color: var(--text-color);
+    font-weight: var(--font-weight);
+    font-style: var(--font-style);
+    font-size: var(--font-size);
+}
+
+/* KPI Icons */
+.cpwn-kpi-icon svg {
+    color: inherit;  /* SVG inherits from parent */
+}
+/* Task Layout */
+.cpwn-task-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.cpwn-task-checkbox-symbol {
+    flex-shrink: 0;
+    margin-left: -4px;
+    margin-top: 4px;
+}
+
+.cpwn-task-text {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Interaction States */
+.cpwn-clickable {
+    cursor: pointer;
+}
+
+.cpwn-hidden {
+    display: none;
+}
+
+.cpwn-visible {
+    display: block;
+}
+
+.cpwn-highlighted {
+    background-color: var(--highlight-color);
+}
+
+/* Hover Effects */
+.cpwn-hover-fade {
+    opacity: var(--hover-opacity);
+    transition: opacity 0.2s;
+}
+
+/* Pull-to-Refresh Animation */
+.cpwn-pull-indicator {
+    transform: var(--pull-transform);
+    transition: transform 0.2s;
+}
+
+/* Context Menu */
+.cpwn-context-menu {
+    position: fixed;
+    box-sizing: border-box;
+    max-height: 45vh;
+    width: var(--menu-width);
+    top: var(--menu-top);
+    left: var(--menu-left);
+    bottom: var(--menu-bottom);
+    visibility: visible;
+}
+
+/* Progress Bars */
+.cpwn-progress-bar {
+    width: var(--progress-width);
+}
+
+/* Tab Content */
+.cpwn-tab-scratch {
+    display: var(--tab-scratch-display, none);
+}
+
+.cpwn-tab-notes {
+    display: var(--tab-notes-display, none);
+}
+
+/* Search Clear Button */
+.cpwn-search-clear {
+    visibility: var(--clear-visibility, hidden);
+}
+
+/* Fade Transitions */
+.cpwn-fade-enter {
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.cpwn-fade-visible {
+    opacity: 1;
+}
