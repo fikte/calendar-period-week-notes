@@ -99,6 +99,8 @@ The plugin now features a powerful, customizable dashboard grid that can be swit
 -   **Advanced Highlighting**: Customize highlighting for the current week row, day column on hover, or use the **Complex** mode to highlight both the row and column up to the hovered date.
 -   **Weekly Notes**: Create and manage weekly notes with customizable naming formats, template support, and a dot indicator on the week number.
 
+**Please Note:** For the calendar event dots you may (optionally in the plugin settings) set up to fetch over the internet the calendar event information you wish to see / view on the caleandar grid and popup window.
+
 ### 🧩 Integrated & Draggable Tab Panels
 
 A powerful set of panels located below the calendar. All tabs can be reordered via drag-and-drop.
@@ -144,7 +146,7 @@ A powerful set of panels located below the calendar. All tabs can be reordered v
 
 ### Manual Installation
 
-1.  Download the zip file containing the `main.js`, `manifest.json` and Theme files from the latest [GitHub release](https://github.com/fikte/calendar-period-week-notes/releases/).
+1.  Download the zip file containing the `main.js`,  `manifest.json` and Theme files from the latest [GitHub release](https://github.com/fikte/calendar-period-week-notes/releases/).
 2.  Create a new folder named `Calendar Period Week Notes` inside your vault's plugin folder: `<VaultFolder>/.obsidian/plugins/`, (you may need to show hidden files for your operating system to view this)
 3.  Copy the downloaded files into this new folder.
 4.  Reload Obsidian, then go to **Settings** > **Community Plugins** and enable it.
@@ -155,23 +157,7 @@ The folder structure should be:
 <VaultFolder>/.obsidian/plugins/Calendar Period Week Notes/
 ├── main.js 
 ├── manifest.json
-├── Themes/
-│ ├── Autumn.json
-│ ├── Beach.json
-│ ├── Calm.json
-│ ├── Christmas.json
-│ ├── Default-Developer.json
-│ ├── Default.json
-│ ├── Garden.json
-│ ├── Halloween.json
-│ ├── Izzy.json
-│ ├── Kate.json
-│ ├── Pride.json
-│ ├── Scary.json
-│ ├── Sky.json
-│ ├── Spring.json
-│ ├── Summer.json
-│ ├── Winter.json
+├── styles.css
 ```
 
 ---
