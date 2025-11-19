@@ -37,7 +37,7 @@ _NEW: Dashboard Task Tab showing summary and heatmap of tasks acrosss your notes
 
 <img width="437" height="298" alt="image" src="https://github.com/user-attachments/assets/d3bc45e5-9893-4470-8655-1c4a889a4412" />
 
-NEW: Dashboard Task custom widget chart examples that can be configured: kpi stat widgets, cumulative line chart to track task completion/project completion which can be based on tag. Radar completion chart, pie chart and simple line chart examples. Create your own with style with colours, show hide legends, show hide toggles, show / hide chart titles and even create section headers to group charts - which you can easily show / hide by clicking the widget name or chevron. Easily order in the settings too by dragging and dropping where you want a widget displayed. Four widget sizes to choose from, mini, small, full and full tall. 
+NEW: Dashboard Task custom widget chart examples that can be configured: kpi stat widgets, cumulative line chart to track task completion/project completion which can be based on tag. Radar completion chart, pie chart and simple line chart examples. Create your own with style with colours, show hide legends, show hide toggles, show / hide chart titles and even create section headers to group charts - which you can easily show / hide by clicking the widget name or chevron. Easily order in the settings too by dragging and dropping where you want a widget displayed. Five widget sizes to choose from all based on widget and height: quarter, third, half, full and full tall. 
 
 
 <img width="484" height="1196" alt="image" src="https://github.com/user-attachments/assets/1d403326-dc32-4d47-95c2-87b9ddd3a259" />
