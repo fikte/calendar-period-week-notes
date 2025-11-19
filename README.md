@@ -1,5 +1,4 @@
 # Obsidian Calendar Period Week Notes
----
 A powerhouse daily and weekly planning plugin for Obsidian which combines a highly customizable calendar with an integrated tabbed interface for your scratchpad, recent notes, tasks, assets and a dashboard containing a number of widgets giving you a complete overview of your vault at a glance.
 
 Move beyond simple daily notes with a unique **Period/Week** system for those who have their financial year mapped out over 13 periods of 4 weeks, (or simply use the standard calendar week numbering), interactive **popups**, and a deeply integrated **task manager**.
