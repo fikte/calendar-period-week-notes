@@ -782,36 +782,44 @@ export class PeriodMonthView extends ItemView {
                 }
 
                 cell.addClass('is-interactive');
-
-
-
                 cell.addEventListener('mouseenter', (event) => {
                     if (this.isPopupLocked) return;
                     window.clearTimeout(this.hideTimeout);
                     this.hideFilePopup();
 
                     this.hoverTimeout = window.setTimeout(() => {
-                        const itemsOnDay = dataMap.get(dateKey) || [];
-                        if (itemsOnDay.length === 0) return;
+                        // Decide which map to use for hover content
+                        var itemsOnDay;
 
-                        let popupData = {};
+                        // For the special Task completion activity widget, use completionMap
+                        // so hover shows tasks by COMPLETION date instead of due date.
+                        if (widgetKey === 'taskcompletionheatmap' && options && options.completionMap instanceof Map) {
+                            itemsOnDay = options.completionMap.get(dateKey) || [];
 
-                        // This checks for the 'description' property which we now know exists on the task object.
+                        } else {
+                            // All other widgets keep using dataMap
+                            itemsOnDay = dataMap.get(dateKey) || [];
+                        }
+
+                        if (!itemsOnDay || itemsOnDay.length === 0) return;
+
+                        var popupData = {};
+
+                        // Task heatmap branch (items are task objects)
                         if (itemsOnDay[0].description !== undefined) {
 
-                            // 1. Get unique file paths from the tasks.
-                            const filePaths = [...new Set(itemsOnDay.map(task => task.path))];
+                            var filePaths = Array.from(new Set(itemsOnDay.map(function (task) { return task.path; })));
 
-                            // 2. Convert paths to TFile objects.
-                            const filesOnDay = filePaths.map(path => this.app.vault.getAbstractFileByPath(path)).filter(file => file instanceof TFile);
+                            var filesOnDay = filePaths
+                                .map(function (path) { return this.app.vault.getAbstractFileByPath(path); }.bind(this))
+                                .filter(function (file) { return file instanceof TFile; });
 
-                            // 3. Categorize the files.
-                            const dailyNotes = [];
-                            const createdNotes = [];
-                            const modifiedNotes = [];
-                            const assets = [];
+                            var dailyNotes = [];
+                            var createdNotes = [];
+                            var modifiedNotes = [];
+                            var assets = [];
 
-                            filesOnDay.forEach(file => {
+                            filesOnDay.forEach(function (file) {
                                 if (this.isDailyNote(file)) {
                                     dailyNotes.push(file);
                                 } else if (file.path && file.path.toLowerCase().endsWith('.md')) {
@@ -819,9 +827,8 @@ export class PeriodMonthView extends ItemView {
                                 } else {
                                     assets.push(file);
                                 }
-                            });
+                            }.bind(this));
 
-                            // 4. Construct the full data object for the popup.
                             popupData = {
                                 tasks: itemsOnDay,
                                 daily: dailyNotes,
@@ -831,28 +838,32 @@ export class PeriodMonthView extends ItemView {
                             };
 
                         } else {
-                            // This is a FILE heatmap.
-                            const dailyNotes = [];
-                            const createdNotes = [];
-                            const modifiedNotes = [];
-                            const assets = [];
+                            // File heatmap branch (unchanged)
+                            var dailyNotes2 = [];
+                            var createdNotes2 = [];
+                            var modifiedNotes2 = [];
+                            var assets2 = [];
 
-                            itemsOnDay.forEach(file => {
+                            itemsOnDay.forEach(function (file) {
                                 if (this.isDailyNote(file)) {
-                                    dailyNotes.push(file);
+                                    dailyNotes2.push(file);
                                 } else if (file.path && file.path.toLowerCase().endsWith('.md')) {
-                                    createdNotes.push(file);
+                                    createdNotes2.push(file);
                                 } else {
-                                    assets.push(file);
+                                    assets2.push(file);
                                 }
-                            });
+                            }.bind(this));
 
                             popupData = {
-                                daily: dailyNotes,
-                                created: createdNotes,
-                                modified: modifiedNotes,
-                                assets: assets
+                                daily: dailyNotes2,
+                                created: createdNotes2,
+                                modified: modifiedNotes2,
+                                assets: assets2
                             };
+                        }
+
+                        if (widgetKey === 'taskcompletionheatmap') {
+                            popupData.isCompletionHeatmap = true;
                         }
 
                         this.showFilePopup(cell, popupData, cellDate.toDate());
@@ -5169,7 +5180,7 @@ export class PeriodMonthView extends ItemView {
                         const completedMoment = moment(t.done.moment);
                         return completedMoment.isBefore(startDate, 'day');
                     }).length;
-                } 
+                }
             }
 
             // b) Apply date range filtering if not an "All Time" chart
@@ -5639,28 +5650,8 @@ export class PeriodMonthView extends ItemView {
                 }
             }
         });
-        /*
-        header.addEventListener('click', async () => {
-            const isCurrentlyCollapsed = widgetContainer.classList.toggle('collapsed');
-            this.plugin.settings.collapsedWidgets[config.widgetKey] = isCurrentlyCollapsed;
-            await this.plugin.saveSettings();
-
-            if (showChevron) {
-                setIcon(toggleIcon, isCurrentlyCollapsed ? 'chevron-right' : 'chevron-down');
-            }
-            // For KPI widgets, we need to show/hide the correct wrapper
-            if (config.chartType === 'kpi') {
-                const kpiWrapper = widgetContainer.querySelector('.cpwn-pm-kpi-wrapper');
-                if (kpiWrapper) {
-                    kpiWrapper.style.display = isCurrentlyCollapsed ? 'none' : '';
-                }
-            }
-        });
-        */
 
         let chartData = await this.getCustomWidgetData(config, allTasks);
-
-
         const chartArea = contentWrapper.createDiv({ cls: 'cpwn-pm-chart-area' });
         const renderer = new CssChartRenderer(chartArea);
         const legendlessConfig = config.legend;
@@ -6970,7 +6961,7 @@ export class PeriodMonthView extends ItemView {
                         }
                     });
                     const gradient = this.createColorGradient(this.plugin.settings.taskStatusColorCompleted);
-                    await this.populateSingleHeatmapWidget(widgetContainer, "Task completion activity", completionMap, gradient, {}, 'taskcompletionheatmap');
+                    await this.populateSingleHeatmapWidget(widgetContainer, "Task completion activity", completionMap, gradient, { completionMap }, 'taskcompletionheatmap');
                     break;
                 }
                 case 'taskstatusoverview': {
@@ -7150,7 +7141,16 @@ export class PeriodMonthView extends ItemView {
                 return task.due.moment.format('YYYY-MM-DD') === dateKey;
             });
 
-            dataByType.tasks = freshTasks;
+            if (!dataByType.isCompletionHeatmap && dateOrTitle && typeof dateOrTitle !== 'string') {
+                const dateKey = moment(dateOrTitle).format('YYYY-MM-DD');
+
+                const freshTasks = (this.allTasks || []).filter(task => {
+                    if (!task.due?.moment) return false;
+                    return task.due.moment.format('YYYY-MM-DD') === dateKey;
+                });
+
+                dataByType.tasks = freshTasks;
+            }
         }
 
         this.activePopupArgs = { targetEl, dataByType, dateOrTitle, isMobile }; // Store args for the new popup
@@ -7263,8 +7263,6 @@ export class PeriodMonthView extends ItemView {
             itemEl.dataset.taskPath = task.path;
             itemEl.dataset.lineNumber = task.lineNumber;
 
-            // --- Create all items directly inside itemEl in the correct order ---
-
             // 2. Create the Checkbox
             const checkbox = itemEl.createDiv({ cls: 'cpwn-task-checkbox-symbol' });
             await view.renderTaskSymbol(checkbox, task);
@@ -7325,8 +7323,6 @@ export class PeriodMonthView extends ItemView {
             for (const task of dataByType.tasks) {
                 await addTaskToList(contentWrapper, task, this);
             }
-
-
         }
         if (hasTasks && hasFiles) {
             contentWrapper.createDiv({ cls: 'cpwn-popup-separator' });
@@ -7414,12 +7410,9 @@ export class PeriodMonthView extends ItemView {
             this.popupEl.remove();
             this.popupEl = null;
             this.activeHoverCell = null;
-            // this.taskRefreshDebounceTimer = null;
-            //this.dashboardRefreshDebounceTimer = null;
+
             this.taskCache = new Map();
         }
-
-
     }
 
     // Updates the month title element with the currently displayed month.
@@ -7828,7 +7821,6 @@ export class PeriodMonthView extends ItemView {
             });
         }
 
-
         if (searchTerm) {
 
             const searchTerm = this.tasksSearchTerm.toLowerCase();
@@ -7837,12 +7829,6 @@ export class PeriodMonthView extends ItemView {
                 searchTerm === "" ? true : this.searchMatches(task.description.toLowerCase(), parsedGroups)
             );
 
-
-
-            /*filteredTasks = this.allTasks.filter(task =>
-                task.description.toLowerCase().includes(searchTerm)
-            );
-            */
         } else {
 
             if (settings.hideCompletedTasks) {
@@ -8025,18 +8011,9 @@ export class PeriodMonthView extends ItemView {
         taskRow.dataset.key = this.getTaskKey(task);
         taskRow.dataset.taskStatus = task.status.type;
 
-        // Add flexbox for proper alignment
-        //taskRow.style.display = 'flex';
-        //taskRow.style.alignItems = 'flex-start'; // Aligns checkbox with first line of text
-        //taskRow.style.gap = '10px'; // Space between checkbox and text
         taskRow.classList.add('cpwn-task-row');
 
-
         const checkbox = taskRow.createDiv({ cls: 'cpwn-task-checkbox-symbol' });
-
-        //checkbox.style.flexShrink = '0'; // Prevent checkbox from shrinking
-        //checkbox.style.marginLeft = '-4px';
-        //checkbox.style.marginTop = '4px';
         checkbox.classList.add('cpwn-task-checkbox-symbol');
 
         this.renderTaskSymbol(checkbox, task);
@@ -8046,8 +8023,6 @@ export class PeriodMonthView extends ItemView {
         });
 
         const textEl = taskRow.createSpan({ cls: 'cpwn-task-text' });
-        //textEl.style.flex = '1'; // Text takes remaining space
-        //textEl.style.minWidth = '0'; // Allows proper text wrapping
         textEl.classList.add('cpwn-task-text');
         if (task.status.type === 'DONE') {
             textEl.classList.add('completed');
@@ -8071,8 +8046,6 @@ export class PeriodMonthView extends ItemView {
 
         return taskRow;
     }
-
-
 
     // Updates an existing task row in the DOM.
     updateTaskItem(taskRowEl, task) {

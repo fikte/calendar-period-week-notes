@@ -12,12 +12,13 @@
   "author": "Tim Williams",
   "license": "MIT",
   "devDependencies": {
-    "@rollup/plugin-commonjs": "^28.0.6",
+    "@rollup/plugin-commonjs": "^28.0.9",
     "@rollup/plugin-json": "^6.1.0",
-    "@rollup/plugin-node-resolve": "^16.0.2",
-    "rollup": "^4.52.4"
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "rollup": "^4.53.3"
   },
   "dependencies": {
-    "ical.js": "^2.2.1"
+    "ical.js": "^2.2.1",
+    "moment": "^2.30.1"
   }
 }

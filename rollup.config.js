@@ -10,12 +10,12 @@ export default {
     format: 'cjs',
     exports: 'default',
   },
-  external: ['obsidian'],
+  external: ['obsidian', 'moment'],
   plugins: [
     nodeResolve({
-      browser: true,
+      browser: true,  preferBuiltins: false
     }),
     commonjs(),
-    json(),
-  ],
+    json()
+  ]
 };
