@@ -17,9 +17,14 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+ calendar-period-week-notes.code-workspace
+
+#Local Scripts
+deploy-to-obsidian.sh
 
 # Obsidian
 .obsidian/workspace.json
 .obsidian/workspace-mobile.json
 .obsidian/workspace-backup*
 .obsidian/cache/
+data.json
