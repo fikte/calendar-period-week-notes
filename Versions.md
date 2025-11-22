@@ -1,5 +1,8 @@
 # Version Change History 
 
+v1.5.0
+- Major new feature: Set your own goals for Tasks, Note creation, (e.g. Daily Note / Journal) and Words written. Track the goals daily with 15 achievement levels including seeing how you've progressed over the last 7 days. Pause goals when you're on vacation. For this new feature and for all task features, Calendar Period Week Notes plugin requires the Tasks plugin to be installed with every task having a creation, due and completion date. 
+
 v1.4.0
 - Major new feature: Custom task chart widgets. Create your own custom task widget charts to be displayed on the task dashboard: radar, line, bar, pie and kpi stats.
 - This version requires the Tasks plugin to be enabled in your Obsidian client to make use of the tasks tab and task dashboard views. For the best experience also each task to have a created date, due date and completed date for every task.
