@@ -1,5 +1,5 @@
 // src/utils/dateUtils.js
-import moment from 'moment';
+import { moment } from 'obsidian';
 
 /**
  * Calculates the custom period and week number based on a given start date.

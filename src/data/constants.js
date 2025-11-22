@@ -3,13 +3,17 @@ export const VIEW_TYPE_PERIOD = "calendar-period-week";
 
 export const DASHBOARDWIDGETS = {
     tasks: {
+        weeklyGoalPoints: { name: 'Weekly points score (Full)' },
+        goalStatusList: { name: 'Daily goals (Full)' },
+        goalStatusListCondensed: { name: 'Daily goals (Half-width)', default: false },
+        weeklyGoalPointsCondensed: { name: 'Weekly momentum (Half-width)', default: false },
         today: { name: 'Today' },
         tomorrow: { name: 'Tomorrow' },
         next7days: { name: 'Next 7 days' },
         futureNoDue: { name: 'Future / No due' },
         upcomingoverdue: { name: 'Upcoming & overdue tasks' },
         taskstatusoverview: { name: 'Task status overview' },
-        taskcompletionheatmap: { name: 'Task completion activity' }
+        taskcompletionheatmap: { name: 'Task completion activity' },
     },
     creation: {
         allfilesheatmap: { name: 'All files' },
@@ -253,7 +257,8 @@ export const DEFAULT_SETTINGS = {
         regularnotesheatmap: true,
         assetsheatmap: true,
     },
-    tasksDashboardOrder: ['today', 'tomorrow', 'next7days', 'futureNoDue', 'upcomingoverdue', 'taskstatusoverview', 'taskcompletionheatmap'],
+
+    tasksDashboardOrder: ['Today\'s goals', 'Weekly points score', 'today', 'tomorrow', 'next7days', 'futureNoDue', 'upcomingoverdue', 'taskstatusoverview', 'taskcompletionheatmap'],
     tasksDashboardWidgets: {
         today: true,
         tomorrow: true,
@@ -269,9 +274,38 @@ export const DEFAULT_SETTINGS = {
     isHeatmapGuideCollapsed: true,
     heatmapLinkConfig: {},
     heatmapTotalClickOpenAction: 'new-tab',
-    customHeatmaps: [],
+    goals: [
+        {
+            id: 'core-daily-note',
+            name: 'Daily note created',
+            type: 'note-created',
+            target: 1,
+            points: 60,
+            core: true,
+            enabled: true
+        },
+        {
+            id: 'core-words-written',
+            name: 'Words written',
+            type: 'word-count',
+            target: 200,
+            points: 24,
+            core: true,
+            enabled: true
+        },
+        {
+            id: 'core-tasks-completed',
+            name: 'Tasks completed',
+            type: 'task-count',
+            target: 1,
+            points: 30,
+            core: true,
+            enabled: true
+        }
+    ],
+    goalScoreHistory: {},
+    vacationHistory: {},
 
-    // In your DEFAULT_SETTINGS
     tasksStatsWidgets: [
         {
             "widgetKey": "custom-completed-line-30d",

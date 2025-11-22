@@ -10,10 +10,13 @@ export class TagSuggest extends AbstractInputSuggest {
         this.inputEl = inputEl;
         this.view = view;
         this.allTags = new Set();
+
+        this.refreshAllTags(); 
+
     }
 
     getSuggestions(query) {
-        this.refreshAllTags();
+        //this.refreshAllTags();
 
         // If the query is empty, show all tags, sorted alphabetically.
         if (!query) {

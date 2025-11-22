@@ -1,7 +1,4 @@
-/* --cpwn-- Obsidian Plugin: Periodic Notes Calendar View --cpwn--
-  Developer: Tim Williams
-  This plugin uses library: https://app.unpkg.com/ical.js@2.2.1/files/dist/ical.es5.min.cjs (c) 2024 Chris Lawley, MIT License  
-*/
+/* -- Obsidian Plugin: Calendar Periodic Week Notes -- */
 
 import { Plugin, debounce } from 'obsidian';
 import { PeriodMonthView, VIEW_TYPE_PERIOD } from './views/PeriodMonthView.js';
@@ -21,6 +18,50 @@ export default class PeriodMonthPlugin extends Plugin {
     async onload() {
 
         this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+
+        const CORE_GOALS = [
+            {
+                id: 'core-daily-note',
+                name: 'Daily note created',
+                type: 'note-created',
+                target: 1,
+                points: 60,
+                core: true,
+                enabled: true
+            },
+            {
+                id: 'core-words-written',
+                name: 'Words written',
+                type: 'word-count',
+                target: 200,
+                points: 24,
+                core: true,
+                enabled: true
+            },
+            {
+                id: 'core-tasks-completed',
+                name: 'Tasks completed',
+                type: 'task-count',
+                target: 2,
+                points: 60,
+                core: true,
+                enabled: true
+            }
+        ];
+
+        // Make sure the goals property exists
+        if (!this.settings.goals || this.settings.goals.length === 0) {
+             this.settings.goals = [...CORE_GOALS];
+        }
+
+        // Always check and inject missing core goals before showing UI
+        CORE_GOALS.forEach(coreGoal => {
+            const found = this.settings.goals.some(g => g.id === coreGoal.id && g.core);
+            if (!found) {
+                this.settings.goals.unshift({ ...coreGoal });
+            }
+        });
+
         this.updateStyles();
         this.registerView(VIEW_TYPE_PERIOD, leaf => new PeriodMonthView(leaf, this));
         this.addRibbonIcon("calendar-check", "Open Calendar Period Week Notes", () => this.activateView());
@@ -55,16 +96,6 @@ export default class PeriodMonthPlugin extends Plugin {
 
     async saveSettings() {
         await this.saveData(this.settings);
-    }
-
-    /**
-     * Injects the plugin's CSS into the document head.
-     */
-    addStyle() {
-        const styleEl = document.createElement('style');
-        styleEl.id = 'cpwn-period-month-plugin-styles';
-        styleEl.textContent = PLUGIN_STYLES;
-        document.head.appendChild(styleEl);
     }
 
     /**
@@ -192,7 +223,7 @@ export default class PeriodMonthPlugin extends Plugin {
     }
 
     async loadTemplates() {
-        
+
         return Promise.resolve(BUNDLED_TEMPLATES);
 
     }

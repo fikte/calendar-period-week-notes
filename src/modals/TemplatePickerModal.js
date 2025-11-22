@@ -95,7 +95,7 @@ export class TemplatePickerModal extends Modal {
         ctx.clearRect(0, 0, width, height); // Clear canvas before drawing
 
         ctx.font = "48px sans-serif";             // Font size and family
-        ctx.fillStyle = template.previewData.datasets[0].color || "#4caf50";;                    // Text color (KPI color if you wish)
+        ctx.fillStyle = template.previewData.datasets[0].color || "#4caf50";                   
         ctx.textAlign = "center";                 // Center horizontally
         ctx.textBaseline = "middle";              // Center vertically
 

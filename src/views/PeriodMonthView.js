@@ -33,12 +33,13 @@ import {
 
 // Widgets
 import { CssChartRenderer } from '../widgets/CssChartRenderer.js';
-import { TaskDataAggregator } from '../widgets/TaskDataAggregator.js';
 
 // Modals
 import { ActionChoiceModal } from '../modals/ActionChoiceModal.js';
 import { ConfirmationModal } from '../modals/ConfirmationModal.js';
 import { FilterSuggest, TagSuggest } from '../utils/suggesters.js';
+import { GoalDataAggregator } from '../widgets/GoalDataAggregator';
+import { GoalTracker } from "../logic/GoalTracker.js";
 
 export { VIEW_TYPE_PERIOD };
 
@@ -63,13 +64,7 @@ export class PeriodMonthView extends ItemView {
         this.fileToHeatmapCache = new Map();
         this.statusBarObserver = null;
         this.heatmapRefreshDebounceTimer = null;
-
-        //pull down to fresh
-        this.taskPullStartY = 0;
-        this.taskPullDistance = 0;
-        this.isTaskPulling = false;
         this.lastTasksDashboardState = ''; // Used to detect changes in tasks for heatmap refreshes.
-
 
         this.mobileBlurTimeout = null;
         this.activeEditingTimeout = null;
@@ -2601,10 +2596,7 @@ export class PeriodMonthView extends ItemView {
                     this.refreshUI({ updateType: 'creation', file });
                 }, 200);
             }
-        }));
-
-
-
+        }))
 
         // Handles CREATING a new file
         this.registerEvent(this.app.vault.on("create", (file) => {
@@ -2713,59 +2705,7 @@ export class PeriodMonthView extends ItemView {
                 // This re-uses the same helper function from the swipe fix.
                 this.blurActiveInput();
             }
-        }, true); // 'true' enables the capture phase, which is crucial for reliability.
-
-
-        const PULL_THRESHOLD = 70; // How far the user needs to pull down to trigger a refresh
-
-        const resetPullStyles = () => {
-            this.taskRefreshIndicator.removeClass('is-ready', 'is-pulling', 'is-refreshing');
-
-            this.tasksContentEl.classList.add('cpwn-pull-indicator');
-            this.tasksContentEl.style.setProperty('--pull-transform', 'translateY(0px)');
-            this.tasksContentEl.style.setProperty('--pull-transform', 'translateY(-50px) scale(0.7)');
-
-            setIcon(this.taskRefreshIndicator, 'arrow-down');
-        };
-
-        this.registerDomEvent(this.tasksContentEl, 'touchstart', (e) => {
-            if (this.tasksContentEl.scrollTop === 0) {
-                this.isTaskPulling = true;
-                this.taskPullStartY = e.touches[0].clientY;
-            }
-        }, { passive: false });
-
-        this.registerDomEvent(this.tasksContentEl, 'touchmove', (e) => {
-            if (!this.isTaskPulling) return;
-
-            const currentY = e.touches[0].clientY;
-            // We only care about the downward pull distance from the start
-            this.taskPullDistance = Math.max(0, currentY - this.taskPullStartY);
-
-            // Only interfere if the list is scrolled to the top AND the user is pulling down.
-            if (this.tasksContentEl.scrollTop === 0 && this.taskPullDistance > 0) {
-                // Prevent the browser from scrolling the page
-                e.preventDefault();
-
-                const pullRatio = Math.min(this.taskPullDistance, PULL_THRESHOLD);
-                this.tasksContentEl.style.transform = `translateY(${pullRatio}px)`;
-
-                this.taskRefreshIndicator.addClass('is-pulling');
-                this.taskRefreshIndicator.style.transform = `translateY(${pullRatio - 50}px) scale(0.7)`;
-
-                if (this.taskPullDistance > PULL_THRESHOLD) {
-                    this.taskRefreshIndicator.addClass('is-ready');
-                    setIcon(this.taskRefreshIndicator, 'check');
-                } else {
-                    this.taskRefreshIndicator.removeClass('is-ready');
-                    setIcon(this.taskRefreshIndicator, 'arrow-down');
-                }
-            } else {
-                // If we've started scrolling down the list, stop tracking the pull
-                this.isTaskPulling = false;
-            }
-
-        }, { passive: false });
+        }, true) // 'true' enables the capture phase, which is crucial for reliability.
 
         this.app.workspace.onLayoutReady(() => {
             const statusBar = document.querySelector('.status-bar');
@@ -2777,34 +2717,7 @@ export class PeriodMonthView extends ItemView {
                 this.statusBarObserver.observe(statusBar);
                 this.updateDynamicPadding(); // Run once on initial load
             }
-        });
-
-        this.registerDomEvent(this.tasksContentEl, 'touchend', async (e) => {
-            if (!this.isTaskPulling) return;
-            this.isTaskPulling = false;
-
-            if (this.taskPullDistance > PULL_THRESHOLD) {
-
-                this.blurActiveInput();
-                // Trigger the refresh
-                this.taskRefreshIndicator.addClass('is-refreshing', 'is-ready');
-                setIcon(this.taskRefreshIndicator, 'loader');
-
-                await this.populateTasks();
-
-                // Reset styles after refresh is complete
-                window.setTimeout(() => {
-                    resetPullStyles();
-                }, 300); // Small delay for user to see the end of the spin
-
-            } else {
-                // Snap back if not pulled far enough
-                resetPullStyles();
-            }
-
-            this.taskPullDistance = 0;
-
-        });
+        })
         this.scheduleDailyRefresh();
     }
 
@@ -6964,6 +6877,1140 @@ export class PeriodMonthView extends ItemView {
                     await this.populateSingleHeatmapWidget(widgetContainer, "Task completion activity", completionMap, gradient, { completionMap }, 'taskcompletionheatmap');
                     break;
                 }
+
+                case 'goalStatusListCondensed': {
+                    // 1. Create Container (Medium/Half-Width)
+                    const widgetContainer = widgetGrid.createDiv({
+                        cls: 'cpwn-pm-widget-container cpwn-pm-widget-small'
+                    });
+
+                    // 2. Determine Settings
+                    const showTitle = typeof this.plugin.settings.showTaskWidgetTitles === 'boolean' ? this.plugin.settings.showTaskWidgetTitles : true;
+                    const showChevron = typeof this.plugin.settings.showTaskWidgetChevrons === 'boolean' ? this.plugin.settings.showTaskWidgetChevrons : true;
+
+                    // 3. Check Collapsed State
+                    if (!this.plugin.settings.collapsedWidgets) this.plugin.settings.collapsedWidgets = {};
+                    const isCollapsed = this.plugin.settings.collapsedWidgets[widgetKey] || false;
+                    if (isCollapsed) widgetContainer.addClass('collapsed');
+
+                    // 4. Render Header
+                    const header = widgetContainer.createDiv({ cls: 'cpwn-pm-widget-header' });
+                    const headerTitle = header.createDiv({ cls: 'cpwn-pm-widget-header-title' });
+
+                    let toggleIcon = null;
+                    if (showChevron) {
+                        toggleIcon = headerTitle.createDiv({ cls: 'cpwn-widget-toggle-icon' });
+                        setIcon(toggleIcon, isCollapsed ? 'chevron-right' : 'chevron-down');
+                    }
+
+                    if (showTitle) {
+                        header.createDiv({ cls: 'cpwn-widget-title' }).setText('Daily goals');
+                    }
+
+                    // 5. Toggle Logic
+                    header.addEventListener('click', async () => {
+                        const currentlyCollapsed = widgetContainer.classList.toggle('collapsed');
+                        this.plugin.settings.collapsedWidgets[widgetKey] = currentlyCollapsed;
+                        await this.plugin.saveSettings();
+                        if (showChevron && toggleIcon) setIcon(toggleIcon, currentlyCollapsed ? 'chevron-right' : 'chevron-down');
+                    });
+
+                    // 6. Render Content
+                    const contentWrapper = widgetContainer.createDiv({ cls: 'cpwn-widget-content' });
+
+                    // --- DATA FETCHING ---
+                    const goals = await GoalDataAggregator.getTodaysGoals(this.app, this.plugin.settings, this.allTasks);
+                    const historySettings = { ...this.plugin.settings, vacationModeGlobal: false };
+                    const rawHistory = await GoalDataAggregator.getPointsHistory(this.app, historySettings, this.allTasks);
+                    
+                    let calculatedTotal = 0;
+                    if (Array.isArray(rawHistory)) {
+                        calculatedTotal = rawHistory.reduce((acc, day) => acc + (day.totalPoints || 0), 0);
+                    } else if (rawHistory && rawHistory.datasets && rawHistory.datasets[0]) {
+                         calculatedTotal = rawHistory.datasets[0].data.reduce((acc, val) => acc + (Number(val) || 0), 0);
+                    }
+                    const totalPoints = calculatedTotal;
+
+                    // --- LEVEL CALCULATION ---
+                    const trackerForLevels = new GoalTracker(this.app, this.plugin.settings);
+                    const lifetimeTargetRaw = trackerForLevels.getLifetimeTargetPoints && trackerForLevels.getLifetimeTargetPoints();
+                    const effectiveTarget = lifetimeTargetRaw && lifetimeTargetRaw > 0 ? lifetimeTargetRaw : 300000;
+                    
+                    const LEVEL_BANDS = [
+                        { frac: 1.0, title: 'Grandmaster of Flow', icon: 'infinity' },
+                        { frac: 0.9, title: 'Legendary Leader', icon: 'crown' },
+                        { frac: 0.8, title: 'Relentless Result', icon: 'trophy' },
+                        { frac: 0.7, title: 'Task Titan', icon: 'medal' },
+                        { frac: 0.6, title: 'Output Overlord', icon: 'award' },
+                        { frac: 0.5, title: 'High Performer', icon: 'star' },
+                        { frac: 0.4, title: 'Productivity Pro', icon: 'zap' },
+                        { frac: 0.3, title: 'Goal Getter', icon: 'target' },
+                        { frac: 0.22, title: 'Focused Ninja', icon: 'crosshair' },
+                        { frac: 0.16, title: 'Efficiency Enthusiast', icon: 'gauge' },
+                        { frac: 0.10, title: 'Daily Driver', icon: 'calendar-check' },
+                        { frac: 0.06, title: 'Momentum Maker', icon: 'trending-up' },
+                        { frac: 0.03, title: 'Task Tinkerer', icon: 'check-circle-2' },
+                        { frac: 0.01, title: 'Routine Rookie', icon: 'clipboard-list' },
+                        { frac: 0.0, title: 'Starter Spark', icon: 'sprout' }
+                    ];
+
+                    const levelsDesc = LEVEL_BANDS.map((band, idx) => ({
+                                min: Math.round(band.frac * effectiveTarget),
+                                title: band.title,
+                                icon: band.icon,
+                                level: LEVEL_BANDS.length - idx
+                            })).sort((a, b) => b.min - a.min);
+
+                    const currentLevel = levelsDesc.find(l => Number(totalPoints) >= l.min) || levelsDesc[levelsDesc.length - 1];
+                    const currentIndex = levelsDesc.indexOf(currentLevel);
+                    const nextLevel = currentIndex > 0 ? levelsDesc[currentIndex - 1] : { min: currentLevel.min * 1.5, title: 'Max Level' };
+                    const percentage = Math.min(100, Math.max(0, ((totalPoints - currentLevel.min) / (nextLevel.min - currentLevel.min)) * 100));
+
+                    // --- GENERATE PROJECTION TEXT & HEADLINE (Required for Tooltip) ---
+                    let projectionText = '';
+                    {
+                        let dailyAverage = 0;
+                        if (Array.isArray(rawHistory) && rawHistory.length > 0) {
+                            const recent = rawHistory.slice(-7);
+                            const sum = recent.reduce((acc, d) => acc + (d.totalPoints||0), 0);
+                            dailyAverage = sum / (recent.length || 1);
+                        } else if (rawHistory && rawHistory.datasets && rawHistory.datasets[0]) {
+                             // Quick check for chart data format too
+                             const d = rawHistory.datasets[0].data || [];
+                             if (d.length >= 2) {
+                                 // Basic diff logic if needed, or just take the last value if cumulative
+                                 // Assuming simple average for now to match logic
+                                 dailyAverage = Number(d[d.length-1]) || 0; 
+                             }
+                        }
+                        
+                        const pointsRemaining = Math.max(0, nextLevel.min - totalPoints);
+                        if (dailyAverage > 0) {
+                            const daysToNext = Math.ceil(pointsRemaining / dailyAverage);
+                            const projectedDate = moment().add(daysToNext, 'days').format('MMM Do');
+                            const avgRounded = Math.round(dailyAverage);
+                            
+                            let headline;
+                            if (avgRounded < 75) {
+                                headline = `Nice and steady. Averaging ~${avgRounded} pts/day.`;
+                            } else if (avgRounded < 175) {
+                                headline = `Good momentum! Averaging ~${avgRounded} pts/day.`;
+                            } else if (avgRounded < 275) {
+                                headline = `You're on fire! Averaging ~${avgRounded} pts/day.`;
+                            } else {
+                                headline = `Absolutely crushing it at ~${avgRounded} pts/day.`;
+                            }
+                            
+                            const paceLine = projectedDate ? `At this pace, you'll level up on ${projectedDate}.` : `Keep going—every day moves you closer.`;
+                            const distanceLine = pointsRemaining > 0 ? `You're only ${pointsRemaining.toLocaleString()} points away!` : `You've already reached this tier—enjoy the win!`;
+
+                            projectionText = 
+                               `Current: ${totalPoints.toLocaleString()} pts\n` +
+                               `Next: ${nextLevel.title} (${nextLevel.min.toLocaleString()} pts)\n\n` +
+                               `${headline}\n` +
+                               `${paceLine}\n` +
+                               `${distanceLine}`;
+                        } else {
+                            projectionText = `Current: ${totalPoints.toLocaleString()} pts\nNext: ${nextLevel.title}\n\nComplete some tasks to see your estimated level-up date!`;
+                        }
+                    }
+
+                    // --- RENDER CONDENSED LAYOUT ---
+                    const splitContainer = contentWrapper.createDiv({ cls: 'cpwn-goal-split-container condensed' });
+
+                    // Left Summary
+                    const listEl = splitContainer.createDiv({ cls: 'cpwn-goal-list-left' });
+
+                    if (this.plugin.settings.vacationModeGlobal) {
+                         // Show Vacation Icon
+                        const iconContainer = listEl.createDiv({
+                            cls: 'cpwn-summary-icon-rest' // Reuse the same large icon class
+                        });
+                        setIcon(iconContainer, 'plane'); // Palm tree icon
+
+                        listEl.createDiv({
+                            cls: 'cpwn-summary-sub',
+                            text: 'On Vacation'
+                        });
+                    } else {
+                        // 1. Analyze Active vs Off goals
+                        const totalGoals = goals.length;
+                        const offGoalsCount = goals.filter(g => !g.isActiveToday).length;
+                        const activeGoalsCount = totalGoals - offGoalsCount;
+                        
+                                            // LEFT: Summary Text
+                    const listEl = splitContainer.createDiv({ cls: 'cpwn-goal-list-left' });
+
+                    if (this.plugin.settings.vacationModeGlobal) {
+                        // Show Vacation Icon
+                        const iconContainer = listEl.createDiv({
+                            cls: 'cpwn-summary-icon-rest' // Reuse the same large icon class
+                        });
+                        setIcon(iconContainer, 'tree-plam'); // Palm tree icon
+
+                        listEl.createDiv({
+                            cls: 'cpwn-summary-sub',
+                            text: 'On Vacation'
+                        });
+                    } else {
+                        const totalGoals = goals.length;
+                        const offGoalsCount = goals.filter(g => !g.isActiveToday).length;
+                        const metCount = goals.filter(g => g.isActiveToday && g.isMet).length;
+
+                        if (offGoalsCount === totalGoals && totalGoals > 0) {
+                            // CASE A: Rest Day (All Off) -> Show Coffee Icon
+                            const iconContainer = listEl.createDiv({
+                                cls: 'cpwn-summary-icon-rest'
+                            });
+                            setIcon(iconContainer, 'coffee'); // Uses the standard Obsidian 'coffee' icon
+
+                            listEl.createDiv({
+                                cls: 'cpwn-summary-sub',
+                                text: 'All goals off'
+                            });
+
+                        } else {
+                            // CASE B: Normal Counting
+                            listEl.createDiv({
+                                cls: 'cpwn-summary-large',
+                                text: `${metCount}/${totalGoals}`
+                            });
+                            
+                            // Dynamic Subtext
+                            let subText = 'goals met';
+                            if (offGoalsCount > 0) {
+                                subText = `${offGoalsCount} off today`;
+                            }
+                            
+                            listEl.createDiv({
+                                cls: 'cpwn-summary-sub',
+                                text: subText
+                            });
+                        }
+                    }
+
+                    }
+
+                    // Right Ring
+                    const levelCol = splitContainer.createDiv({ cls: 'cpwn-goal-level-right' });
+                    const size = 60;
+                    const stroke = 4;
+                    const r = (size - stroke) / 2;
+                    const circ = 2 * Math.PI * r;
+                    const offset = circ - (percentage / 100) * circ;
+
+                    const svgWrapper = levelCol.createDiv({ cls: 'cpwn-level-circle-wrapper' });
+                    const svgNs = 'http://www.w3.org/2000/svg';
+                    const svgEl = document.createElementNS(svgNs, 'svg');
+                    svgEl.setAttribute('width', String(size));
+                    svgEl.setAttribute('height', String(size));
+                    svgEl.style.transform = 'rotate(-90deg)';
+                    
+                    const bgCircle = document.createElementNS(svgNs, 'circle');
+                    bgCircle.setAttribute('cx', String(size/2)); bgCircle.setAttribute('cy', String(size/2)); bgCircle.setAttribute('r', String(r));
+                    bgCircle.setAttribute('stroke', 'var(--background-modifier-border)'); bgCircle.setAttribute('stroke-width', String(stroke)); bgCircle.setAttribute('fill', 'none');
+                    svgEl.appendChild(bgCircle);
+
+                    const progCircle = document.createElementNS(svgNs, 'circle');
+                    progCircle.setAttribute('cx', String(size/2)); progCircle.setAttribute('cy', String(size/2)); progCircle.setAttribute('r', String(r));
+                    progCircle.setAttribute('stroke', 'var(--text-accent)'); progCircle.setAttribute('stroke-width', String(stroke)); progCircle.setAttribute('fill', 'none');
+                    progCircle.style.strokeDasharray = `${circ}`; progCircle.style.strokeDashoffset = `${offset}`;
+                    svgEl.appendChild(progCircle);
+                    svgWrapper.appendChild(svgEl);
+
+                    const iconInner = svgWrapper.createDiv({ cls: 'cpwn-level-icon-inner' });
+                    setIcon(iconInner, currentLevel.icon || 'sprout');
+                    levelCol.createDiv({ text: currentLevel.title, cls: 'cpwn-level-title-text' });
+
+                    // --- FULL TOOLTIP LOGIC (With Mini-Ring and Styling) ---
+                    let goalTooltipEl = null;
+
+                    const buildTooltipContent = () => {
+                        // CLEANUP
+                        document.querySelectorAll('.cpwn-goal-tooltip').forEach(el => el.remove());
+
+                        if (!goalTooltipEl) {
+                            goalTooltipEl = document.body.createDiv({ cls: 'cpwn-goal-tooltip' });
+                        }
+                        goalTooltipEl.empty();
+
+                        const header = goalTooltipEl.createDiv({ cls: 'cpwn-goal-tooltip-header' });
+
+                        // Mini Ring in Tooltip
+                        const ringWrapper = header.createDiv({ cls: 'cpwn-goal-tooltip-ring-wrapper' });
+                        const miniSize = 28; const miniStroke = 3;
+                        const miniR = (miniSize - miniStroke) / 2;
+                        const miniCirc = 2 * Math.PI * miniR;
+                        const miniOffset = miniCirc - (percentage / 100) * miniCirc;
+
+                        const miniSvg = document.createElementNS(svgNs, 'svg');
+                        miniSvg.setAttribute('width', String(miniSize)); miniSvg.setAttribute('height', String(miniSize));
+                        miniSvg.style.transform = 'rotate(-90deg)';
+
+                        const miniBg = document.createElementNS(svgNs, 'circle');
+                        miniBg.setAttribute('cx', String(miniSize/2)); miniBg.setAttribute('cy', String(miniSize/2));
+                        miniBg.setAttribute('r', String(miniR)); miniBg.setAttribute('stroke', 'var(--background-modifier-border)');
+                        miniBg.setAttribute('stroke-width', String(miniStroke)); miniBg.setAttribute('fill', 'var(--background-primary)');
+                        miniSvg.appendChild(miniBg);
+
+                        const miniProg = document.createElementNS(svgNs, 'circle');
+                        miniProg.setAttribute('cx', String(miniSize/2)); miniProg.setAttribute('cy', String(miniSize/2));
+                        miniProg.setAttribute('r', String(miniR)); miniProg.setAttribute('stroke', 'var(--text-accent)');
+                        miniProg.setAttribute('stroke-width', String(miniStroke)); miniProg.setAttribute('fill', 'none');
+                        miniProg.style.strokeDasharray = `${miniCirc}`; miniProg.style.strokeDashoffset = `${miniOffset}`;
+                        miniSvg.appendChild(miniProg);
+                        ringWrapper.appendChild(miniSvg);
+
+                        const ringIcon = ringWrapper.createDiv({ cls: 'cpwn-goal-tooltip-ring-icon' });
+                        setIcon(ringIcon, currentLevel.icon || 'sprout');
+
+                        header.createDiv({ cls: 'cpwn-goal-tooltip-title', text: currentLevel.title });
+
+                        const body = goalTooltipEl.createDiv({ cls: 'cpwn-goal-tooltip-body' });
+                        
+                        // Render full projection text lines
+                        projectionText.split('\n').forEach(line => {
+                            const trimmed = line.trim();
+                            if (!trimmed) {
+                                body.createDiv({ cls: 'cpwn-goal-tooltip-spacer' });
+                                return;
+                            }
+                            if (trimmed.startsWith('At this pace')) {
+                                body.createDiv({ cls: 'cpwn-goal-tooltip-spacer-large' });
+                            }
+                            
+                            const isEmphasis = trimmed.startsWith('Current:') || trimmed.startsWith('Next:') || trimmed.startsWith('Nice and steady') || trimmed.startsWith('Good momentum') || trimmed.startsWith("You're on fire") || trimmed.startsWith('Absolutely crushing');
+                            
+                            body.createDiv({
+                                cls: isEmphasis ? 'cpwn-goal-tooltip-line-strong' : 'cpwn-goal-tooltip-line',
+                                text: trimmed
+                            });
+                        });
+                    };
+
+                    const positionTooltip = (evt) => {
+                        if (!goalTooltipEl) return;
+                        const padding = 12;
+                        let x = evt.clientX + padding;
+                        let y = evt.clientY + padding;
+                        
+                        // Measure tooltip
+                        const rect = goalTooltipEl.getBoundingClientRect();
+                        if (x + rect.width + padding > window.innerWidth) x = evt.clientX - rect.width - padding;
+                        if (y + rect.height + padding > window.innerHeight) y = evt.clientY - rect.height - padding;
+                        
+                        goalTooltipEl.style.left = `${x}px`;
+                        goalTooltipEl.style.top = `${y}px`;
+                    };
+
+                    svgWrapper.addEventListener('mouseenter', (evt) => {
+                        buildTooltipContent();
+                        requestAnimationFrame(() => {
+                            if (!goalTooltipEl) return;
+                            goalTooltipEl.style.opacity = '1';
+                            goalTooltipEl.style.pointerEvents = 'none';
+                            positionTooltip(evt);
+                        });
+                    });
+
+                    svgWrapper.addEventListener('mousemove', (evt) => {
+                        positionTooltip(evt);
+                    });
+
+                    svgWrapper.addEventListener('mouseleave', () => {
+                        if (goalTooltipEl) {
+                            goalTooltipEl.style.opacity = '0';
+                            goalTooltipEl.remove();
+                            goalTooltipEl = null;
+                        }
+                    });
+
+                    break;
+                }
+
+
+            
+                case 'weeklyGoalPointsCondensed': {
+                    // 1. Create Container (Medium/Half-Width)
+                    const widgetContainer = widgetGrid.createDiv({
+                        cls: 'cpwn-pm-widget-container cpwn-pm-widget-small'
+                    });
+
+                    // 2. Determine Settings
+                    const showTitle =
+                        typeof this.plugin.settings.showTaskWidgetTitles === 'boolean'
+                            ? this.plugin.settings.showTaskWidgetTitles
+                            : true;
+                    const showChevron =
+                        typeof this.plugin.settings.showTaskWidgetChevrons === 'boolean'
+                            ? this.plugin.settings.showTaskWidgetChevrons
+                            : true;
+
+                    // 3. Check Collapsed State
+                    if (!this.plugin.settings.collapsedWidgets) {
+                        this.plugin.settings.collapsedWidgets = {};
+                    }
+                    const isCollapsed = this.plugin.settings.collapsedWidgets[widgetKey] || false;
+                    if (isCollapsed) widgetContainer.addClass('collapsed');
+
+                    // 4. Render Header
+                    const header = widgetContainer.createDiv({ cls: 'cpwn-pm-widget-header' });
+                    const headerTitle = header.createDiv({ cls: 'cpwn-pm-widget-header-title' });
+
+                    let toggleIcon = null;
+                    if (showChevron) {
+                        toggleIcon = headerTitle.createDiv({ cls: 'cpwn-widget-toggle-icon' });
+                        setIcon(toggleIcon, isCollapsed ? 'chevron-right' : 'chevron-down');
+                    }
+
+                    if (showTitle) {
+                        header.createDiv({ cls: 'cpwn-widget-title' }).setText('Weekly momentum');
+                    }
+
+                    // 5. Toggle Logic
+                    header.addEventListener('click', async () => {
+                        const currentlyCollapsed = widgetContainer.classList.toggle('collapsed');
+                        this.plugin.settings.collapsedWidgets[widgetKey] = currentlyCollapsed;
+                        await this.plugin.saveSettings();
+                        if (showChevron && toggleIcon) {
+                            setIcon(toggleIcon, currentlyCollapsed ? 'chevron-right' : 'chevron-down');
+                        }
+                    });
+
+                    // 6. Render Content
+                    const contentWrapper = widgetContainer.createDiv({
+                        cls: 'cpwn-widget-content'
+                    });
+
+                    // --- DATA FETCHING LOGIC (Identical to full widget) ---
+                    const beforeCount =
+                        Object.keys(this.plugin.settings.goalScoreHistory || {}).length;
+
+                    // FIX: Force vacation mode OFF for history retrieval
+                    const historySettings = { ...this.plugin.settings, vacationModeGlobal: false };
+
+                    const fullHistory = await GoalDataAggregator.getPointsHistory(
+                        this.app,
+                        historySettings,
+                        this.allTasks
+                    );
+
+                    const afterCount =
+                        Object.keys(this.plugin.settings.goalScoreHistory || {}).length;
+                    if (afterCount > beforeCount) {
+                        await this.plugin.saveSettings();
+                    }
+
+                    let lifetimeTotal = 0;
+                    if (Array.isArray(fullHistory)) {
+                        lifetimeTotal = fullHistory.reduce(
+                            (acc, day) => acc + (day.totalPoints || 0),
+                            0
+                        );
+                    } else if (
+                        fullHistory &&
+                        fullHistory.datasets &&
+                        fullHistory.datasets[0] &&
+                        Array.isArray(fullHistory.datasets[0].data)
+                    ) {
+                        lifetimeTotal = fullHistory.datasets[0].data.reduce(
+                            (acc, val) => acc + (Number(val) || 0),
+                            0
+                        );
+                    }
+
+                    // Generate Weekly Data
+                    const labels = [];
+                    const dataPoints = [];
+
+                    // FIX: Initialize GoalTracker with 'historySettings'
+                    const tracker = new GoalTracker(this.app, historySettings);
+
+                    let currentRunningTotal = lifetimeTotal;
+                    const today = moment();
+
+                    for (let i = 0; i < 7; i++) {
+                        const date = today.clone().subtract(i, 'days');
+
+                        labels.unshift(date.format('dd'));
+                        dataPoints.unshift(currentRunningTotal);
+
+                        const dailyRes = await tracker.calculateDailyScore(date, this.allTasks);
+                        currentRunningTotal -= dailyRes.totalPoints;
+                    }
+
+                    // Construct chartDataObj
+                    const chartDataObj = {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Weekly Momentum',
+                                data: dataPoints,
+                                borderColor: 'var(--text-accent)',
+                                backgroundColor: 'rgba(var(--text-accent-rgb), 0.1)',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 3
+                            }
+                        ]
+                    };
+
+                    // 7. Render (The Chart Renderer will adapt to the narrower 'medium' container)
+                    const renderer = new CssChartRenderer(contentWrapper);
+                    renderer.renderWeeklyGoalMomentum(chartDataObj, { labelClass: 'cpwn-axis-label-large' });
+
+                    break;
+                }
+
+
+                case 'weeklyGoalPoints':
+                case 'goalStatusList': {
+
+                    // 1. Create Container
+                    const widgetContainer = widgetGrid.createDiv({
+                        cls: 'cpwn-pm-widget-container cpwn-pm-widget-medium'
+                    });
+
+                    // 2. Determine Settings
+                    const showTitle =
+                        typeof this.plugin.settings.showTaskWidgetTitles === 'boolean'
+                            ? this.plugin.settings.showTaskWidgetTitles
+                            : true;
+                    const showChevron =
+                        typeof this.plugin.settings.showTaskWidgetChevrons === 'boolean'
+                            ? this.plugin.settings.showTaskWidgetChevrons
+                            : true;
+
+                    // 3. Check Collapsed State
+                    if (!this.plugin.settings.collapsedWidgets) {
+                        this.plugin.settings.collapsedWidgets = {};
+                    }
+                    const isCollapsed = this.plugin.settings.collapsedWidgets[widgetKey] || false;
+                    if (isCollapsed) widgetContainer.addClass('collapsed');
+
+                    // 4. Render Header
+                    const header = widgetContainer.createDiv({ cls: 'cpwn-pm-widget-header' });
+                    const headerTitle = header.createDiv({ cls: 'cpwn-pm-widget-header-title' });
+
+                    let toggleIcon = null;
+                    if (showChevron) {
+                        toggleIcon = headerTitle.createDiv({ cls: 'cpwn-widget-toggle-icon' });
+                        setIcon(toggleIcon, isCollapsed ? 'chevron-right' : 'chevron-down');
+                    }
+
+                    if (showTitle) {
+                        const titleText =
+                            widgetKey === 'weeklyGoalPoints' ? 'Weekly momentum' : 'Daily goals';
+                        header.createDiv({ cls: 'cpwn-widget-title' }).setText(titleText);
+                    }
+
+                    // 5. Toggle Logic
+                    header.addEventListener('click', async () => {
+                        const currentlyCollapsed = widgetContainer.classList.toggle('collapsed');
+                        this.plugin.settings.collapsedWidgets[widgetKey] = currentlyCollapsed;
+                        await this.plugin.saveSettings();
+                        if (showChevron && toggleIcon) {
+                            setIcon(toggleIcon, currentlyCollapsed ? 'chevron-right' : 'chevron-down');
+                        }
+                    });
+
+                    // 6. Render Content
+                    const contentWrapper = widgetContainer.createDiv({
+                        cls: 'cpwn-widget-content'
+                    });
+
+                    // ---------------------------------------------------------------------
+                    // WEEKLY MOMENTUM WIDGET
+                    // ---------------------------------------------------------------------
+                    if (widgetKey === 'weeklyGoalPoints') {
+                        const beforeCount =
+                            Object.keys(this.plugin.settings.goalScoreHistory || {}).length;
+
+                        // FIX 1: Create a settings object that forces vacation mode OFF
+                        const historySettings = { ...this.plugin.settings, vacationModeGlobal: false };
+
+                        // FIX 2: Use 'historySettings' here to get the correct Lifetime Total
+                        const fullHistory = await GoalDataAggregator.getPointsHistory(
+                            this.app,
+                            historySettings,
+                            this.allTasks
+                        );
+
+                        const afterCount =
+                            Object.keys(this.plugin.settings.goalScoreHistory || {}).length;
+                        if (afterCount > beforeCount) {
+                            await this.plugin.saveSettings();
+                        }
+
+                        let lifetimeTotal = 0;
+                        if (Array.isArray(fullHistory)) {
+                            lifetimeTotal = fullHistory.reduce(
+                                (acc, day) => acc + (day.totalPoints || 0),
+                                0
+                            );
+                        } else if (
+                            fullHistory &&
+                            fullHistory.datasets &&
+                            fullHistory.datasets[0] &&
+                            Array.isArray(fullHistory.datasets[0].data)
+                        ) {
+                            lifetimeTotal = fullHistory.datasets[0].data.reduce(
+                                (acc, val) => acc + (Number(val) || 0),
+                                0
+                            );
+                        }
+
+                        // 2. Generate Weekly Data (Backwards from Total)
+                        const labels = [];
+                        const dataPoints = [];
+
+                        // FIX 3: Initialize GoalTracker with 'historySettings'
+                        // This ensures it can calculate past days' scores even if Vacation Mode is ON today.
+                        const tracker = new GoalTracker(this.app, historySettings);
+
+                        let currentRunningTotal = lifetimeTotal;
+                        const today = moment();
+
+                        for (let i = 0; i < 7; i++) {
+                            const date = today.clone().subtract(i, 'days');
+
+                            labels.unshift(date.format('ddd'));
+                            dataPoints.unshift(currentRunningTotal);
+
+                            const dailyRes = await tracker.calculateDailyScore(date, this.allTasks);
+                            currentRunningTotal -= dailyRes.totalPoints;
+                        }
+
+                        // 3. Construct chartDataObj
+                        const chartDataObj = {
+                            labels: labels,
+                            datasets: [
+                                {
+                                    label: 'Weekly Momentum',
+                                    data: dataPoints,
+                                    borderColor: 'var(--text-accent)',
+                                    backgroundColor: 'rgba(var(--text-accent-rgb), 0.1)',
+                                    borderWidth: 2,
+                                    fill: true,
+                                    tension: 0.4,
+                                    pointRadius: 3
+                                }
+                            ]
+                        };
+
+                        // 4. Render
+                        const renderer = new CssChartRenderer(contentWrapper);
+                        renderer.renderWeeklyGoalMomentum(chartDataObj);
+                    }
+
+                    // ---------------------------------------------------------------------
+                    // DAILY GOALS + LEVEL RING
+                    // ---------------------------------------------------------------------
+                    else if (widgetKey === 'goalStatusList') {
+                        const goals = await GoalDataAggregator.getTodaysGoals(
+                            this.app,
+                            this.plugin.settings,
+                            this.allTasks
+                        );
+
+                        // --- Get Points History ---
+                        const beforeCount =
+                            Object.keys(this.plugin.settings.goalScoreHistory || {}).length;
+
+                        const historySettings = { ...this.plugin.settings, vacationModeGlobal: false };
+
+                        const rawHistory = await GoalDataAggregator.getPointsHistory(
+                            this.app,
+                            historySettings, // Use the temporary settings here
+                            this.allTasks
+                        );
+
+                        const afterCount =
+                            Object.keys(this.plugin.settings.goalScoreHistory || {}).length;
+                        if (afterCount > beforeCount) {
+                            await this.plugin.saveSettings();
+                        }
+
+                        let calculatedTotal = 0;
+
+                        // Array format (ideal): [{ date, totalPoints }, ...]
+                        if (Array.isArray(rawHistory)) {
+                            calculatedTotal = rawHistory.reduce(
+                                (acc, day) => acc + (day.totalPoints || 0),
+                                0
+                            );
+                        }
+                        // Chart object format: { labels: [], datasets: [{ data: [...] }] }
+                        else if (
+                            rawHistory &&
+                            rawHistory.datasets &&
+                            rawHistory.datasets[0] &&
+                            Array.isArray(rawHistory.datasets[0].data)
+                        ) {
+                            calculatedTotal = rawHistory.datasets[0].data.reduce(
+                                (acc, val) => acc + (Number(val) || 0),
+                                0
+                            );
+                        } else {
+                            console.warn(
+                                'Daily Goals: Could not parse history data for total points',
+                                rawHistory
+                            );
+                        }
+
+                        const totalPoints = calculatedTotal;
+
+                        // -------------------------------
+                        // Dynamic level thresholds
+                        // -------------------------------
+                        const trackerForLevels = new GoalTracker(this.app, this.plugin.settings);
+                        const lifetimeTargetRaw =
+                            trackerForLevels.getLifetimeTargetPoints &&
+                            trackerForLevels.getLifetimeTargetPoints();
+                        const effectiveTarget =
+                            lifetimeTargetRaw && lifetimeTargetRaw > 0 ? lifetimeTargetRaw : 300000;
+
+                        const LEVEL_BANDS = [
+                            { frac: 1.0, title: 'Grandmaster of Flow', icon: 'infinity' },
+                            { frac: 0.9, title: 'Legendary Leader', icon: 'crown' },
+                            { frac: 0.8, title: 'Relentless Result', icon: 'trophy' },
+                            { frac: 0.7, title: 'Task Titan', icon: 'medal' },
+                            { frac: 0.6, title: 'Output Overlord', icon: 'award' },
+                            { frac: 0.5, title: 'High Performer', icon: 'star' },
+                            { frac: 0.4, title: 'Productivity Pro', icon: 'zap' },
+                            { frac: 0.3, title: 'Goal Getter', icon: 'target' },
+                            { frac: 0.22, title: 'Focused Ninja', icon: 'crosshair' },
+                            { frac: 0.16, title: 'Efficiency Enthusiast', icon: 'gauge' },
+                            { frac: 0.10, title: 'Daily Driver', icon: 'calendar-check' },
+                            { frac: 0.06, title: 'Momentum Maker', icon: 'trending-up' },
+                            { frac: 0.03, title: 'Task Tinkerer', icon: 'check-circle-2' },
+                            { frac: 0.01, title: 'Routine Rookie', icon: 'clipboard-list' },
+                            { frac: 0.0, title: 'Starter Spark', icon: 'sprout' }
+                        ];
+
+                        const levelsDesc = LEVEL_BANDS
+                            .map((band, idx) => ({
+                                min: Math.round(band.frac * effectiveTarget),
+                                title: band.title,
+                                icon: band.icon,
+                                level: LEVEL_BANDS.length - idx
+                            }))
+                            .sort((a, b) => b.min - a.min);
+
+                        // 2. Find current level
+                        const currentLevel =
+                            levelsDesc.find(l => Number(totalPoints) >= l.min) ||
+                            levelsDesc[levelsDesc.length - 1];
+
+                        // 3. Find next level
+                        const currentIndex = levelsDesc.indexOf(currentLevel);
+                        const nextLevel =
+                            currentIndex > 0
+                                ? levelsDesc[currentIndex - 1]
+                                : { min: currentLevel.min * 1.5, title: 'Max Level' };
+
+                        // 4. Calculate Percentage within current level
+                        const pointsInLevel = totalPoints - currentLevel.min;
+                        const pointsNeededForLevel = nextLevel.min - currentLevel.min;
+                        const percentage = Math.min(
+                            100,
+                            Math.max(0, (pointsInLevel / pointsNeededForLevel) * 100)
+                        );
+
+                        // 5. Daily average (last 7 days)
+                        let dailyAverage = 0;
+                        let projectionText = 'Start completing tasks to generate a projection!';
+
+                        if (Array.isArray(rawHistory) && rawHistory.length > 0) {
+                            const recentHistory = rawHistory.slice(-7);
+                            const sumRecent = recentHistory.reduce(
+                                (acc, day) => acc + (day.totalPoints || 0),
+                                0
+                            );
+                            dailyAverage = sumRecent / (recentHistory.length || 1);
+                        } else if (
+                            rawHistory &&
+                            rawHistory.datasets &&
+                            rawHistory.datasets[0]
+                        ) {
+                            const data = rawHistory.datasets[0].data || [];
+
+                            if (data.length >= 2) {
+                                const recentCumulative = data.slice(-8);
+                                const dailyDiffs = [];
+                                for (let i = 1; i < recentCumulative.length; i++) {
+                                    const todayTotal = Number(recentCumulative[i]) || 0;
+                                    const yesterdayTotal = Number(recentCumulative[i - 1]) || 0;
+                                    dailyDiffs.push(todayTotal - yesterdayTotal);
+                                }
+                                const sumRecent = dailyDiffs.reduce((acc, val) => acc + val, 0);
+                                dailyAverage = sumRecent / (dailyDiffs.length || 1);
+                            } else if (data.length === 1) {
+                                dailyAverage = Number(data[0]) || 0;
+                            } else {
+                                dailyAverage = 0;
+                            }
+                        }
+
+                        // 6. Generate Motivating Message (tiered)
+                        let tooltipIcon = 'circle';
+                        let tooltipIconColor = 'var(--text-muted)';
+
+                        {
+                            const pointsRemaining = Math.max(0, nextLevel.min - totalPoints);
+
+                            if (dailyAverage > 0) {
+                                const daysToNext = Math.ceil(pointsRemaining / dailyAverage);
+                                const projectedDate = moment()
+                                    .add(daysToNext, 'days')
+                                    .format('MMM Do');
+
+                                const avgRounded = Math.round(dailyAverage);
+
+                                let headline;
+                                if (avgRounded < 75) {
+                                    headline = `Nice and steady. Averaging ~${avgRounded} pts/day.`;
+                                    tooltipIcon = 'circle';
+                                    tooltipIconColor = 'var(--text-muted)';
+                                } else if (avgRounded < 175) {
+                                    headline = `Good momentum! Averaging ~${avgRounded} pts/day.`;
+                                    tooltipIcon = 'trending-up';
+                                    tooltipIconColor = 'var(--text-accent)';
+                                } else if (avgRounded < 275) {
+                                    headline = `You're on fire! Averaging ~${avgRounded} pts/day.`;
+                                    tooltipIcon = 'flame';
+                                    tooltipIconColor = 'var(--color-orange)';
+                                } else {
+                                    headline = `Absolutely crushing it at ~${avgRounded} pts/day.`;
+                                    tooltipIcon = 'rocket';
+                                    tooltipIconColor = 'var(--color-green)';
+                                }
+
+                                const paceLine = projectedDate
+                                    ? `At this pace, you'll level up on ${projectedDate}.`
+                                    : `Keep going—every day moves you closer.`;
+
+                                const distanceLine =
+                                    pointsRemaining > 0
+                                        ? `You're only ${pointsRemaining.toLocaleString()} points away!`
+                                        : `You've already reached this tier—enjoy the win!`;
+
+                                projectionText =
+                                    `Current: ${totalPoints.toLocaleString()} pts\n` +
+                                    `Next: ${nextLevel.title} (${nextLevel.min.toLocaleString()} pts)\n\n` +
+                                    `${headline}\n` +
+                                    `${paceLine}\n` +
+                                    `${distanceLine}`;
+                            } else {
+                                projectionText =
+                                    `Current: ${totalPoints.toLocaleString()} pts\n` +
+                                    `Next: ${nextLevel.title}\n\n` +
+                                    `Complete some tasks to see your estimated level-up date!`;
+                                tooltipIcon = 'info';
+                                tooltipIconColor = 'var(--text-muted)';
+                            }
+                        }
+
+                        // 7. Render Layout
+                        const splitContainer = contentWrapper.createDiv({
+                            cls: 'cpwn-goal-split-container'
+                        });
+
+                        // Left: list of goals
+                        const listEl = splitContainer.createDiv({ cls: 'cpwn-goal-list-left' });
+                        if (this.plugin.settings.vacationModeGlobal) {
+                            // Vacation mode ON: show override message
+                             // Show Vacation Icon
+                        const iconContainer = listEl.createDiv({
+                            cls: 'cpwn-summary-icon-rest' // Reuse the same large icon class
+                        });
+                        setIcon(iconContainer, 'plane'); // Palm tree icon
+
+                            
+                            listEl.createDiv({
+                                text: 'All goals paused, enjoy your vacation!',
+                                cls: 'cpwn-muted-text'
+                            });
+                        } else if (goals.length === 0) {
+                            listEl.createDiv({
+                                text: 'No goals set.',
+                                cls: 'cpwn-muted-text'
+                            });
+                        } else {
+                            goals.forEach(g => {
+
+
+                                const row = listEl.createDiv({ cls: 'cpwn-goal-row' });
+                                const left = row.createDiv({ cls: 'cpwn-goal-left' });
+                                const iconSpan = left.createSpan({ cls: 'cpwn-goal-icon' });
+
+                                // CHECK IF ACTIVE TODAY
+                                if (!g.isActiveToday) {
+                                    row.addClass('cpwn-goal-inactive'); // Add class for styling
+
+                                    // Render "Rest Day" Icon instead of Checkbox
+                                    setIcon(iconSpan, 'coffee'); // 'coffee' or 'moon' or 'pause-circle'
+                                    iconSpan.setAttribute('aria-label', 'Rest day');
+
+                                    // Render Title (Dimmed)
+                                    const titleEl = left.createDiv({ cls: 'cpwn-goal-title', text: g.name });
+
+                                    // Render "Off" Badge instead of progress
+                                    const badge = row.createDiv({ cls: 'cpwn-goal-rest-badge', text: 'Off' });
+
+                                    return; // Skip the rest of the rendering for this goal
+                                }
+
+
+
+                                setIcon(iconSpan, g.isMet ? 'square-check' : 'square');
+                                iconSpan.addClass(g.isMet ? 'is-completed' : 'is-incomplete');
+
+
+
+
+                                const textContainer = left.createDiv({
+                                    cls: 'cpwn-goal-text'
+                                });
+                                const titleRow = textContainer.createDiv({
+                                    cls: 'cpwn-goal-title-row'
+                                });
+                                titleRow.createSpan({
+                                    text: g.name,
+                                    cls: 'cpwn-goal-title'
+                                });
+                                if (g.type !== 'note-created') {
+                                    titleRow.createSpan({
+                                        text: ` (${g.current || 0}/${g.target})`,
+                                        cls: 'cpwn-goal-count-inline'
+                                    });
+                                }
+                                const right = row.createDiv({ cls: 'cpwn-goal-right' });
+                                const ptsClass =
+                                    g.points < 0 ? 'cpwn-points-neg' : 'cpwn-points-pos';
+                                right.createSpan({
+                                    text: g.points > 0 ? `+${g.points}` : `${g.points}`,
+                                    cls: `cpwn-goal-points ${ptsClass}`
+                                });
+                            });
+                        }
+
+                        // Right: Level Circle with Tooltip
+                        const levelCol = splitContainer.createDiv({
+                            cls: 'cpwn-goal-level-right'
+                        });
+
+                        const size = 60;
+                        const stroke = 4;
+                        const r = (size - stroke) / 2;
+                        const circ = 2 * Math.PI * r;
+                        const offset = circ - (percentage / 100) * circ;
+
+                        const svgWrapper = levelCol.createDiv({ cls: 'cpwn-level-circle-wrapper' });
+                        // Basic aria label for accessibility; real content comes from custom tooltip
+                        svgWrapper.setAttribute('aria-label', 'Goal progress summary');
+
+                        // Safe SVG Creation
+                        const svgNs = 'http://www.w3.org/2000/svg';
+                        const svgEl = document.createElementNS(svgNs, 'svg');
+                        svgEl.setAttribute('width', String(size));
+                        svgEl.setAttribute('height', String(size));
+                        svgEl.style.transform = 'rotate(-90deg)';
+
+                        const bgCircle = document.createElementNS(svgNs, 'circle');
+                        bgCircle.setAttribute('cx', String(size / 2));
+                        bgCircle.setAttribute('cy', String(size / 2));
+                        bgCircle.setAttribute('r', String(r));
+                        bgCircle.setAttribute('stroke', 'var(--background-modifier-border)');
+                        bgCircle.setAttribute('stroke-width', String(stroke));
+                        bgCircle.setAttribute('fill', 'none');
+                        svgEl.appendChild(bgCircle);
+
+                        const progCircle = document.createElementNS(svgNs, 'circle');
+                        progCircle.setAttribute('cx', String(size / 2));
+                        progCircle.setAttribute('cy', String(size / 2));
+                        progCircle.setAttribute('r', String(r));
+                        progCircle.setAttribute('stroke', 'var(--text-accent)');
+                        progCircle.setAttribute('stroke-width', String(stroke));
+                        progCircle.setAttribute('fill', 'none');
+                        progCircle.style.strokeDasharray = `${circ}`;
+                        progCircle.style.strokeDashoffset = `${offset}`;
+                        progCircle.style.transition = 'stroke-dashoffset 0.5s ease';
+                        svgEl.appendChild(progCircle);
+
+                        svgWrapper.appendChild(svgEl);
+
+                        // Icon Inner (center of ring)
+                        const iconInner = svgWrapper.createDiv({ cls: 'cpwn-level-icon-inner' });
+                        setIcon(iconInner, currentLevel.icon || 'sprout');
+
+                        // Level Title under ring
+                        levelCol.createDiv({
+                            text: currentLevel.title,
+                            cls: 'cpwn-level-title-text'
+                        });
+
+                        // -----------------------------------------
+                        // Custom tooltip styled like popup
+                        // -----------------------------------------
+                        let goalTooltipEl = null;
+
+                        const buildTooltipContent = () => {
+                            if (!goalTooltipEl) {
+                                goalTooltipEl = document.body.createDiv({
+                                    cls: 'cpwn-goal-tooltip'
+                                });
+                            }
+                            goalTooltipEl.empty();
+
+                            const header = goalTooltipEl.createDiv({
+                                cls: 'cpwn-goal-tooltip-header'
+                            });
+
+                            // Mini progress ring that mirrors the widget icon
+                            const ringWrapper = header.createDiv({
+                                cls: 'cpwn-goal-tooltip-ring-wrapper'
+                            });
+
+                            const miniSize = 28;
+                            const miniStroke = 3;
+                            const miniR = (miniSize - miniStroke) / 2;
+                            const miniCirc = 2 * Math.PI * miniR;
+                            const miniOffset = miniCirc - (percentage / 100) * miniCirc;
+
+                            const miniSvg = document.createElementNS(svgNs, 'svg');
+                            miniSvg.setAttribute('width', String(miniSize));
+                            miniSvg.setAttribute('height', String(miniSize));
+                            miniSvg.style.transform = 'rotate(-90deg)';
+
+                            // Background ring
+                            const miniBg = document.createElementNS(svgNs, 'circle');
+                            miniBg.setAttribute('cx', String(miniSize / 2));
+                            miniBg.setAttribute('cy', String(miniSize / 2));
+                            miniBg.setAttribute('r', String(miniR));
+                            miniBg.setAttribute('stroke', 'var(--background-modifier-border)');
+                            miniBg.setAttribute('stroke-width', String(miniStroke));
+                            miniBg.setAttribute('fill', 'var(--background-primary)');
+                            miniSvg.appendChild(miniBg);
+
+                            // Progress arc
+                            const miniProg = document.createElementNS(svgNs, 'circle');
+                            miniProg.setAttribute('cx', String(miniSize / 2));
+                            miniProg.setAttribute('cy', String(miniSize / 2));
+                            miniProg.setAttribute('r', String(miniR));
+                            miniProg.setAttribute('stroke', 'var(--text-accent)');
+                            miniProg.setAttribute('stroke-width', String(miniStroke));
+                            miniProg.setAttribute('fill', 'none');
+                            miniProg.style.strokeDasharray = `${miniCirc}`;
+                            miniProg.style.strokeDashoffset = `${miniOffset}`;
+                            miniSvg.appendChild(miniProg);
+
+                            ringWrapper.appendChild(miniSvg);
+
+                            // Level icon centered over the ring
+                            const ringIcon = ringWrapper.createDiv({
+                                cls: 'cpwn-goal-tooltip-ring-icon'
+                            });
+                            setIcon(ringIcon, currentLevel.icon || 'sprout');
+
+                            // Level title
+                            header.createDiv({
+                                cls: 'cpwn-goal-tooltip-title',
+                                text: currentLevel.title
+                            });
+
+                            const body = goalTooltipEl.createDiv({
+                                cls: 'cpwn-goal-tooltip-body'
+                            });
+
+                            const lines = projectionText.split('\n');
+
+                            lines.forEach((line) => {
+                                const trimmed = line.trim();
+                                if (!trimmed) {
+                                    body.createDiv({ cls: 'cpwn-goal-tooltip-spacer' });
+                                    return;
+                                }
+
+                                // Extra gap before "At this pace..."
+                                if (trimmed.startsWith('At this pace')) {
+                                    body.createDiv({ cls: 'cpwn-goal-tooltip-spacer-large' });
+                                }
+
+                                const isEmphasis =
+                                    trimmed.startsWith('Current:') ||
+                                    trimmed.startsWith('Next:') ||
+                                    trimmed.startsWith('Nice and steady') ||
+                                    trimmed.startsWith('Good momentum') ||
+                                    trimmed.startsWith("You're on fire") ||
+                                    trimmed.startsWith('Absolutely crushing');
+
+                                body.createDiv({
+                                    cls: isEmphasis
+                                        ? 'cpwn-goal-tooltip-line-strong'
+                                        : 'cpwn-goal-tooltip-line',
+                                    text: trimmed
+                                });
+                            });
+                        };
+
+                        const positionTooltip = (evt) => {
+                            if (!goalTooltipEl) return;
+
+                            const padding = 12;
+                            const viewportWidth = window.innerWidth;
+                            const viewportHeight = window.innerHeight;
+
+                            // Start by placing it to the bottom-right of the cursor
+                            let x = evt.clientX + padding;
+                            let y = evt.clientY + padding;
+
+                            // Measure tooltip
+                            const rect = goalTooltipEl.getBoundingClientRect();
+
+                            // If it would overflow to the right, flip to left side
+                            if (x + rect.width + padding > viewportWidth) {
+                                x = evt.clientX - rect.width - padding;
+                            }
+
+                            // If it would overflow the bottom, move up
+                            if (y + rect.height + padding > viewportHeight) {
+                                y = evt.clientY - rect.height - padding;
+                            }
+
+                            // Final clamp to viewport
+                            x = Math.max(padding, Math.min(x, viewportWidth - rect.width - padding));
+                            y = Math.max(padding, Math.min(y, viewportHeight - rect.height - padding));
+
+                            goalTooltipEl.style.left = `${x}px`;
+                            goalTooltipEl.style.top = `${y}px`;
+                        };
+
+                        svgWrapper.addEventListener('mouseenter', (evt) => {
+                            buildTooltipContent();
+                            // Ensure layout is up to date before measuring
+                            requestAnimationFrame(() => {
+                                if (!goalTooltipEl) return;
+                                goalTooltipEl.style.opacity = '1';
+                                goalTooltipEl.style.pointerEvents = 'none';
+                                positionTooltip(evt);
+                            });
+                        });
+
+                        svgWrapper.addEventListener('mousemove', (evt) => {
+                            positionTooltip(evt);
+                        });
+
+                        svgWrapper.addEventListener('mouseleave', () => {
+                            if (goalTooltipEl) {
+                                goalTooltipEl.style.opacity = '0';
+                            }
+                        });
+                    }
+                    break;
+                }
+
                 case 'taskstatusoverview': {
                     const metrics = await this.getTaskMetrics();
                     // This passes the entire metrics object as the second argument

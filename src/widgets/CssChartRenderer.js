@@ -219,7 +219,7 @@ export class CssChartRenderer {
         // Add the correct class to the main container. This is what the CSS will use.
         if (showLegend) {
             this.container.addClass(`cpwn-legend-${legendPosition}`);
-    console.log(legendPosition);
+            console.log(legendPosition);
         } else {
             // This class is for when the legend is off (e.g., mini/small widgets)
             this.container.addClass('is-pie-only');
@@ -900,4 +900,212 @@ export class CssChartRenderer {
             this.renderLegend(chartContainer, datasets);
         }
     }
+
+    /**
+    * Renders a bespoke cumulative area chart for Goal Momentum.
+    * Strictly follows Obsidian UI guidelines (CSS classes, textContent).
+    */
+    renderWeeklyGoalMomentum(chartData, options = {}) {
+        this.cleanup();
+        const chartContainer = this.container.createDiv({ cls: 'cpwn-pm-css-chart-container' });
+
+        const svgNs = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(svgNs, "svg");
+
+        svg.setAttribute('viewBox', '0 0 300 135');
+        svg.setAttribute('preserveAspectRatio', 'none');
+
+        svg.setAttribute('preserveAspectRatio', 'none');
+        svg.setAttribute('width', '100%');
+        svg.setAttribute('height', '100%');
+
+
+        chartContainer.appendChild(svg);
+
+        const dataset = chartData.datasets[0];
+        if (!dataset || dataset.data.length < 2) {
+            chartContainer.createDiv({ text: "Not enough data", cls: "cpwn-muted-text" });
+            return;
+        }
+
+        const rawData = dataset.data;
+        const minVal = Math.min(...rawData);
+        const maxVal = Math.max(...rawData);
+        const range = (maxVal - minVal) === 0 ? 10 : (maxVal - minVal);
+
+        const padding = { top: 15, right: 10, bottom: 10, left: 10 };
+        const width = 300 - padding.left - padding.right;
+        const height = 120 - padding.top - padding.bottom;
+
+        // Map values to coordinates
+        const points = rawData.map((val, i) => {
+            const x = padding.left + (i / (rawData.length - 1)) * width;
+            // Normalize Y: Lowest value sits at bottom (y = height + top)
+            const normalizedVal = val - minVal;
+            const y = padding.top + height - (normalizedVal / range) * height;
+            return { x, y, val };
+        });
+
+        // 1. Grid Lines (Stop at the dot)
+        points.forEach((p) => {
+            const gridLine = document.createElementNS(svgNs, 'line');
+            gridLine.classList.add('cpwn-chart-grid-line');
+            gridLine.setAttribute('x1', p.x);
+            gridLine.setAttribute('y1', p.y); // Start EXACTLY at the dot
+            gridLine.setAttribute('x2', p.x);
+            gridLine.setAttribute('y2', padding.top + height); // Go down to bottom axis
+            gridLine.setAttribute('stroke-opacity', '0.3'); // Subtle opacity via attribute
+            svg.appendChild(gridLine);
+        });
+
+        // 2. Gradient Definition
+        const defs = document.createElementNS(svgNs, 'defs');
+        const gradientId = 'goalMomentumGradient-' + Math.random().toString(36).substr(2, 9);
+        const gradient = document.createElementNS(svgNs, 'linearGradient');
+        gradient.setAttribute('id', gradientId);
+        gradient.setAttribute('x1', '0%');
+        gradient.setAttribute('y1', '0%');
+        gradient.setAttribute('x2', '0%');
+        gradient.setAttribute('y2', '100%');
+
+        const stop1 = document.createElementNS(svgNs, 'stop');
+        stop1.setAttribute('offset', '0%');
+        stop1.setAttribute('stop-color', 'var(--interactive-accent)');
+        stop1.setAttribute('stop-opacity', '0.5');
+
+        const stop2 = document.createElementNS(svgNs, 'stop');
+        stop2.setAttribute('offset', '100%');
+        stop2.setAttribute('stop-color', 'var(--interactive-accent)');
+        stop2.setAttribute('stop-opacity', '0.05');
+
+        gradient.appendChild(stop1);
+        gradient.appendChild(stop2);
+        defs.appendChild(gradient);
+        svg.appendChild(defs);
+
+        // 3. Draw Paths
+        const lineD = points.map((p, i) => (i === 0 ? `M ${p.x},${p.y}` : `L ${p.x},${p.y}`)).join(' ');
+        const areaD = `${lineD} L ${points[points.length - 1].x},${padding.top + height} L ${points[0].x},${padding.top + height} Z`;
+
+        const areaPath = document.createElementNS(svgNs, 'path');
+        areaPath.classList.add('cpwn-chart-area-fill');
+        areaPath.setAttribute('d', areaD);
+        areaPath.setAttribute('fill', `url(#${gradientId})`);
+        svg.appendChild(areaPath);
+
+        const linePath = document.createElementNS(svgNs, 'path');
+        linePath.classList.add('cpwn-chart-line-stroke');
+        linePath.setAttribute('d', lineD);
+        svg.appendChild(linePath);
+
+        // 4. Dots & Hit Targets
+        points.forEach((p, i) => {
+            const circle = document.createElementNS(svgNs, 'circle');
+            circle.classList.add('cpwn-chart-dot');
+            circle.setAttribute('cx', p.x);
+            circle.setAttribute('cy', p.y);
+            circle.setAttribute('r', '3.5');
+            svg.appendChild(circle);
+
+            // Invisible Hit Target
+            const hitTarget = document.createElementNS(svgNs, 'rect');
+            hitTarget.classList.add('cpwn-chart-hit-target');
+            hitTarget.setAttribute('x', p.x - 10);
+            hitTarget.setAttribute('y', padding.top);
+            hitTarget.setAttribute('width', 20);
+            hitTarget.setAttribute('height', height);
+
+            // Tooltip Events (Using Arrow Functions to fix 'this' context)
+            hitTarget.addEventListener('mouseenter', (e) => {
+                const label = chartData.labels[i];
+                this.showTooltip(e, `${label}: ${p.val} pts`);
+                circle.setAttribute('r', '5.5'); // Highlight effect
+            });
+
+            hitTarget.addEventListener('mousemove', (e) => {
+                this.moveTooltip(e);
+            });
+
+            hitTarget.addEventListener('mouseleave', () => {
+                this.hideTooltip();
+                circle.setAttribute('r', '3.5'); // Reset
+            });
+
+            svg.appendChild(hitTarget);
+        });
+
+        const labelClass = options.labelClass || 'cpwn-axis-label';
+
+        // 5. X-Axis Labels
+        chartData.labels.forEach((label, i) => {
+            const text = document.createElementNS(svgNs, 'text');
+            text.classList.add(labelClass);
+            text.setAttribute('text-anchor', 'middle');
+            text.setAttribute('x', points[i].x);
+            text.setAttribute('y', 130);
+            text.textContent = label; // Use textContent
+            svg.appendChild(text);
+        });
+
+    }
+
+    showTooltip(e, text) {
+        // 1. Create tooltip element if it doesn't exist yet
+        if (!this.tooltipEl) {
+            this.tooltipEl = document.body.createDiv({ cls: 'cpwn-chart-tooltip' });
+            // Safety: Ensure it doesn't block mouse events for the chart
+            this.tooltipEl.style.pointerEvents = 'none';
+            this.tooltipEl.style.position = 'absolute';
+            this.tooltipEl.style.zIndex = '9999'; // Ensure it sits on top
+        }
+
+        // 2. Set the text content
+        this.tooltipEl.setText(text);
+
+        // 3. Position and show it
+        this.moveTooltip(e);
+        this.tooltipEl.style.display = 'block';
+    }
+
+    /**
+ * Updates the tooltip position to follow the mouse.
+ * Adds smart positioning to prevent overflow on the right edge.
+ * @param {MouseEvent} e - The mouse movement event.
+ */
+    moveTooltip(e) {
+        if (this.tooltipEl) {
+            const tooltipRect = this.tooltipEl.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const offset = 15; // Base offset from cursor
+
+            let left = e.pageX + offset;
+            let top = e.pageY + offset;
+
+            // Check for right overflow
+            if (left + tooltipRect.width > viewportWidth - 20) { // 20px buffer
+                // Flip to left side of cursor
+                left = e.pageX - tooltipRect.width - offset;
+            }
+
+            // Optional: Check for bottom overflow (flip up)
+            const viewportHeight = window.innerHeight;
+            if (top + tooltipRect.height > viewportHeight - 20) {
+                top = e.pageY - tooltipRect.height - offset;
+            }
+
+            this.tooltipEl.style.left = `${left}px`;
+            this.tooltipEl.style.top = `${top}px`;
+        }
+    }
+
+
+    /**
+     * Hides the tooltip from view.
+     */
+    hideTooltip() {
+        if (this.tooltipEl) {
+            this.tooltipEl.style.display = 'none';
+        }
+    }
+
 }

@@ -17,7 +17,7 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
- calendar-period-week-notes.code-workspace
+calendar-period-week-notes.code-workspace
 
 #Local Scripts
 deploy-to-obsidian.sh
