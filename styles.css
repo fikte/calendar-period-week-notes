@@ -3109,6 +3109,11 @@ body.is-mobile .cpwn-tabs-content-wrapper {
     fill: var(--text-muted);
 }
 
+.cpwn-pm-line-chart .cpwn-small-axis-label {
+    font-size: 14px;
+    fill: var(--text-muted);
+}
+
 .cpwn-pm-line-chart .line-path {
     fill: none;
     stroke-width: 3.5; /* Slightly thicker line */
@@ -3485,21 +3490,21 @@ body.is-mobile .cpwn-tabs-content-wrapper {
 
 /* Pie Chart Size Differentiation */
 .cpwn-pm-widget-medium .cpwn-pm-widget-pie {
-    min-height: 175px; /* Default for medium */
+    max-height: 150px; /* Default for medium */
 }
 .cpwn-pm-widget-medium .cpwn-pm-widget-pie .cpwn-pm-pie-chart {
-    min-height: 150px;
+    /*min-height: 150px;*/
     max-height: 175px;
 }
 
 .cpwn-pm-widget-large .cpwn-pm-widget-pie {
-    min-height: 260px; /* Taller for large */
+    max-height: 260px; /* Taller for large */
 }
 
 /* Make sure the pie itself scales appropriately */
 .cpwn-pm-widget-large .cpwn-pm-widget-pie .cpwn-pm-pie-chart {
-    min-height: 220px;
-    max-height: 220px;
+   /* min-height: 220px;*/
+    max-height: 260px;
 }
 
 /* -- LAYOUTS -- */
@@ -4029,3 +4034,509 @@ body.is-mobile .cpwn-tabs-content-wrapper {
 .cpwn-fade-visible {
     opacity: 1;
 }
+
+/* Chart Container */
+.cpwn-pm-css-chart-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.cpwn-pm-css-chart-container svg {
+    overflow: visible;
+    width: 100%;
+    font-family: var(--font-ui);
+}
+
+/* Grid Lines */
+.cpwn-chart-grid-line {
+    stroke: var(--background-modifier-border);
+    stroke-width: 1px;
+}
+
+
+.cpwn-chart-line-stroke {
+    fill: none;
+    stroke: var(--interactive-accent);
+    stroke-width: 2px;
+}
+
+/* Data Points */
+.cpwn-chart-dot {
+    fill: var(--interactive-accent);
+    stroke: var(--background-primary);
+    stroke-width: 1px;
+    transition: r 0.2s ease;
+}
+
+/* Hit Targets (Invisible) */
+.cpwn-chart-hit-target {
+    fill: transparent;
+    cursor: pointer;
+}
+
+/* Axis Labels */
+.cpwn-axis-label {
+    font-size: 10px;
+    fill: var(--text-muted);
+    text-anchor: middle;
+}
+
+
+/* Tooltip */
+.cpwn-chart-tooltip {
+    position: absolute;
+    z-index: var(--layer-tooltip);
+    pointer-events: none;
+    padding: 4px 8px;
+    background-color: var(--background-modifier-message);
+    color: var(--text-normal);
+    border-radius: var(--radius-s);
+    font-size: var(--font-ui-smaller);
+    box-shadow: var(--shadow-s);
+    display: none;
+}
+
+/* Goal Row Layout */
+.cpwn-goal-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    padding: 2px 0;
+}
+
+/* Left Section (Icon + Text) */
+.cpwn-goal-left {
+    display: flex;
+    align-items: center;
+    flex-grow: 1;
+    min-width: 0; /* Allows text truncation if needed */
+}
+
+/* Icon Styling */
+.cpwn-goal-icon {
+    margin-right: 8px;
+    display: flex;
+    align-items: center;
+}
+
+.cpwn-goal-icon.is-completed {
+    color: var(--text-success);
+}
+
+.cpwn-goal-icon.is-incomplete {
+    color: var(--text-muted);
+}
+
+/* Text Container */
+.cpwn-goal-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+}
+
+.cpwn-goal-title {
+    font-weight: var(--font-ui-small);
+    color: var(--text-normal);
+}
+
+.cpwn-goal-progress {
+    font-size: var(--font-ui-smaller);
+    /* cpwn-muted-text handles color, but we ensure size here */
+}
+
+/* Right Section (Points) */
+.cpwn-goal-right {
+    white-space: nowrap;
+    margin-left: 8px;
+}
+
+.cpwn-goal-points {
+    font-weight: bold;
+    font-size: var(--font-ui-small);
+    color: var(--text-accent);
+}
+
+.cpwn-goal-list-left .cpwn-goal-row:first-child {
+    margin-top: 10px;
+}
+
+/* --- Daily Goals Widget Split Layout --- */
+.cpwn-goal-split-container {
+    display: grid;
+    grid-template-columns: 1fr 80px; /* List takes available space, Level takes fixed 80px */
+    gap: 12px;
+    align-items: center;
+}
+
+/* Left List Styling */
+.cpwn-goal-list-left {
+    display: flex;
+    flex-direction: column;
+    /*gap: 6px;*/
+}
+
+.cpwn-goal-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2px 0;
+}
+
+.cpwn-goal-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow: hidden; /* Prevent text overflow */
+}
+
+.cpwn-goal-title-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cpwn-goal-title {
+    font-size: 0.95em;
+    color: var(--text-normal);
+}
+
+.cpwn-goal-count-inline {
+    font-size: 0.85em;
+    color: var(--text-muted);
+}
+
+.cpwn-goal-right {
+    margin-left: 8px;
+    white-space: nowrap;
+}
+
+.cpwn-goal-points {
+    font-weight: bold;
+    font-size: 0.9em;
+}
+.cpwn-points-pos { color: var(--text-accent); }
+.cpwn-points-neg { color: var(--text-error); }
+
+/* Right Level Styling */
+.cpwn-goal-level-right {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.cpwn-level-circle-wrapper {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cpwn-level-icon-inner {
+    position: absolute;
+    color: var(--text-normal);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.cpwn-level-icon-inner svg {
+    width: 34px;
+    height: 34px;
+}
+
+.cpwn-level-title-text {
+    font-size: 0.75em;
+    color: var(--text-muted);
+    margin-top: 6px;
+    line-height: 1.1;
+    max-width: 80px;
+}
+
+.cpwn-level-circle-wrapper svg circle:nth-child(2) {
+    transition: stroke-dashoffset 0.5s ease;
+    /* Ensure the stroke color is visible */
+    stroke: var(--text-accent); 
+    /* Ensure it's on top */
+    z-index: 2; 
+}
+
+/* Goal progress tooltip, styled like a mini popup window */
+.cpwn-goal-tooltip {
+    position: fixed;
+    z-index: 9999;
+    max-width: 360px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background-color: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    color: var(--text-normal);
+    font-size: 12px;
+    line-height: 1.4;
+    opacity: 0;
+    transition: opacity 0.15s ease-out;
+    pointer-events: none;
+}
+
+/* Optional: reuse popup font/spacing feel */
+.cpwn-goal-tooltip-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+/* Wrapper for the mini ring */
+.cpwn-goal-tooltip-ring-wrapper {
+    position: relative;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+}
+.cpwn-goal-tooltip-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Performance state icon (color set inline from JS) */
+.cpwn-goal-tooltip-icon-perf {
+    opacity: 0.9;
+}
+
+/* Level icon uses the progress accent colour */
+.cpwn-goal-tooltip-icon-level {
+    /* Bigger icon in the popup */
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    /* Progress value (0–100) comes from JS; default to 0 */
+    --cpwn-goal-progress: 0;
+
+    /* Outer ring: accent for [0, progress], dull border after that */
+    background:
+        conic-gradient(
+            var(--text-accent)
+                0deg
+                calc(var(--cpwn-goal-progress) * 3.6deg),
+            var(--background-modifier-border)
+                calc(var(--cpwn-goal-progress) * 3.6deg)
+                360deg
+        ),
+        radial-gradient(
+            farthest-side,
+            var(--background-primary) 70%,
+            transparent 71%
+        );
+
+    /* Make sure the inner circle stays the background color, ring outside */
+    background-origin: border-box;
+    background-clip: border-box, padding-box;
+}
+
+
+/* Center the Lucide icon over the SVG ring */
+.cpwn-goal-tooltip-ring-icon {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Make the Lucide glyph itself clearly visible inside the ring */
+.cpwn-goal-tooltip-ring-icon svg {
+    width: 14px;
+    height: 14px;
+    stroke: var(--text-normal);
+    color: var(--text-normal);
+}
+
+.cpwn-goal-tooltip-title {
+    font-weight: 600;
+    font-size: 12px;
+}
+
+.cpwn-goal-tooltip-body {
+    margin-top: 2px;
+}
+
+.cpwn-goal-tooltip-line-strong {
+    font-weight: 500;
+    margin-bottom: 2px;
+}
+
+.cpwn-goal-tooltip-line {
+    color: var(--text-muted);
+    margin-bottom: 2px;
+}
+
+.cpwn-goal-tooltip-spacer {
+    height: 4px;
+}
+
+.cpwn-goal-tooltip-spacer-large {
+    height: 8px; /* gap between “Nice and steady…” and “At this pace…” */
+}
+
+/* Weekday pill selector in GoalEditModal */
+.cpwn-goal-days-picker {
+    display: inline-flex;
+    border-radius: 999px;
+    overflow: hidden;                    /* clip inner corners */
+    background-color: var(--background-modifier-border);
+}
+
+/* Each day cell: larger tap target */
+.cpwn-goal-day {
+    padding: 6px 16px;                   /* bigger horizontally and vertically */
+    min-width: 28px;                     /* wider cells */
+    text-align: center;
+    font-size: 12px;                     /* larger letter */
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    color: var(--text-muted);
+    background-color: transparent;
+    border-right: 1px solid rgba(0, 0, 0, 0.25);
+}
+
+/* Make the very first cell visually round on the left */
+.cpwn-goal-day:first-child {
+    border-top-left-radius: 999px;
+    border-bottom-left-radius: 999px;
+}
+
+/* Make the very last cell visually round on the right */
+.cpwn-goal-day:last-child {
+    border-top-right-radius: 999px;
+    border-bottom-right-radius: 999px;
+    border-right: none;
+}
+
+/* Active days: Obsidian accent, but keep corner rounding from above */
+.cpwn-goal-day.is-active {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent, #fff);
+}
+
+.cpwn-level-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 6px;
+    font-size: 0.9em;
+}
+
+.cpwn-level-table th,
+.cpwn-level-table td {
+    padding: 4px 6px;
+}
+
+.cpwn-level-table tr:nth-child(even) {
+    background-color: var(--background-secondary-alt);
+}
+
+.cpwn-level-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
+.cpwn-goal-item .setting-item {
+    border-top: none;
+    border-bottom: none;
+    padding: 0; /* Remove default padding if it's too large */
+}
+
+/* Dim the entire row */
+.cpwn-goal-item.cpwn-goal-inactive {
+    opacity: 0.5;
+    filter: grayscale(100%);
+}
+
+/* Style the "Rest" icon */
+.cpwn-goal-item.cpwn-goal-inactive .cpwn-goal-icon {
+    color: var(--text-muted);
+    cursor: default;
+}
+
+/* Style the "OFF" badge */
+.cpwn-goal-rest-badge {
+    font-size: 0.7em;
+    font-weight: bold;
+    color: var(--text-muted);
+    border: 1px solid var(--text-muted);
+    border-radius: 4px;
+    padding: 2px 6px;
+    margin-left: auto; /* Push to the right */
+}
+
+/* Condensed Daily Goal Widget Layout */
+.cpwn-goal-split-container.condensed {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 10px;
+}
+
+.cpwn-goal-summary-large {
+    font-size: 2em;
+    font-weight: bold;
+    line-height: 1;
+}
+
+.cpwn-goal-summary-sub {
+    font-size: 0.8em;
+    color: var(--text-muted);
+}
+
+/* The larger font size for the condensed chart */
+.cpwn-axis-label-large {
+    font-size: 16px; /* Larger font */
+    fill: var(--text-muted);
+}
+
+/* Vacation Text */
+.cpwn-summary-vacation {
+    font-size: 0.9em;
+    color: var(--text-muted);
+}
+
+/* Large Numbers (e.g. "1/3") */
+.cpwn-summary-large {
+    font-size: 2.2em;
+    font-weight: bold;
+    line-height: 1;
+    color: var(--text-normal);
+}
+
+.cpwn-summary-icon-rest {
+    display: flex;
+    justify-content: center; /* Center horizontally */
+    margin-top: 10px;
+    margin-bottom: 2px;
+    color: var(--text-muted);
+}
+
+.cpwn-summary-icon-rest svg {
+    width: 44px;
+    height: 44px;
+}
+
+/* Subtext (e.g. "goals met" or "2 off today") */
+.cpwn-summary-sub {
+    padding-top: 10px;
+    font-size: 0.6em;
+    color: var(--text-muted);
+}
+

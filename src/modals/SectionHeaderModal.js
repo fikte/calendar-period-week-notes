@@ -26,7 +26,7 @@ export class SectionHeaderModal extends Modal {
             : defaultConfig;
     }
 
-    async onOpen() {
+    onOpen() {
         const { contentEl } = this;
         contentEl.empty();
         contentEl.createEl('h2', { text: 'Create section header' });
@@ -44,7 +44,7 @@ export class SectionHeaderModal extends Modal {
 
         new Setting(contentEl)
             .setName('Visible')
-            .setDesc('Toggle whether this section header is visible on the dashboard. Having the section header enabled but hidden allows you to use it for grouping widgets without affecting if a section header that\s above is being toggled to show and hide over time, i.e. this section of grouped widgets will always be visible.')
+            .setDesc('Toggle whether this section header is visible on the dashboard. Having the section header enabled but hidden allows you to use it for grouping widgets without affecting if a section header that\'s above is being toggled to show and hide over time, i.e. this section of grouped widgets will always be visible.')
             .addToggle(toggle => toggle
                 .setValue(this.config.isVisible ?? true) // Default to true if not set
                 .onChange(value => {

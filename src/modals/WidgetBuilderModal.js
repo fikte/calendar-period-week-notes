@@ -71,7 +71,7 @@ export class WidgetBuilderModal extends Modal {
             }
 
             // Clear and add the correct options
-            legendPositionDropdown.selectEl.innerHTML = '';
+            llegendPositionDropdown.selectEl.empty();
             legendPositionDropdown.addOptions(newOptions);
 
             // Reset position if the old one is invalid

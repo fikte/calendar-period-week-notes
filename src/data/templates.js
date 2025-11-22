@@ -13,7 +13,6 @@ export const BUNDLED_TEMPLATES = [
     line,
     pie,
     radar,
-    // Add other imported templates to this array
 ];
 
 

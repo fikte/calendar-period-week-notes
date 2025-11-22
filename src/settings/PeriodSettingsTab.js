@@ -14,6 +14,8 @@ import { PeriodMonthView } from '../views/PeriodMonthView.js';
 import { WidgetBuilderModal } from '../modals/WidgetBuilderModal.js';
 import { SectionHeaderModal } from '../modals/SectionHeaderModal.js';
 import { TemplatePickerModal } from '../modals/TemplatePickerModal.js';
+import { GoalEditModal } from '../modals/GoalEditModal.js';
+import { GoalTracker } from '../logic/GoalTracker';
 
 /**
  * The settings tab class for the plugin, responsible for building the settings UI.
@@ -1103,6 +1105,7 @@ export class PeriodSettingsTab extends PluginSettingTab {
             assets: "Assets tab",
             tasks: "Tasks tab",
             dashboard: 'Dashboard tab',
+            goals: 'Goal configuration',
             themes: "Themes",
             importExport: "Import / Export",
             startHere: "Help",
@@ -1251,6 +1254,9 @@ export class PeriodSettingsTab extends PluginSettingTab {
                 break;
             case 'dashboard':
                 this.renderDashboardSettings();
+                break;
+            case 'goals':
+                this.renderGoalsSettings();
                 break;
             case 'themes':
                 this.renderThemesSettings();
@@ -2403,6 +2409,296 @@ export class PeriodSettingsTab extends PluginSettingTab {
         // Default to showing the Tasks tab on first render
         tasksBtn.click();
     }
+
+    renderGoalsSettings() {
+        const containerEl = this.contentEl;
+        containerEl.empty();
+        containerEl.createEl("h1", { text: "Goal configuration" });
+        containerEl.createEl("p", { text: "Define goals to track your progress and earn points. Drag to reorder." });
+
+        const goalsList = containerEl.createDiv({ cls: 'cpwn-goals-list' });
+        this.enableGoalSorting(goalsList);
+
+        const allGoals = this.plugin.settings.goals || [];
+        const coreGoals = allGoals.filter(g => g.core);
+        const customGoals = allGoals.filter(g => !g.core);
+
+        // --- Render core goals first ---
+        coreGoals.forEach((goal, index) =>
+            this.renderGoalItem(goalsList, goal, allGoals.indexOf(goal), true)
+        );
+
+        // --- Render Custom Goals ---
+        customGoals.forEach((goal, index) => {
+            this.renderGoalItem(goalsList, goal, allGoals.indexOf(goal), false);
+        });
+
+        // --- Add New Goal Button ---
+        new Setting(containerEl)
+            .addButton(btn => {
+                btn.setButtonText("Add new goal")
+                    .setCta()
+                    .onClick(() => {
+                        new GoalEditModal(this.app, null, async (newGoal) => {
+                            if (!this.plugin.settings.goals) this.plugin.settings.goals = [];
+                            this.plugin.settings.goals.push(newGoal);
+                            await this.saveAndUpdate();
+                            this.renderGoalsSettings();
+                        }).open();
+                    });
+            });
+
+
+        // --- Global Vacation Toggle ---
+        new Setting(containerEl)
+            .setName("Global Vacation Mode")
+            .setDesc("When enabled, all goals are paused — no points or penalties are tracked. Note: you can also pause goals individually. To do this enter the goal settings to toggle on/off.")
+            .addToggle(toggle => {
+                toggle.setValue(!!this.plugin.settings.vacationModeGlobal)
+                    .onChange(async (value) => {
+                        this.plugin.settings.vacationModeGlobal = value;
+                        await this.saveAndUpdate();
+                    });
+            });
+
+
+        containerEl.createEl('h3', { text: 'Level ladder' });
+
+        const tracker = new GoalTracker(this.app, this.plugin.settings);
+        const lifetimeTargetRaw =
+            tracker.getLifetimeTargetPoints && tracker.getLifetimeTargetPoints();
+        const effectiveTarget =
+            lifetimeTargetRaw && lifetimeTargetRaw > 0 ? lifetimeTargetRaw : 300000;
+
+        // Same bands you use in the widget / GoalTracker
+        const LEVEL_BANDS = [
+            { frac: 1.0, title: 'Grandmaster of Flow', icon: 'infinity' },
+            { frac: 0.9, title: 'Legendary Leader', icon: 'crown' },
+            { frac: 0.8, title: 'Relentless Result', icon: 'trophy' },
+            { frac: 0.7, title: 'Task Titan', icon: 'medal' },
+            { frac: 0.6, title: 'Output Overlord', icon: 'award' },
+            { frac: 0.5, title: 'High Performer', icon: 'star' },
+            { frac: 0.4, title: 'Productivity Pro', icon: 'zap' },
+            { frac: 0.3, title: 'Goal Getter', icon: 'target' },
+            { frac: 0.22, title: 'Focused Ninja', icon: 'crosshair' },
+            { frac: 0.16, title: 'Efficiency Enthusiast', icon: 'gauge' },
+            { frac: 0.10, title: 'Daily Driver', icon: 'calendar-check' },
+            { frac: 0.06, title: 'Momentum Maker', icon: 'trending-up' },
+            { frac: 0.03, title: 'Task Tinkerer', icon: 'check-circle-2' },
+            { frac: 0.01, title: 'Routine Rookie', icon: 'clipboard-list' },
+            { frac: 0.0, title: 'Starter Spark', icon: 'sprout' }
+        ];
+
+        const levels = LEVEL_BANDS
+            .map((band, idx) => ({
+                min: Math.round(band.frac * effectiveTarget),
+                title: band.title,
+                icon: band.icon,
+                level: LEVEL_BANDS.length - idx
+            }))
+            // for display, show from lowest -> highest points
+            .sort((a, b) => a.min - b.min);
+
+        const table = containerEl.createEl('table', { cls: 'cpwn-level-table' });
+
+        const headerRow = table.createEl('tr');
+        headerRow.createEl('th', { text: 'Level' });
+        headerRow.createEl('th', { text: 'Name' });
+        headerRow.createEl('th', { text: 'Icon' });
+        headerRow.createEl('th', { text: 'Points needed' });
+
+        for (const lvl of levels) {
+            const row = table.createEl('tr');
+
+            row.createEl('td', { text: String(lvl.level) });
+            row.createEl('td', { text: lvl.title });
+
+            const iconCell = row.createEl('td');
+            const iconDiv = iconCell.createDiv({ cls: 'cpwn-level-icon' });
+            setIcon(iconDiv, lvl.icon);
+
+            row.createEl('td', { text: lvl.min.toLocaleString() });
+        }
+
+        containerEl.createEl('div', { cls: 'cpwn-setting-spacer' });
+
+        // --- Reset Scoring Cache ---
+        new Setting(containerEl)
+            .setName("Reset scoring cache")
+            .setDesc("Clears cached daily scores and recomputes them from your tasks and notes. Vacation history is kept, but past totals may change.")
+            .addButton(btn => btn
+                .setButtonText("Reset cache")
+                .setWarning()
+                .onClick(async () => {
+                    if (!confirm("Are you sure you want to reset the scoring cache? This will delete all cached daily scores and rebuild them from your tasks and notes.")) {
+                        return;
+                    }
+                    this.plugin.settings.goalScoreHistory = {};
+                    await this.plugin.saveData(this.plugin.settings);
+                    new Notice("Goal scoring cache cleared. It will be rebuilt as you view dashboards.", 4000);
+                    this.triggerDashboardRefresh();
+                }));
+
+        // --- Reset Vacation History ---
+        new Setting(containerEl)
+            .setName("Reset vacation history")
+            .setDesc("Clears stored vacation days for all goals. After resetting the scoring cache, past days will be recomputed without vacation applied.")
+            .addButton(btn => btn
+                .setButtonText("Reset vacation days")
+                .setWarning()
+                .onClick(async () => {
+                    if (!confirm("Are you sure you want to reset all vacation history? All days will be treated as normal working days on the next rebuild.")) {
+                        return;
+                    }
+                    this.plugin.settings.vacationHistory = {};
+                    await this.plugin.saveData(this.plugin.settings);
+                    new Notice("Vacation history cleared. Reset the scoring cache if you want past days recomputed without vacation.", 5000);
+                }));
+    }
+
+    getGoalDisplayName(goal) {
+        // If the user named it "Tasks completed" (default), rename it to "Core: Tasks"
+        // Or check by type if you want to force it
+        if (goal.type === 'task-count') return "Task count";
+        if (goal.type === 'word-count') return "Words count";
+        if (goal.type === 'note-created') return "Create note";
+
+        // Fallback for custom names
+        return goal.type;
+    }
+
+    renderGoalItem(goalsList, goal, index, isCore) {
+        const goalEl = goalsList.createDiv({ cls: 'cpwn-goal-item setting-item' });
+        goalEl.setAttribute('draggable', isCore ? 'false' : 'true');
+        goalEl.dataset.index = index;
+
+        // Drag handle (disabled for core)
+        const handle = goalEl.createDiv({ cls: 'cpwn-pm-drag-handle' });
+        setIcon(handle, 'grip-vertical');
+        handle.style.marginRight = '10px';
+        handle.style.cursor = isCore ? 'not-allowed' : 'grab';
+        if (isCore) handle.style.opacity = '0.5';
+
+        const info = goalEl.createDiv({ cls: 'setting-item-info' });
+
+
+
+        info.createEl('div', { text: goal.name, cls: 'setting-item-name' });
+        info.createEl('div', {
+            text: `${this.getGoalDisplayName(goal)} | Target: ${goal.target} | ${goal.points} pts`,
+            cls: 'setting-item-description'
+        });
+
+        const controls = goalEl.createDiv({ cls: 'setting-item-control' });
+
+        // EDIT (always)
+        new Setting(controls)
+            .addButton(btn => btn
+                .setIcon('pencil')
+                .onClick(() => {
+                    new GoalEditModal(this.app, goal, async (updatedGoal) => {
+                        this.plugin.settings.goals[index] = updatedGoal;
+                        await this.saveAndUpdate();
+                        this.renderGoalsSettings();
+                    }).open();
+                }));
+
+        // TOGGLE (always)
+        new Setting(controls)
+            .addToggle(toggle => {
+                toggle.setValue(!!goal.enabled)
+                    .onChange(async value => {
+                        goal.enabled = value;
+                        await this.saveAndUpdate();
+                        this.renderGoalsSettings();
+                    });
+            });
+
+        // DELETE (only for custom)
+        if (!isCore) {
+            new Setting(controls)
+                .addButton(btn => btn
+                    .setIcon('trash')
+                    .setWarning()
+                    .onClick(async () => {
+                        if (confirm(`Delete goal "${goal.name}"?`)) {
+                            this.plugin.settings.goals.splice(index, 1);
+                            await this.saveAndUpdate();
+                            this.renderGoalsSettings();
+                        }
+                    }));
+        }
+
+    }
+
+    // Helper method to handle Drag & Drop logic
+    enableGoalSorting(container) {
+        let draggedItem = null;
+
+        container.addEventListener('dragstart', (e) => {
+            draggedItem = e.target.closest('.cpwn-goal-item');
+            if (draggedItem) {
+                draggedItem.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                // Firefox requires data to be set
+                e.dataTransfer.setData('text/plain', draggedItem.dataset.index);
+            }
+        });
+
+        container.addEventListener('dragend', async (e) => {
+            if (draggedItem) {
+                draggedItem.classList.remove('dragging');
+
+                // Update settings based on DOM order
+                const newOrder = [];
+                const children = Array.from(container.children);
+
+                children.forEach(child => {
+                    const oldIndex = parseInt(child.dataset.index);
+                    if (!isNaN(oldIndex) && this.plugin.settings.goals[oldIndex]) {
+                        newOrder.push(this.plugin.settings.goals[oldIndex]);
+                    }
+                });
+
+                this.plugin.settings.goals = newOrder;
+                await this.saveAndUpdate();
+
+                // Re-render to update indices
+                this.renderGoalsSettings();
+            }
+            draggedItem = null;
+        });
+
+        container.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            const afterElement = this.getDragAfterElement(container, e.clientY);
+            if (draggedItem) {
+                if (afterElement == null) {
+                    container.appendChild(draggedItem);
+                } else {
+                    container.insertBefore(draggedItem, afterElement);
+                }
+            }
+        });
+
+
+    }
+
+    // Reusing your existing helper, or defining it here if it's private
+    getDragAfterElement(container, y) {
+        const draggableElements = [...container.querySelectorAll('.cpwn-goal-item:not(.dragging)')];
+
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
 
 
     renderGeneralDashboardSettings(container) {
