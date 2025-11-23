@@ -5,8 +5,8 @@ export const DASHBOARDWIDGETS = {
     tasks: {
         weeklyGoalPoints: { name: 'Weekly points score (Full)' },
         goalStatusList: { name: 'Daily goals (Full)' },
-        goalStatusListCondensed: { name: 'Daily goals (Half-width)', default: false },
-        weeklyGoalPointsCondensed: { name: 'Weekly momentum (Half-width)', default: false },
+        goalStatusListCondensed: { name: 'Daily goals (Half-width)' },
+        weeklyGoalPointsCondensed: { name: 'Weekly momentum (Half-width)' },
         today: { name: 'Today' },
         tomorrow: { name: 'Tomorrow' },
         next7days: { name: 'Next 7 days' },
@@ -51,7 +51,7 @@ export const DEFAULT_SETTINGS = {
     tabDisplayMode: "iconOnly",
     mobileTabDisplayMode: "iconOnly",
     collapsedNoteGroups: {},
-    tabOrder: ["scratch", "tasks", "notes", "assets", "dashboard"],
+    tabOrder: ["dashboard", "tasks", "scratch", "notes", "assets"],
     tabIcons: {
         scratch: "pencil",
         notes: "files",
@@ -62,7 +62,7 @@ export const DEFAULT_SETTINGS = {
     },
     assetsLookbackDays: 120,
     assetsDefaultView: 'grid',
-    defaultDashboardView: 'creation',
+    defaultDashboardView: 'tasks',
     taskBarChartDefaultMode: 'percent',
     tabVisibility: {
         scratch: true,
@@ -148,6 +148,8 @@ export const DEFAULT_SETTINGS = {
     taskHeatmapMaxpoint: 10,
     showTaskDot: false,
     taskDotColor: "rgba(200, 100, 200, 1)",
+    taskBarChartDefaultMode: 'count',
+
 
     // Task Dashboard Colors
     taskStatusColorOverdue: 'rgba(244, 21, 1, 0.5)',
@@ -183,7 +185,7 @@ export const DEFAULT_SETTINGS = {
     enableRowHighlight: true,
     enableColumnHighlight: true,
     enableRowToDateHighlight: false,
-    highlightCurrentWeek: true,
+    highlightCurrentWeek: false,
 
     // Colors
     selectedTabColor: "rgba(102, 102, 102, 1)",
@@ -198,7 +200,7 @@ export const DEFAULT_SETTINGS = {
     dateCellHoverColorLight: "rgba(105, 105, 105, 0.75)",     // Light Grey
     dateCellHoverColorDark: "rgba(51, 51, 51, 1)",
     assetDotColor: "rgba(255, 0, 0, 1)",
-    todayHighlightStyle: "circle", // 'cell' or 'circle'
+    todayHighlightStyle: "cell", // 'cell' or 'circle'
     todayCircleColorLight: "rgba(255, 80, 80, 0.40)",
     todayCircleColorDark: "rgba(255, 80, 80, 0.75)",
     highlightTodayLabels: true,
@@ -258,8 +260,12 @@ export const DEFAULT_SETTINGS = {
         assetsheatmap: true,
     },
 
-    tasksDashboardOrder: ['Today\'s goals', 'Weekly points score', 'today', 'tomorrow', 'next7days', 'futureNoDue', 'upcomingoverdue', 'taskstatusoverview', 'taskcompletionheatmap'],
+    tasksDashboardOrder: ['goalStatusList', 'weeklyGoalPoints', 'goalStatusListCondensed', 'weeklyGoalPointsCondensed', 'today', 'tomorrow', 'next7days', 'futureNoDue', 'upcomingoverdue', 'taskcompletionheatmap', 'taskstatusoverview'],
     tasksDashboardWidgets: {
+        goalStatusList: true,
+        weeklyGoalPoints: true,
+        goalStatusListCondensed: false,
+        weeklyGoalPointsCondensed: false,
         today: true,
         tomorrow: true,
         next7days: true,
@@ -305,41 +311,6 @@ export const DEFAULT_SETTINGS = {
     ],
     goalScoreHistory: {},
     vacationHistory: {},
-
-    tasksStatsWidgets: [
-        {
-            "widgetKey": "custom-completed-line-30d",
-            "widgetName": "Tasks Completed",
-            "size": "medium",
-            "chartType": "line",
-            "metric": "completed",
-            "dateRange": { "look": "back", "unit": "days", "value": 30 },
-            "groupBy": "day",
-            "todayMarker": {
-                "show": true,
-                "color": "rgba(134, 169, 222, 0.75)"
-            },
-            "legend": true
-        },
-        {
-            "widgetKey": "custom-overdue-kpi",
-            "widgetName": "Overdue Tasks",
-            "size": "mini",
-            "chartType": "kpi",
-            "metric": "overdue",
-            "dateRange": { "look": "back", "unit": "days", "value": 999 },
-            "groupBy": "none",
-            "legend": true
-        },
-        {
-            "widgetKey": "custom-priority-pie",
-            "widgetName": "Tasks by Priority",
-            "size": "small",
-            "chartType": "pie",
-            "metric": "priority",
-            "dateRange": { "look": "back", "unit": "days", "value": 365 },
-            "groupBy": "priority",
-            "legend": true,
-        }
-    ]
+    tasksStatsWidgets: []
+    
 };

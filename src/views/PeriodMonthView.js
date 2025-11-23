@@ -1271,8 +1271,6 @@ export class PeriodMonthView extends ItemView {
     }
 
     getViewType() { return VIEW_TYPE_PERIOD; }
-    //getDisplayText() { return "📅 Calendar period week notes"; }
-    //removed the emoji from display text
     getDisplayText() { return "Calendar period week notes"; }
     getIcon() { return "calendar-check"; }
 
@@ -1698,6 +1696,8 @@ export class PeriodMonthView extends ItemView {
                                 contentDiv.style.setProperty('--cpwn-heatmap-color', finalColor);
 
                                 // This creates a border using the theme's background color, making a clean gap.
+                                //REMOVED 2025-11-23 
+                               
                                 const isInHighlightedRow = settings.highlightCurrentWeek &&
                                     row.classList.contains('current-week-row');
 
@@ -1706,10 +1706,11 @@ export class PeriodMonthView extends ItemView {
                                     const borderColor = document.body.classList.contains('cpwn-theme-dark')
                                         ? settings.rowHighlightColorDark
                                         : settings.rowHighlightColorLight;
-                                    contentDiv.style.border = `${this.plugin.settings.contentBorderWidth} solid ${borderColor}`;
+                                   // contentDiv.style.border = `${this.plugin.settings.contentBorderWidth} solid ${borderColor}`;
                                 } else {
                                     contentDiv.style.border = `${this.plugin.settings.contentBorderWidth} solid var(--background-secondary)`;
                                 }
+                    
                                 // A slightly smaller radius makes it look neatly inset.
                                 contentDiv.addClass('cpwn-content-heatmap-cell-box');
 
@@ -8137,7 +8138,6 @@ export class PeriodMonthView extends ItemView {
         const displayValue = this.taskBarChartMode === 'percent'
             ? `${percentage}%`
             : `${value}`;
-
         // Create the DOM elements
         widgetEl.createEl('div', { text: label, cls: 'cpwn-pm-bar-label' });
         widgetEl.createEl('div', { text: displayValue, cls: 'cpwn-pm-bar-display-value' });
@@ -9391,10 +9391,23 @@ export class PeriodMonthView extends ItemView {
      * @returns {Promise<string>} The content of the note, or an empty string if it doesn't exist.
      */
     async loadNote() {
+        
         const path = this.plugin.settings.fixedNoteFile;
+        if (!path) return null;
+
+        
         const file = this.app.vault.getAbstractFileByPath(path);
-        if (file instanceof TFile) return await this.app.vault.read(file);
-        return "";
+        if (file instanceof TFile) {
+            try {
+                // Safely attempt to read the file
+                return await this.app.vault.read(file);
+            } catch (error) {
+                console.warn(`[Calendar Plugin] Could not read scratchpad file at ${path}:`, error);
+                // Return empty string or null to fail gracefully instead of crashing
+                return ""; 
+            }
+        }
+        return null;
     }
 
     /**

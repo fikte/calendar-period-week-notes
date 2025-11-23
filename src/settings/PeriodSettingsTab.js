@@ -2581,8 +2581,6 @@ export class PeriodSettingsTab extends PluginSettingTab {
 
         const info = goalEl.createDiv({ cls: 'setting-item-info' });
 
-
-
         info.createEl('div', { text: goal.name, cls: 'setting-item-name' });
         info.createEl('div', {
             text: `${this.getGoalDisplayName(goal)} | Target: ${goal.target} | ${goal.points} pts`,
