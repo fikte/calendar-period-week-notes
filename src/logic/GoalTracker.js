@@ -143,6 +143,14 @@ export class GoalTracker {
             }
 
             totalPoints += goalPoints;
+
+            //MERCY RULE 
+            // If user met NO goals at all, assume it was a non-tracking day (e.g. before install)
+            // and reset negative scores to 0.
+            if (metGoalsCount === 0 && totalPoints < 0) {
+                totalPoints = 0;
+            }
+
             results.push({
                 id: goal.id,
                 name: goal.name,

@@ -235,12 +235,17 @@ body.is-mobile .cpwn-month-header-nav button .svg-icon {
 }
 
 body .cpwn-period-month-container.today-style-cell .cpwn-today-cell .cpwn-day-content {
-  background-color: var(--cpwn-today-highlight-color-themed);
+  background-color: var(--cpwn-today-highlight-color-themed) !important;
   border-radius: 6px;
 }
 
 body .cpwn-period-month-container.today-style-cell .cpwn-period-calendar-table tbody tr.current-week-row td.cpwn-today-cell .cpwn-day-content {
     background-color: var(--cpwn-today-highlight-color-themed) !important;
+}
+
+body .cpwn-period-month-container.today-style-cell .cpwn-today-cell .cpwn-dots-container {
+  position: relative;
+  z-index: 1;
 }
 
 .cpwn-period-month-container.today-style-circle .cpwn-today-cell .cpwn-day-number {
@@ -567,19 +572,6 @@ body.is-mobile .cpwn-pm-search-input {
     outline: none !important;
     box-shadow: none !important;
 }
-
-/* This is the visual cutout */
-/*.cpwn-scratchpad-wrapper::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 56px;
-  height: 64px;
-  background-color: var(--background-secondary);
-  z-index: 3;
-  border-bottom-left-radius: var(--cpwn-radius-m);
-}*/
 
 .cpwn-scratchpad-wrapper.markdown-preview-view {
   overflow-wrap: break-word;
@@ -2420,7 +2412,7 @@ body.theme-light .cpwn-search-input-clear-btn .svg-icon {
 
 .cpwn-content-heatmap-cell-box {
     border-radius: 8px;
-    box-sizing: border-box;
+    /* box-sizing: border-box; */
 }
 
 .cpwn-heatmap-cell.cpwn-heatmap-current-week-cell {
@@ -4539,4 +4531,6 @@ body.is-mobile .cpwn-tabs-content-wrapper {
     font-size: 0.6em;
     color: var(--text-muted);
 }
+
+
 
