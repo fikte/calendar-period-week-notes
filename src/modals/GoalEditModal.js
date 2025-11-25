@@ -226,8 +226,8 @@ export class GoalEditModal extends Modal {
         let explanation = "";
 
         if (this.tempGoal.type === 'note-created') {
-            points = 60; 
-            explanation = "Reward: 60 pts\n(Penalty: -10 pts if missed)";
+            points = 30; 
+            explanation = "Reward: 30 pts\n(Penalty: -10 pts if missed)";
         } else if (this.tempGoal.type === 'task-count') {
             const count = this.tempGoal.target || 0;
             points = count * 30;

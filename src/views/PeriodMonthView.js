@@ -1697,7 +1697,7 @@ export class PeriodMonthView extends ItemView {
 
                                 // This creates a border using the theme's background color, making a clean gap.
                                 //REMOVED 2025-11-23 
-                               
+
                                 const isInHighlightedRow = settings.highlightCurrentWeek &&
                                     row.classList.contains('current-week-row');
 
@@ -1706,11 +1706,11 @@ export class PeriodMonthView extends ItemView {
                                     const borderColor = document.body.classList.contains('cpwn-theme-dark')
                                         ? settings.rowHighlightColorDark
                                         : settings.rowHighlightColorLight;
-                                   // contentDiv.style.border = `${this.plugin.settings.contentBorderWidth} solid ${borderColor}`;
+                                    // contentDiv.style.border = `${this.plugin.settings.contentBorderWidth} solid ${borderColor}`;
                                 } else {
                                     contentDiv.style.border = `${this.plugin.settings.contentBorderWidth} solid var(--background-secondary)`;
                                 }
-                    
+
                                 // A slightly smaller radius makes it look neatly inset.
                                 contentDiv.addClass('cpwn-content-heatmap-cell-box');
 
@@ -2155,11 +2155,10 @@ export class PeriodMonthView extends ItemView {
     }
 
     /**
-     * Scans the entire vault for open tasks with due dates (e.g., 📅YYYY-MM-DD)
-     * and populates `this.tasksByDate` map for quick lookups by the calendar view.
+     * populates `this.tasksByDate` map for quick lookups by the calendar view.
      */
-    // This is the NEW, CORRECT version of the function
     async buildTasksByDateMap() {
+        
         this.tasksByDate.clear();
         this.fileToTaskDates.clear();
 
@@ -6923,20 +6922,23 @@ export class PeriodMonthView extends ItemView {
                     const goals = await GoalDataAggregator.getTodaysGoals(this.app, this.plugin.settings, this.allTasks);
                     const historySettings = { ...this.plugin.settings, vacationModeGlobal: false };
                     const rawHistory = await GoalDataAggregator.getPointsHistory(this.app, historySettings, this.allTasks);
-                    
+
                     let calculatedTotal = 0;
                     if (Array.isArray(rawHistory)) {
                         calculatedTotal = rawHistory.reduce((acc, day) => acc + (day.totalPoints || 0), 0);
                     } else if (rawHistory && rawHistory.datasets && rawHistory.datasets[0]) {
-                         calculatedTotal = rawHistory.datasets[0].data.reduce((acc, val) => acc + (Number(val) || 0), 0);
+                        calculatedTotal = rawHistory.datasets[0].data.reduce((acc, val) => acc + (Number(val) || 0), 0);
                     }
                     const totalPoints = calculatedTotal;
 
                     // --- LEVEL CALCULATION ---
                     const trackerForLevels = new GoalTracker(this.app, this.plugin.settings);
                     const lifetimeTargetRaw = trackerForLevels.getLifetimeTargetPoints && trackerForLevels.getLifetimeTargetPoints();
+
+                    const todayScore = await trackerForLevels.calculateDailyScore(moment(), this.allTasks);
+
                     const effectiveTarget = lifetimeTargetRaw && lifetimeTargetRaw > 0 ? lifetimeTargetRaw : 300000;
-                    
+
                     const LEVEL_BANDS = [
                         { frac: 1.0, title: 'Grandmaster of Flow', icon: 'infinity' },
                         { frac: 0.9, title: 'Legendary Leader', icon: 'crown' },
@@ -6956,11 +6958,11 @@ export class PeriodMonthView extends ItemView {
                     ];
 
                     const levelsDesc = LEVEL_BANDS.map((band, idx) => ({
-                                min: Math.round(band.frac * effectiveTarget),
-                                title: band.title,
-                                icon: band.icon,
-                                level: LEVEL_BANDS.length - idx
-                            })).sort((a, b) => b.min - a.min);
+                        min: Math.round(band.frac * effectiveTarget),
+                        title: band.title,
+                        icon: band.icon,
+                        level: LEVEL_BANDS.length - idx
+                    })).sort((a, b) => b.min - a.min);
 
                     const currentLevel = levelsDesc.find(l => Number(totalPoints) >= l.min) || levelsDesc[levelsDesc.length - 1];
                     const currentIndex = levelsDesc.indexOf(currentLevel);
@@ -6973,24 +6975,24 @@ export class PeriodMonthView extends ItemView {
                         let dailyAverage = 0;
                         if (Array.isArray(rawHistory) && rawHistory.length > 0) {
                             const recent = rawHistory.slice(-7);
-                            const sum = recent.reduce((acc, d) => acc + (d.totalPoints||0), 0);
+                            const sum = recent.reduce((acc, d) => acc + (d.totalPoints || 0), 0);
                             dailyAverage = sum / (recent.length || 1);
                         } else if (rawHistory && rawHistory.datasets && rawHistory.datasets[0]) {
-                             // Quick check for chart data format too
-                             const d = rawHistory.datasets[0].data || [];
-                             if (d.length >= 2) {
-                                 // Basic diff logic if needed, or just take the last value if cumulative
-                                 // Assuming simple average for now to match logic
-                                 dailyAverage = Number(d[d.length-1]) || 0; 
-                             }
+                            // Quick check for chart data format too
+                            const d = rawHistory.datasets[0].data || [];
+                            if (d.length >= 2) {
+                                // Basic diff logic if needed, or just take the last value if cumulative
+                                // Assuming simple average for now to match logic
+                                dailyAverage = Number(d[d.length - 1]) || 0;
+                            }
                         }
-                        
+
                         const pointsRemaining = Math.max(0, nextLevel.min - totalPoints);
                         if (dailyAverage > 0) {
                             const daysToNext = Math.ceil(pointsRemaining / dailyAverage);
                             const projectedDate = moment().add(daysToNext, 'days').format('MMM Do');
                             const avgRounded = Math.round(dailyAverage);
-                            
+
                             let headline;
                             if (avgRounded < 75) {
                                 headline = `Nice and steady. Averaging ~${avgRounded} pts/day.`;
@@ -7001,16 +7003,16 @@ export class PeriodMonthView extends ItemView {
                             } else {
                                 headline = `Absolutely crushing it at ~${avgRounded} pts/day.`;
                             }
-                            
+
                             const paceLine = projectedDate ? `At this pace, you'll level up on ${projectedDate}.` : `Keep going—every day moves you closer.`;
                             const distanceLine = pointsRemaining > 0 ? `You're only ${pointsRemaining.toLocaleString()} points away!` : `You've already reached this tier—enjoy the win!`;
 
-                            projectionText = 
-                               `Current: ${totalPoints.toLocaleString()} pts\n` +
-                               `Next: ${nextLevel.title} (${nextLevel.min.toLocaleString()} pts)\n\n` +
-                               `${headline}\n` +
-                               `${paceLine}\n` +
-                               `${distanceLine}`;
+                            projectionText =
+                                `Current: ${totalPoints.toLocaleString()} pts\n` +
+                                `Next: ${nextLevel.title} (${nextLevel.min.toLocaleString()} pts)\n\n` +
+                                `${headline}\n` +
+                                `${paceLine}\n` +
+                                `${distanceLine}`;
                         } else {
                             projectionText = `Current: ${totalPoints.toLocaleString()} pts\nNext: ${nextLevel.title}\n\nComplete some tasks to see your estimated level-up date!`;
                         }
@@ -7023,7 +7025,7 @@ export class PeriodMonthView extends ItemView {
                     const listEl = splitContainer.createDiv({ cls: 'cpwn-goal-list-left' });
 
                     if (this.plugin.settings.vacationModeGlobal) {
-                         // Show Vacation Icon
+                        // Show Vacation Icon
                         const iconContainer = listEl.createDiv({
                             cls: 'cpwn-summary-icon-rest' // Reuse the same large icon class
                         });
@@ -7038,57 +7040,57 @@ export class PeriodMonthView extends ItemView {
                         const totalGoals = goals.length;
                         const offGoalsCount = goals.filter(g => !g.isActiveToday).length;
                         const activeGoalsCount = totalGoals - offGoalsCount;
-                        
-                                            // LEFT: Summary Text
-                    const listEl = splitContainer.createDiv({ cls: 'cpwn-goal-list-left' });
 
-                    if (this.plugin.settings.vacationModeGlobal) {
-                        // Show Vacation Icon
-                        const iconContainer = listEl.createDiv({
-                            cls: 'cpwn-summary-icon-rest' // Reuse the same large icon class
-                        });
-                        setIcon(iconContainer, 'tree-plam'); // Palm tree icon
+                        // LEFT: Summary Text
+                        const listEl = splitContainer.createDiv({ cls: 'cpwn-goal-list-left' });
 
-                        listEl.createDiv({
-                            cls: 'cpwn-summary-sub',
-                            text: 'On Vacation'
-                        });
-                    } else {
-                        const totalGoals = goals.length;
-                        const offGoalsCount = goals.filter(g => !g.isActiveToday).length;
-                        const metCount = goals.filter(g => g.isActiveToday && g.isMet).length;
-
-                        if (offGoalsCount === totalGoals && totalGoals > 0) {
-                            // CASE A: Rest Day (All Off) -> Show Coffee Icon
+                        if (this.plugin.settings.vacationModeGlobal) {
+                            // Show Vacation Icon
                             const iconContainer = listEl.createDiv({
-                                cls: 'cpwn-summary-icon-rest'
+                                cls: 'cpwn-summary-icon-rest' // Reuse the same large icon class
                             });
-                            setIcon(iconContainer, 'coffee'); // Uses the standard Obsidian 'coffee' icon
+                            setIcon(iconContainer, 'tree-plam'); // Palm tree icon
 
                             listEl.createDiv({
                                 cls: 'cpwn-summary-sub',
-                                text: 'All goals off'
+                                text: 'On Vacation'
                             });
-
                         } else {
-                            // CASE B: Normal Counting
-                            listEl.createDiv({
-                                cls: 'cpwn-summary-large',
-                                text: `${metCount}/${totalGoals}`
-                            });
-                            
-                            // Dynamic Subtext
-                            let subText = 'goals met';
-                            if (offGoalsCount > 0) {
-                                subText = `${offGoalsCount} off today`;
+                            const totalGoals = goals.length;
+                            const offGoalsCount = goals.filter(g => !g.isActiveToday).length;
+                            const metCount = goals.filter(g => g.isActiveToday && g.isMet).length;
+
+                            if (offGoalsCount === totalGoals && totalGoals > 0) {
+                                // CASE A: Rest Day (All Off) -> Show Coffee Icon
+                                const iconContainer = listEl.createDiv({
+                                    cls: 'cpwn-summary-icon-rest'
+                                });
+                                setIcon(iconContainer, 'coffee'); // Uses the standard Obsidian 'coffee' icon
+
+                                listEl.createDiv({
+                                    cls: 'cpwn-summary-sub',
+                                    text: 'All goals off'
+                                });
+
+                            } else {
+                                // CASE B: Normal Counting
+                                listEl.createDiv({
+                                    cls: 'cpwn-summary-large',
+                                    text: `${metCount}/${totalGoals}`
+                                });
+
+                                // Dynamic Subtext
+                                let subText = 'goals met';
+                                if (offGoalsCount > 0) {
+                                    subText = `${offGoalsCount} off today`;
+                                }
+
+                                listEl.createDiv({
+                                    cls: 'cpwn-summary-sub',
+                                    text: subText
+                                });
                             }
-                            
-                            listEl.createDiv({
-                                cls: 'cpwn-summary-sub',
-                                text: subText
-                            });
                         }
-                    }
 
                     }
 
@@ -7106,14 +7108,14 @@ export class PeriodMonthView extends ItemView {
                     svgEl.setAttribute('width', String(size));
                     svgEl.setAttribute('height', String(size));
                     svgEl.style.transform = 'rotate(-90deg)';
-                    
+
                     const bgCircle = document.createElementNS(svgNs, 'circle');
-                    bgCircle.setAttribute('cx', String(size/2)); bgCircle.setAttribute('cy', String(size/2)); bgCircle.setAttribute('r', String(r));
+                    bgCircle.setAttribute('cx', String(size / 2)); bgCircle.setAttribute('cy', String(size / 2)); bgCircle.setAttribute('r', String(r));
                     bgCircle.setAttribute('stroke', 'var(--background-modifier-border)'); bgCircle.setAttribute('stroke-width', String(stroke)); bgCircle.setAttribute('fill', 'none');
                     svgEl.appendChild(bgCircle);
 
                     const progCircle = document.createElementNS(svgNs, 'circle');
-                    progCircle.setAttribute('cx', String(size/2)); progCircle.setAttribute('cy', String(size/2)); progCircle.setAttribute('r', String(r));
+                    progCircle.setAttribute('cx', String(size / 2)); progCircle.setAttribute('cy', String(size / 2)); progCircle.setAttribute('r', String(r));
                     progCircle.setAttribute('stroke', 'var(--text-accent)'); progCircle.setAttribute('stroke-width', String(stroke)); progCircle.setAttribute('fill', 'none');
                     progCircle.style.strokeDasharray = `${circ}`; progCircle.style.strokeDashoffset = `${offset}`;
                     svgEl.appendChild(progCircle);
@@ -7149,13 +7151,13 @@ export class PeriodMonthView extends ItemView {
                         miniSvg.style.transform = 'rotate(-90deg)';
 
                         const miniBg = document.createElementNS(svgNs, 'circle');
-                        miniBg.setAttribute('cx', String(miniSize/2)); miniBg.setAttribute('cy', String(miniSize/2));
+                        miniBg.setAttribute('cx', String(miniSize / 2)); miniBg.setAttribute('cy', String(miniSize / 2));
                         miniBg.setAttribute('r', String(miniR)); miniBg.setAttribute('stroke', 'var(--background-modifier-border)');
                         miniBg.setAttribute('stroke-width', String(miniStroke)); miniBg.setAttribute('fill', 'var(--background-primary)');
                         miniSvg.appendChild(miniBg);
 
                         const miniProg = document.createElementNS(svgNs, 'circle');
-                        miniProg.setAttribute('cx', String(miniSize/2)); miniProg.setAttribute('cy', String(miniSize/2));
+                        miniProg.setAttribute('cx', String(miniSize / 2)); miniProg.setAttribute('cy', String(miniSize / 2));
                         miniProg.setAttribute('r', String(miniR)); miniProg.setAttribute('stroke', 'var(--text-accent)');
                         miniProg.setAttribute('stroke-width', String(miniStroke)); miniProg.setAttribute('fill', 'none');
                         miniProg.style.strokeDasharray = `${miniCirc}`; miniProg.style.strokeDashoffset = `${miniOffset}`;
@@ -7168,7 +7170,65 @@ export class PeriodMonthView extends ItemView {
                         header.createDiv({ cls: 'cpwn-goal-tooltip-title', text: currentLevel.title });
 
                         const body = goalTooltipEl.createDiv({ cls: 'cpwn-goal-tooltip-body' });
-                        
+
+                        if (todayScore && todayScore.breakdown) {
+                            const bd = todayScore.breakdown;
+                            const breakdownDiv = goalTooltipEl.createDiv({ cls: 'cpwn-goal-breakdown' });
+                            breakdownDiv.style.marginTop = '12px';
+                            breakdownDiv.style.borderTop = '1px solid var(--background-modifier-border)';
+                            breakdownDiv.style.paddingTop = '8px';
+
+                            const makeRow = (label, pts, icon) => {
+                                const row = breakdownDiv.createDiv({ cls: 'cpwn-breakdown-row' });
+                                // Ensure the row itself aligns its children (left vs right)
+                                row.style.display = 'flex';
+                                row.style.justifyContent = 'space-between';
+                                row.style.alignItems = 'center'; // Vertically center the Left vs Right groups
+                                row.style.fontSize = '0.9em';
+                                row.style.marginBottom = '4px';
+
+                                // LEFT SIDE: Icon + Label
+                                const left = row.createDiv();
+                                // Make this a flex container too so the Icon aligns with the Text
+                                left.style.display = 'flex';
+                                left.style.alignItems = 'center'; // Critical for Icon/Text alignment
+                                left.style.gap = '6px'; // Add a small consistent gap
+
+                                if (icon) {
+                                    const iconSpan = left.createSpan({ cls: 'cpwn-bd-icon' });
+                                    setIcon(iconSpan, icon);
+                                    // Optional: ensure icon doesn't shrink
+                                    iconSpan.style.display = 'flex';
+                                }
+
+                                // The label text
+                                left.createSpan({ text: label });
+
+                                // RIGHT SIDE: Points
+                                const right = row.createDiv({ cls: 'cpwn-bd-pts', text: `+${pts}` });
+                                if (pts > 0) right.style.color = 'var(--text-accent)';
+                                else right.style.color = 'var(--text-muted)';
+                            };
+
+
+                            if (bd.goals !== 0) makeRow("Goals", bd.goals, "target");
+                            if (bd.allMet > 0) makeRow("All Met Bonus", bd.allMet, "star");
+                            if (bd.streak > 0) makeRow("Streak Bonus", bd.streak, "flame");
+                            if (bd.multiplier > 0) makeRow("Multiplier", bd.multiplier, "zap");
+
+                            // Total for Today
+                            const totalRow = breakdownDiv.createDiv({ cls: 'cpwn-breakdown-total' });
+                            totalRow.style.display = 'flex';
+                            totalRow.style.justifyContent = 'space-between';
+                            totalRow.style.fontWeight = 'bold';
+                            totalRow.style.marginTop = '6px';
+                            totalRow.style.borderTop = '1px dashed var(--background-modifier-border)';
+                            totalRow.style.paddingTop = '4px';
+                            totalRow.createDiv({ text: "Today's Total" });
+                            totalRow.createDiv({ text: `${todayScore.totalPoints}`, style: 'color: var(--text-accent)' });
+                        }
+
+
                         // Render full projection text lines
                         projectionText.split('\n').forEach(line => {
                             const trimmed = line.trim();
@@ -7179,9 +7239,9 @@ export class PeriodMonthView extends ItemView {
                             if (trimmed.startsWith('At this pace')) {
                                 body.createDiv({ cls: 'cpwn-goal-tooltip-spacer-large' });
                             }
-                            
+
                             const isEmphasis = trimmed.startsWith('Current:') || trimmed.startsWith('Next:') || trimmed.startsWith('Nice and steady') || trimmed.startsWith('Good momentum') || trimmed.startsWith("You're on fire") || trimmed.startsWith('Absolutely crushing');
-                            
+
                             body.createDiv({
                                 cls: isEmphasis ? 'cpwn-goal-tooltip-line-strong' : 'cpwn-goal-tooltip-line',
                                 text: trimmed
@@ -7194,17 +7254,19 @@ export class PeriodMonthView extends ItemView {
                         const padding = 12;
                         let x = evt.clientX + padding;
                         let y = evt.clientY + padding;
-                        
+
                         // Measure tooltip
                         const rect = goalTooltipEl.getBoundingClientRect();
                         if (x + rect.width + padding > window.innerWidth) x = evt.clientX - rect.width - padding;
                         if (y + rect.height + padding > window.innerHeight) y = evt.clientY - rect.height - padding;
-                        
+
                         goalTooltipEl.style.left = `${x}px`;
                         goalTooltipEl.style.top = `${y}px`;
                     };
 
                     svgWrapper.addEventListener('mouseenter', (evt) => {
+
+                        
                         buildTooltipContent();
                         requestAnimationFrame(() => {
                             if (!goalTooltipEl) return;
@@ -7230,7 +7292,7 @@ export class PeriodMonthView extends ItemView {
                 }
 
 
-            
+
                 case 'weeklyGoalPointsCondensed': {
                     // 1. Create Container (Medium/Half-Width)
                     const widgetContainer = widgetGrid.createDiv({
@@ -7323,6 +7385,7 @@ export class PeriodMonthView extends ItemView {
                     // Generate Weekly Data
                     const labels = [];
                     const dataPoints = [];
+                    const breakdowns = [];
 
                     // FIX: Initialize GoalTracker with 'historySettings'
                     const tracker = new GoalTracker(this.app, historySettings);
@@ -7337,15 +7400,20 @@ export class PeriodMonthView extends ItemView {
                         dataPoints.unshift(currentRunningTotal);
 
                         const dailyRes = await tracker.calculateDailyScore(date, this.allTasks);
+
+                        breakdowns.unshift(dailyRes.breakdown || { goals: 0, allMet: 0, streak: 0, multiplier: 0 });
+
                         currentRunningTotal -= dailyRes.totalPoints;
                     }
 
                     // Construct chartDataObj
                     const chartDataObj = {
                         labels: labels,
+                        breakdowns: breakdowns,
                         datasets: [
                             {
                                 label: 'Weekly Momentum',
+                                breakdowns: breakdowns,
                                 data: dataPoints,
                                 borderColor: 'var(--text-accent)',
                                 backgroundColor: 'rgba(var(--text-accent-rgb), 0.1)',
@@ -7465,6 +7533,7 @@ export class PeriodMonthView extends ItemView {
                         // 2. Generate Weekly Data (Backwards from Total)
                         const labels = [];
                         const dataPoints = [];
+                        const breakdowns = [];
 
                         // FIX 3: Initialize GoalTracker with 'historySettings'
                         // This ensures it can calculate past days' scores even if Vacation Mode is ON today.
@@ -7480,12 +7549,16 @@ export class PeriodMonthView extends ItemView {
                             dataPoints.unshift(currentRunningTotal);
 
                             const dailyRes = await tracker.calculateDailyScore(date, this.allTasks);
+
+                            breakdowns.unshift(dailyRes.breakdown || { goals: 0, allMet: 0, streak: 0, multiplier: 0 });
+
                             currentRunningTotal -= dailyRes.totalPoints;
                         }
 
                         // 3. Construct chartDataObj
                         const chartDataObj = {
                             labels: labels,
+                            breakdowns: breakdowns,
                             datasets: [
                                 {
                                     label: 'Weekly Momentum',
@@ -7569,6 +7642,9 @@ export class PeriodMonthView extends ItemView {
                         const lifetimeTargetRaw =
                             trackerForLevels.getLifetimeTargetPoints &&
                             trackerForLevels.getLifetimeTargetPoints();
+
+                        const todayScore = await trackerForLevels.calculateDailyScore(moment(), this.allTasks);
+
                         const effectiveTarget =
                             lifetimeTargetRaw && lifetimeTargetRaw > 0 ? lifetimeTargetRaw : 300000;
 
@@ -7722,13 +7798,13 @@ export class PeriodMonthView extends ItemView {
                         const listEl = splitContainer.createDiv({ cls: 'cpwn-goal-list-left' });
                         if (this.plugin.settings.vacationModeGlobal) {
                             // Vacation mode ON: show override message
-                             // Show Vacation Icon
-                        const iconContainer = listEl.createDiv({
-                            cls: 'cpwn-summary-icon-rest' // Reuse the same large icon class
-                        });
-                        setIcon(iconContainer, 'plane'); // Palm tree icon
+                            // Show Vacation Icon
+                            const iconContainer = listEl.createDiv({
+                                cls: 'cpwn-summary-icon-rest' // Reuse the same large icon class
+                            });
+                            setIcon(iconContainer, 'plane'); // Palm tree icon
 
-                            
+
                             listEl.createDiv({
                                 text: 'All goals paused, enjoy your vacation!',
                                 cls: 'cpwn-muted-text'
@@ -7810,7 +7886,7 @@ export class PeriodMonthView extends ItemView {
 
                         const svgWrapper = levelCol.createDiv({ cls: 'cpwn-level-circle-wrapper' });
                         // Basic aria label for accessibility; real content comes from custom tooltip
-                        svgWrapper.setAttribute('aria-label', 'Goal progress summary');
+                        //svgWrapper.setAttribute('aria-label', 'Goal progress summary');
 
                         // Safe SVG Creation
                         const svgNs = 'http://www.w3.org/2000/svg';
@@ -7925,6 +8001,63 @@ export class PeriodMonthView extends ItemView {
                                 cls: 'cpwn-goal-tooltip-body'
                             });
 
+                            if (todayScore && todayScore.breakdown) {
+                                const bd = todayScore.breakdown;
+                                const breakdownDiv = goalTooltipEl.createDiv({ cls: 'cpwn-goal-breakdown' });
+                                breakdownDiv.style.marginTop = '12px';
+                                breakdownDiv.style.borderTop = '1px solid var(--background-modifier-border)';
+                                breakdownDiv.style.paddingTop = '8px';
+
+                                const makeRow = (label, pts, icon) => {
+                                    const row = breakdownDiv.createDiv({ cls: 'cpwn-breakdown-row' });
+                                    // Ensure the row itself aligns its children (left vs right)
+                                    row.style.display = 'flex';
+                                    row.style.justifyContent = 'space-between';
+                                    row.style.alignItems = 'center'; // Vertically center the Left vs Right groups
+                                    row.style.fontSize = '0.9em';
+                                    row.style.marginBottom = '4px';
+
+                                    // LEFT SIDE: Icon + Label
+                                    const left = row.createDiv();
+                                    // Make this a flex container too so the Icon aligns with the Text
+                                    left.style.display = 'flex';
+                                    left.style.alignItems = 'center'; // Critical for Icon/Text alignment
+                                    left.style.gap = '6px'; // Add a small consistent gap
+
+                                    if (icon) {
+                                        const iconSpan = left.createSpan({ cls: 'cpwn-bd-icon' });
+                                        setIcon(iconSpan, icon);
+                                        // Optional: ensure icon doesn't shrink
+                                        iconSpan.style.display = 'flex';
+                                    }
+
+                                    // The label text
+                                    left.createSpan({ text: label });
+
+                                    // RIGHT SIDE: Points
+                                    const right = row.createDiv({ cls: 'cpwn-bd-pts', text: `+${pts}` });
+                                    if (pts > 0) right.style.color = 'var(--text-accent)';
+                                    else right.style.color = 'var(--text-muted)';
+                                };
+
+
+                                if (bd.goals !== 0) makeRow("Goals", bd.goals, "target");
+                                if (bd.allMet > 0) makeRow("All Met Bonus", bd.allMet, "star");
+                                if (bd.streak > 0) makeRow("Streak Bonus", bd.streak, "flame");
+                                if (bd.multiplier > 0) makeRow("Multiplier", bd.multiplier, "zap");
+
+                                // Total for Today
+                                const totalRow = breakdownDiv.createDiv({ cls: 'cpwn-breakdown-total' });
+                                totalRow.style.display = 'flex';
+                                totalRow.style.justifyContent = 'space-between';
+                                totalRow.style.fontWeight = 'bold';
+                                totalRow.style.marginTop = '6px';
+                                totalRow.style.borderTop = '1px dashed var(--background-modifier-border)';
+                                totalRow.style.paddingTop = '4px';
+                                totalRow.createDiv({ text: "Today's Total" });
+                                totalRow.createDiv({ text: `${todayScore.totalPoints}`, style: 'color: var(--text-accent)' });
+                            }
+
                             const lines = projectionText.split('\n');
 
                             lines.forEach((line) => {
@@ -7959,55 +8092,85 @@ export class PeriodMonthView extends ItemView {
                         const positionTooltip = (evt) => {
                             if (!goalTooltipEl) return;
 
-                            const padding = 12;
+                            const padding = 10;
                             const viewportWidth = window.innerWidth;
                             const viewportHeight = window.innerHeight;
 
-                            // Start by placing it to the bottom-right of the cursor
-                            let x = evt.clientX + padding;
-                            let y = evt.clientY + padding;
+                            // 1. Get Coordinates safely (Handle Touch vs Mouse)
+                            let clientX = evt.clientX;
+                            let clientY = evt.clientY;
 
-                            // Measure tooltip
+                            // Fallback for touch events if clientX is missing
+                            if ((clientX === undefined || clientX === null) && evt.touches && evt.touches.length > 0) {
+                                clientX = evt.touches[0].clientX;
+                                clientY = evt.touches[0].clientY;
+                            }
+                            // Final fallback to center screen if no coordinates found
+                            if (clientX === undefined) {
+                                clientX = viewportWidth / 2;
+                                clientY = viewportHeight / 2;
+                            }
+
+                            // 2. Measure Tooltip
                             const rect = goalTooltipEl.getBoundingClientRect();
 
-                            // If it would overflow to the right, flip to left side
+                            // 3. Initial Position (Bottom-Right of cursor)
+                            let x = clientX + padding;
+                            let y = clientY + padding;
+
+                            // 4. Flip Logic
+                            // Right edge overflow? Flip to left.
                             if (x + rect.width + padding > viewportWidth) {
-                                x = evt.clientX - rect.width - padding;
+                                x = clientX - rect.width - padding;
                             }
-
-                            // If it would overflow the bottom, move up
+                            // Bottom edge overflow? Flip up.
                             if (y + rect.height + padding > viewportHeight) {
-                                y = evt.clientY - rect.height - padding;
+                                y = clientY - rect.height - padding;
                             }
 
-                            // Final clamp to viewport
-                            x = Math.max(padding, Math.min(x, viewportWidth - rect.width - padding));
-                            y = Math.max(padding, Math.min(y, viewportHeight - rect.height - padding));
+                            // 5. Hard Clamp (Keep it on screen no matter what)
+                            // Ensure left edge is at least 'padding'
+                            x = Math.max(padding, x);
+                            // Ensure right edge doesn't overflow (move left if needed)
+                            if (x + rect.width > viewportWidth - padding) {
+                                x = viewportWidth - rect.width - padding;
+                            }
+
+                            // Ensure top edge is at least 'padding'
+                            y = Math.max(padding, y);
+                            // Ensure bottom edge doesn't overflow
+                            if (y + rect.height > viewportHeight - padding) {
+                                y = viewportHeight - rect.height - padding;
+                            }
 
                             goalTooltipEl.style.left = `${x}px`;
                             goalTooltipEl.style.top = `${y}px`;
                         };
 
-                        svgWrapper.addEventListener('mouseenter', (evt) => {
-                            buildTooltipContent();
-                            // Ensure layout is up to date before measuring
-                            requestAnimationFrame(() => {
-                                if (!goalTooltipEl) return;
-                                goalTooltipEl.style.opacity = '1';
-                                goalTooltipEl.style.pointerEvents = 'none';
-                                positionTooltip(evt);
-                            });
-                        });
 
-                        svgWrapper.addEventListener('mousemove', (evt) => {
+                        svgWrapper.addEventListener('mouseenter', (evt) => {
+
+                        
+                        buildTooltipContent();
+                        requestAnimationFrame(() => {
+                            if (!goalTooltipEl) return;
+                            goalTooltipEl.style.opacity = '1';
+                            goalTooltipEl.style.pointerEvents = 'none';
                             positionTooltip(evt);
                         });
+                    });
 
-                        svgWrapper.addEventListener('mouseleave', () => {
-                            if (goalTooltipEl) {
-                                goalTooltipEl.style.opacity = '0';
-                            }
-                        });
+                    svgWrapper.addEventListener('mousemove', (evt) => {
+                        positionTooltip(evt);
+                    });
+
+                    svgWrapper.addEventListener('mouseleave', () => {
+                        if (goalTooltipEl) {
+                            goalTooltipEl.style.opacity = '0';
+                            goalTooltipEl.remove();
+                            goalTooltipEl = null;
+                        }
+                    });
                     }
                     break;
                 }
@@ -8968,6 +9131,7 @@ export class PeriodMonthView extends ItemView {
 
         ];
 
+        /*
         const finalGroups = {};
         groupOrder.forEach(g => {
             const showGroup = settings.taskDateGroupsToShow.includes(g.key);
@@ -8983,6 +9147,56 @@ export class PeriodMonthView extends ItemView {
             }
 
         });
+        
+            */
+
+        const finalGroups = {};
+        groupOrder.forEach(g => {
+            const showGroup = settings.taskDateGroupsToShow.includes(g.key);
+            let tasksInGroup = groupsData[g.key];
+
+            if (g.key === 'completed') {
+                 const showCompletedSetting = this.plugin.settings.showCompletedTasksToday;
+                 const isSearching = this.tasksSearchTerm && this.tasksSearchTerm.trim().length > 0;
+
+                 if (isSearching) {
+                     // CASE 1: USER IS SEARCHING
+                     // Show ALL completed tasks that match the search (no date filter)
+                     // 'tasksInGroup' is already search-filtered by your earlier logic, so just keep it as is.
+                     // We do NOT filter by 'today'.
+                 } 
+                 else if (showCompletedSetting) {
+                     // CASE 2: NO SEARCH, BUT SETTING IS ON
+                     // Show only completed tasks for TODAY
+                     const today = moment();
+                     tasksInGroup = tasksInGroup.filter(t => {
+                         // Ensure task has a done date and it is Today
+                         return t.done?.moment && t.done.moment.isSame(today, 'day');
+                     });
+                 } 
+                 else {
+                     // CASE 3: NO SEARCH, SETTING OFF
+                     // Hide everything
+                     tasksInGroup = [];
+                 }
+            }
+
+            // Check if we have tasks left to show
+            const hasTasks = tasksInGroup && tasksInGroup.length > 0;
+            
+            // Logic to decide if group header renders
+            const isCompletedGroup = g.key === 'completed';
+            const shouldRender = (settings.taskDateGroupsToShow.includes(g.key) || isCompletedGroup) && hasTasks;
+
+            if (shouldRender) {
+                finalGroups[g.key] = {
+                    ...g,
+                    tasks: tasksInGroup
+                };
+            }
+        });
+
+
 
         return finalGroups;
     }
@@ -9059,6 +9273,12 @@ export class PeriodMonthView extends ItemView {
         taskRow.dataset.taskStatus = task.status.type;
 
         taskRow.classList.add('cpwn-task-row');
+
+        if (this.plugin.settings.taskTextTruncate) { 
+
+            console.log('Adding truncate class to task row');
+            taskRow.addClass('cpwn-task-truncate');
+        }
 
         const checkbox = taskRow.createDiv({ cls: 'cpwn-task-checkbox-symbol' });
         checkbox.classList.add('cpwn-task-checkbox-symbol');
@@ -9391,11 +9611,11 @@ export class PeriodMonthView extends ItemView {
      * @returns {Promise<string>} The content of the note, or an empty string if it doesn't exist.
      */
     async loadNote() {
-        
+
         const path = this.plugin.settings.fixedNoteFile;
         if (!path) return null;
 
-        
+
         const file = this.app.vault.getAbstractFileByPath(path);
         if (file instanceof TFile) {
             try {
@@ -9404,7 +9624,7 @@ export class PeriodMonthView extends ItemView {
             } catch (error) {
                 console.warn(`[Calendar Plugin] Could not read scratchpad file at ${path}:`, error);
                 // Return empty string or null to fail gracefully instead of crashing
-                return ""; 
+                return "";
             }
         }
         return null;

@@ -2816,10 +2816,26 @@ body.theme-dark .cpwn-heatmap-cell.cpwn-heatmap-current-week-cell {
 }
 
 /* When truncation is enabled, apply nowrap */
-.cpwn-tasks-container.truncate-mode .cpwn-task-row .cpwn-task-text {
+/*.cpwn-tasks-container.truncate-mode .cpwn-task-row .cpwn-task-text {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}*/
+
+.cpwn-task-row.cpwn-task-truncate .cpwn-task-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block; 
+    max-width: 100%;
+}
+
+/* Also ensure the rendered paragraph inside MarkdownRenderer inherits this behavior */
+.cpwn-task-row.cpwn-task-truncate .cpwn-task-text p {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 0; 
 }
 
 /* When full text mode is enabled, ensure wrapping */
@@ -4069,7 +4085,7 @@ body.is-mobile .cpwn-tabs-content-wrapper {
 
 /* Axis Labels */
 .cpwn-axis-label {
-    font-size: 10px;
+    font-size: 8px;
     fill: var(--text-muted);
     text-anchor: middle;
 }
@@ -4262,9 +4278,9 @@ body.is-mobile .cpwn-tabs-content-wrapper {
 
 /* Goal progress tooltip, styled like a mini popup window */
 .cpwn-goal-tooltip {
-    position: fixed;
+    position: fixed !important;
     z-index: 9999;
-    max-width: 360px;
+    max-width: min(360px, 90vw); /* Never exceed 90% of screen width */
     padding: 10px 12px;
     border-radius: 8px;
     background-color: var(--background-primary);
@@ -4276,7 +4292,27 @@ body.is-mobile .cpwn-tabs-content-wrapper {
     opacity: 0;
     transition: opacity 0.15s ease-out;
     pointer-events: none;
+    white-space: normal; 
 }
+
+/* NEW: Mobile-Specific Override */
+@media screen and (max-width: 480px) {
+    .cpwn-goal-tooltip {
+        /* Force it to be centered at the bottom of the viewport */
+        top: auto !important;       /* Ignore JS top */
+        bottom: 20px !important;    /* Stick to bottom with padding */
+        left: 50% !important;       /* Center horizontally */
+        transform: translateX(-50%) !important; /* Perfect centering */
+        
+        /* Ensure width is safe */
+        width: 90vw !important;
+        max-width: 360px !important;
+        
+        /* Add a backdrop shadow to make it pop over content */
+        box-shadow: 0 -4px 20px rgba(0,0,0,0.4) !important;
+    }
+}
+
 
 /* Optional: reuse popup font/spacing feel */
 .cpwn-goal-tooltip-header {
