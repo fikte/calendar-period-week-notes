@@ -2285,15 +2285,19 @@ export class PeriodSettingsTab extends PluginSettingTab {
         new Setting(containerEl).setName("Task group heading font size").setDesc("The font size for the date/tag group headings (e.g., 'Overdue', 'Today'). Default is 13px.").addText(text => text.setValue(this.plugin.settings.taskHeadingFontSize).onChange(async value => { this.plugin.settings.taskHeadingFontSize = value; await this.saveAndUpdate(); }));
         new Setting(containerEl).setName("Task text font size").setDesc("The font size for the individual task items in the list. Default is 14px.").addText(text => text.setValue(this.plugin.settings.taskTextFontSize).onChange(async value => { this.plugin.settings.taskTextFontSize = value; await this.saveAndUpdate(); }));
         new Setting(containerEl).setName("Truncate long task text").setDesc("If enabled, long tasks will be shortened with '...'. If disabled, they will wrap to multiple lines.").addToggle(toggle => toggle.setValue(this.plugin.settings.taskTextTruncate).onChange(async (value) => { this.plugin.settings.taskTextTruncate = value; await this.saveAndUpdate(); }));
-        new Setting(containerEl).setName("Show completed tasks for Today").setDesc("If enabled, tasks that you marked as complete today will appear in the lists (regardless of their due date).").addToggle(toggle => toggle.setValue(this.plugin.settings.showCompletedTasksToday).onChange(async (value) => { this.plugin.settings.showCompletedTasksToday = value; await this.saveAndUpdate(); }));
         new Setting(containerEl).setName("Task sort order").setDesc("The default order for tasks within each group.").addDropdown(dropdown => dropdown.addOption('dueDate', 'By Due Date (earliest first)').addOption('a-z', 'A-Z').addOption('z-a', 'Z-A').setValue(this.plugin.settings.taskSortOrder).onChange(async (value) => { this.plugin.settings.taskSortOrder = value; await this.saveAndUpdate(); }));
         new Setting(containerEl).setName("Group tasks by").setDesc("Choose how to group tasks in the view. Second-clicking the Tasks tab will also toggle this.").addDropdown(dropdown => dropdown.addOption('date', 'Date (Overdue, Today, etc.)').addOption('tag', 'Tag').setValue(this.plugin.settings.taskGroupBy).onChange(async (value) => { this.plugin.settings.taskGroupBy = value; await this.saveAndUpdate(); this.refreshDisplay(); }));
 
         if (this.plugin.settings.taskGroupBy === 'date') {
             new Setting(containerEl).setName("Date groups to show").setHeading();
-            const dateGroups = [{ key: 'overdue', name: 'Overdue' }, { key: 'today', name: 'Today' }, { key: 'tomorrow', name: 'Tomorrow' }, { key: 'next7days', name: 'Next 7 Days' }, { key: 'future', name: 'Future' }, { key: 'noDate', name: 'Someday' },];
-            dateGroups.forEach(g => { new Setting(containerEl).setName(g.name).addToggle(t => t.setValue(this.plugin.settings.taskDateGroupsToShow.includes(g.key)).onChange(async v => { const groups = this.plugin.settings.taskDateGroupsToShow; if (v && !groups.includes(g.key)) groups.push(g.key); else if (!v) this.plugin.settings.taskDateGroupsToShow = groups.filter(i => i !== g.key); await this.saveAndUpdate(); })); });
+            const dateGroups = [{ key: 'overdue', name: 'Overdue', desc: 'Show tasks that have a due date before today and are not completed.' }, { key: 'today', name: 'Today', desc: 'Show all tasks that have a due date of today.' }, { key: 'tomorrow', name: 'Tomorrow', desc: 'Show all tasks that have a due date of tomorrow.' }, { key: 'next7days', name: 'Next 7 Days', desc: 'Show all tasks that are due after tomorrow and up to 7 days ahead' }, { key: 'future', name: 'Future', desc: 'Show tasks that have a due date after the next 7 days out.' }, { key: 'noDate', name: 'Someday', desc: 'Show all tasks that due not have a due date.' }];
+            dateGroups.forEach(g => { new Setting(containerEl).setName(g.name).setDesc(g.desc).addToggle(t => t.setValue(this.plugin.settings.taskDateGroupsToShow.includes(g.key)).onChange(async v => { const groups = this.plugin.settings.taskDateGroupsToShow; if (v && !groups.includes(g.key)) groups.push(g.key); else if (!v) this.plugin.settings.taskDateGroupsToShow = groups.filter(i => i !== g.key); await this.saveAndUpdate(); })); });
         }
+        new Setting(containerEl).setName("Completed").setDesc("Show tasks that you have marked as complete today.").addToggle(toggle => toggle.setValue(this.plugin.settings.showCompletedTasksToday).onChange(async (value) => { this.plugin.settings.showCompletedTasksToday = value; await this.saveAndUpdate(); }));
+
+
+        containerEl.createEl('div', { cls: 'cpwn-setting-spacer' });
+
 
         new Setting(containerEl).setName("Content & appearance").setHeading();
         this.createIgnoredFolderList(containerEl, "Exclude folders from Task search", "Tasks in these folders will not appear in the 'Tasks' list.", 'taskIgnoreFolders');
@@ -2310,6 +2314,7 @@ export class PeriodSettingsTab extends PluginSettingTab {
             { key: 'noDate', name: 'Someday icon' },
             { key: 'tag', name: 'Tag Group icon' }
         ];
+
 
         // Loop through the settings to create each input field and its reset button
         taskGroupIconSettings.forEach(s => {
@@ -2356,6 +2361,9 @@ export class PeriodSettingsTab extends PluginSettingTab {
                         this.refreshDisplay();
                     }
                 }));
+
+        containerEl.createEl('div', { cls: 'cpwn-setting-spacer' });
+
 
         new Setting(containerEl).setName("Task group backgrounds").setHeading();
         this.createRgbaColorSetting(containerEl, "Overdue", "Background color for the 'Overdue' task group.", "taskGroupColorOverdue");
@@ -2569,15 +2577,18 @@ export class PeriodSettingsTab extends PluginSettingTab {
 
     renderGoalItem(goalsList, goal, index, isCore) {
         const goalEl = goalsList.createDiv({ cls: 'cpwn-goal-item setting-item' });
-        goalEl.setAttribute('draggable', isCore ? 'false' : 'true');
+        //goalEl.setAttribute('draggable', isCore ? 'false' : 'true');
+        goalEl.setAttribute('draggable', 'true');
         goalEl.dataset.index = index;
 
         // Drag handle (disabled for core)
         const handle = goalEl.createDiv({ cls: 'cpwn-pm-drag-handle' });
         setIcon(handle, 'grip-vertical');
         handle.style.marginRight = '10px';
-        handle.style.cursor = isCore ? 'not-allowed' : 'grab';
-        if (isCore) handle.style.opacity = '0.5';
+        //handle.style.cursor = isCore ? 'not-allowed' : 'grab';
+        handle.style.cursor = 'grab';
+
+        //if (isCore) handle.style.opacity = '0.5';
 
         const info = goalEl.createDiv({ cls: 'setting-item-info' });
 

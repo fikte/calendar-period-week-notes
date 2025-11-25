@@ -912,7 +912,7 @@ export class CssChartRenderer {
         const svgNs = "http://www.w3.org/2000/svg";
         const svg = document.createElementNS(svgNs, "svg");
 
-        svg.setAttribute('viewBox', '0 0 300 135');
+        svg.setAttribute('viewBox', '0 0 300 125');
         svg.setAttribute('preserveAspectRatio', 'none');
 
         svg.setAttribute('preserveAspectRatio', 'none');
@@ -1018,8 +1018,64 @@ export class CssChartRenderer {
             // Tooltip Events (Using Arrow Functions to fix 'this' context)
             hitTarget.addEventListener('mouseenter', (e) => {
                 const label = chartData.labels[i];
-                this.showTooltip(e, `${label}: ${p.val} pts`);
-                circle.setAttribute('r', '5.5'); // Highlight effect
+                const score = p.val.toLocaleString();
+
+                // 1. Create a container div
+                const content = document.createElement('div');
+
+                // 2. Header
+                const header = content.createDiv({ cls: 'cpwn-chart-tt-header' });
+                header.style.fontWeight = 'bold';
+                header.style.marginBottom = '6px';
+                header.style.fontSize = '1.1em'; // Make header slightly larger too
+                header.setText(`${label}: ${score} pts`);
+
+                // 3. Breakdown
+                if (chartData.breakdowns && chartData.breakdowns[i]) {
+                    const bd = chartData.breakdowns[i];
+
+                    if (bd.goals || bd.allMet || bd.streak || bd.multiplier) {
+                        const bdContainer = content.createDiv({ cls: 'cpwn-chart-tt-breakdown' });
+                        Object.assign(bdContainer.style, {
+                            fontSize: '1em', // CHANGED: Was 0.85em. Now 1em (standard size)
+                            opacity: '1',    // CHANGED: Increased opacity for better readability
+                            borderTop: '1px solid rgba(255,255,255,0.2)',
+                            marginTop: '6px',
+                            paddingTop: '6px'
+                        });
+
+                        // Helper for rows with STRICT ALIGNMENT & LARGER TEXT
+                        const addRow = (name, val) => {
+                            const row = bdContainer.createDiv();
+                            row.style.display = 'flex';
+                            row.style.justifyContent = 'space-between';
+                            row.style.alignItems = 'center';
+                            row.style.marginBottom = '3px'; // Slightly more breathing room
+
+                            // Left side (Label)
+                            const left = row.createDiv();
+                            left.style.display = 'flex';
+                            left.style.alignItems = 'center';
+                            left.createSpan({ text: name });
+
+                            // Right side (Value)
+                            const valSpan = row.createSpan({ text: `+${val}` });
+                            valSpan.style.fontWeight = 'bold'; // Make the numbers pop
+                            valSpan.style.color = 'var(--text-accent)';
+                            valSpan.style.fontFamily = 'var(--font-monospace)';
+                            // Optional: make the numbers specifically larger?
+                            // valSpan.style.fontSize = '1.1em'; 
+                        };
+
+                        if (bd.goals > 0) addRow('Goals', bd.goals);
+                        if (bd.allMet > 0) addRow('All Met', bd.allMet);
+                        if (bd.streak > 0) addRow('Streak', bd.streak);
+                        if (bd.multiplier > 0) addRow('Multiplier', bd.multiplier);
+                    }
+                }
+
+                this.showTooltip(e, content);
+                circle.setAttribute('r', '5.5');
             });
 
             hitTarget.addEventListener('mousemove', (e) => {
@@ -1042,36 +1098,92 @@ export class CssChartRenderer {
             text.classList.add(labelClass);
             text.setAttribute('text-anchor', 'middle');
             text.setAttribute('x', points[i].x);
-            text.setAttribute('y', 130);
+            text.setAttribute('y', 127);
             text.textContent = label; // Use textContent
             svg.appendChild(text);
         });
 
     }
 
-    showTooltip(e, text) {
-        // 1. Create tooltip element if it doesn't exist yet
+    showTooltip(e, content) {
+        // Create tooltip element if it doesn't exist
         if (!this.tooltipEl) {
             this.tooltipEl = document.body.createDiv({ cls: 'cpwn-chart-tooltip' });
-            // Safety: Ensure it doesn't block mouse events for the chart
-            this.tooltipEl.style.pointerEvents = 'none';
             this.tooltipEl.style.position = 'absolute';
-            this.tooltipEl.style.zIndex = '9999'; // Ensure it sits on top
+            this.tooltipEl.style.zIndex = '1000';
+            this.tooltipEl.style.pointerEvents = 'none'; // Prevent tooltip from blocking mouse
+            this.tooltipEl.style.backgroundColor = 'var(--background-primary)';
+            this.tooltipEl.style.border = '1px solid var(--background-modifier-border)';
+            this.tooltipEl.style.padding = '8px';
+            this.tooltipEl.style.borderRadius = '4px';
+            this.tooltipEl.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
         }
 
-        // 2. Set the text content
-        this.tooltipEl.setText(text);
+        // Clear previous content
+        this.tooltipEl.empty();
 
-        // 3. Position and show it
+        // Append new content safely
+        if (typeof content === 'string') {
+            this.tooltipEl.setText(content);
+        } else if (content instanceof HTMLElement) {
+            this.tooltipEl.appendChild(content);
+        }
+
+        // Position the tooltip
         this.moveTooltip(e);
+
+        // Ensure it's visible
         this.tooltipEl.style.display = 'block';
     }
 
     /**
- * Updates the tooltip position to follow the mouse.
- * Adds smart positioning to prevent overflow on the right edge.
- * @param {MouseEvent} e - The mouse movement event.
- */
+     * Updates the tooltip position to follow the mouse.
+     * Adds smart positioning to prevent overflow on the right edge.
+     * @param {MouseEvent} e - The mouse movement event.
+     */
+    moveTooltip(e) {
+        if (!this.tooltipEl) return;
+
+        const tooltipRect = this.tooltipEl.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+
+        // 1. Calculate initial position (e.g., 15px offset from cursor)
+        let left = e.clientX + 15;
+        let top = e.clientY + 15;
+
+        // 2. Right Boundary Check
+        // If the tooltip's right edge exceeds the viewport width...
+        if (left + tooltipRect.width > viewportWidth - 10) { // 10px buffer
+            // ...flip it to the left side of the cursor
+            left = e.clientX - tooltipRect.width - 15;
+        }
+
+        // 3. Left Boundary Check (Safety net)
+        // If flipping it left pushed it off the left edge (very narrow screen)...
+        if (left < 10) {
+            left = 10; // Anchor it to the left edge with padding
+        }
+
+        // 4. Bottom Boundary Check
+        // If the tooltip's bottom edge exceeds the viewport height...
+        if (top + tooltipRect.height > viewportHeight - 10) {
+            // ...flip it to above the cursor
+            top = e.clientY - tooltipRect.height - 15;
+        }
+
+        // 5. Top Boundary Check (Safety net)
+        // If flipping it up pushed it off the top edge...
+        if (top < 10) {
+            top = 10; // Anchor to top edge
+        }
+
+        // 6. Apply coordinates
+        this.tooltipEl.style.left = `${left}px`;
+        this.tooltipEl.style.top = `${top}px`;
+    }
+
+    /*
     moveTooltip(e) {
         if (this.tooltipEl) {
             const tooltipRect = this.tooltipEl.getBoundingClientRect();
@@ -1097,7 +1209,7 @@ export class CssChartRenderer {
             this.tooltipEl.style.top = `${top}px`;
         }
     }
-
+    */
 
     /**
      * Hides the tooltip from view.

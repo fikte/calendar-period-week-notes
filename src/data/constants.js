@@ -286,7 +286,7 @@ export const DEFAULT_SETTINGS = {
             name: 'Daily note created',
             type: 'note-created',
             target: 1,
-            points: 60,
+            points: 30,
             core: true,
             enabled: true
         },

@@ -45,6 +45,170 @@ export class GoalTracker {
      * @returns {Promise<{date: string, totalPoints: number, results: Array<object>, allMet: boolean, level: number, levelTitle: string, levelIcon: string}>}
      */
     async calculateDailyScore(date, allTasks = []) {
+        if (this.settings.vacationModeGlobal) {
+            return {
+                date: date.format('YYYY-MM-DD'),
+                totalPoints: 0,
+                breakdown: { goals: 0, allMet: 0, multiplier: 0, streak: 0 }, // NEW
+                results: [],
+                allMet: false,
+                level: 0,
+                levelTitle: '',
+                levelIcon: ''
+            };
+        }
+
+        const isoKey = date.format('YYYY-MM-DD');
+        const todayStart = moment().startOf('day');
+        const dateStart = date.clone().startOf('day');
+        const canUseCache = dateStart.isBefore(todayStart, 'day');
+
+        // Return cached snapshot if available
+        if (canUseCache &&
+            this.settings.goalScoreHistory &&
+            this.settings.goalScoreHistory[isoKey] &&
+            this.settings.goalScoreHistory[isoKey].breakdown // Ensure cache has breakdown
+        ) {
+            return this.settings.goalScoreHistory[isoKey];
+        }
+
+        if (!this.settings.goalScoreHistory) this.settings.goalScoreHistory = {};
+        if (!this.settings.vacationHistory) this.settings.vacationHistory = {};
+
+        const vacationForDay = this.settings.vacationHistory[isoKey] || {};
+        let totalPoints = 0;
+
+        // NEW: Initialize breakdown tracker
+        let breakdown = {
+            goals: 0,
+            allMet: 0,
+            multiplier: 0,
+            streak: 0
+        };
+
+        const results = [];
+        const goals = this.settings.goals || [];
+        const weekdayIndex = date.isoWeekday() - 1;
+        let activeGoalsCount = 0;
+        let metGoalsCount = 0;
+
+        const activeGoals = (this.settings.goals || []).filter(g => !!g.enabled);
+
+        for (const goal of activeGoals) {
+            const activeDays = Array.isArray(goal.activeDays) && goal.activeDays.length > 0
+                ? goal.activeDays
+                : [0, 1, 2, 3, 4, 5, 6];
+
+            const isActiveToday = activeDays.includes(weekdayIndex);
+            const isVacationToday = !!vacationForDay[goal.id] || !!goal.vacationMode === true;
+
+            if (isActiveToday && goal.vacationMode) {
+                if (!this.settings.vacationHistory[isoKey]) {
+                    this.settings.vacationHistory[isoKey] = {};
+                }
+                this.settings.vacationHistory[isoKey][goal.id] = true;
+            }
+
+            let result = { isMet: false, current: 0 };
+
+            if (isActiveToday && !isVacationToday) {
+                result = await this.checkGoal(goal, date, allTasks);
+                activeGoalsCount++;
+            } else if (isActiveToday && isVacationToday) {
+                result = await this.checkGoal(goal, date, allTasks);
+                activeGoalsCount++;
+            }
+
+            let goalPoints = 0;
+
+            if (isActiveToday && result.isMet && !isVacationToday) {
+                metGoalsCount++;
+                const baseValue = parseInt(goal.points || 0);
+                goalPoints = baseValue;
+
+                if (goal.type === 'task-count') {
+                    const extra = Math.max(0, result.current - goal.target);
+                    if (extra > 0) {
+                        goalPoints += extra * 2;
+                    }
+                }
+            } else if (isActiveToday && !result.isMet && !isVacationToday) {
+                goalPoints = -10;
+            } else {
+                goalPoints = 0;
+            }
+
+            totalPoints += goalPoints;
+            breakdown.goals += goalPoints; // Track goal points
+
+            results.push({
+                id: goal.id,
+                name: goal.name,
+                isMet: isActiveToday ? result.isMet : false,
+                isActiveToday,
+                isVacationToday,
+                points: goalPoints,
+                target: goal.target,
+                current: result.current,
+                type: goal.type
+            });
+        }
+
+        if (metGoalsCount === 0 && totalPoints < 0) {
+            totalPoints = 0;
+            breakdown.goals = 0; // Reset if mercy rule applies
+        }
+
+        // 2. "All Goals Met" Daily Bonus
+        const allGoalsMet = activeGoalsCount > 0 && metGoalsCount === activeGoalsCount;
+        if (allGoalsMet) {
+            totalPoints += 100;
+            breakdown.allMet = 100; // Track bonus
+
+            // 3. Small Goal Count Multiplier
+            if (activeGoalsCount > 0 && activeGoalsCount < 3) {
+                const preMult = totalPoints;
+                totalPoints = Math.floor(totalPoints * 1.5);
+                breakdown.multiplier = totalPoints - preMult; // Track difference
+            }
+
+            // 4. Streak Bonus
+            const yesterday = date.clone().subtract(1, 'days');
+            const yesterdayResults = await this.calculateDailyScoreSimple(yesterday, allTasks);
+            if (yesterdayResults.allMet) {
+                totalPoints += 50;
+                breakdown.streak = 50; // Track streak
+            }
+        }
+
+        const achievement = this.getAchievementLevel(totalPoints);
+
+        const resultObj = {
+            date: isoKey,
+            totalPoints,
+            breakdown, // Return the breakdown
+            results,
+            allMet: allGoalsMet,
+            level: achievement.level,
+            levelTitle: achievement.title,
+            levelIcon: achievement.icon
+        };
+
+        if (canUseCache) {
+            if (!this.settings.goalScoreHistory) {
+                this.settings.goalScoreHistory = {};
+            }
+            this.settings.goalScoreHistory[isoKey] = {
+                ...resultObj,
+                cachedAt: Date.now()
+            };
+        }
+
+        return resultObj;
+    }
+
+    /*
+    async calculateDailyScore(date, allTasks = []) {
 
         if (this.settings.vacationModeGlobal) {
             // Vacation applies to all goals, skip scoring
@@ -210,6 +374,8 @@ export class GoalTracker {
 
         return resultObj;
     }
+    */
+
 
 
     // Simplified calculation for "Yesterday" to avoid infinite loops/deep recursion
@@ -336,7 +502,7 @@ export class GoalTracker {
         ];
 
         //const target = this.getLifetimeTargetPoints();
-        const target = this.getLifetimeTargetPoints() || 300000;        
+        const target = this.getLifetimeTargetPoints() || 300000;
         if (!target) {
             // Fallback: no goals yet
             return { min: 0, title: "Starter Spark", level: 1, icon: "sprout" };
