@@ -2285,9 +2285,26 @@ export class PeriodSettingsTab extends PluginSettingTab {
         new Setting(containerEl).setName("Task group heading font size").setDesc("The font size for the date/tag group headings (e.g., 'Overdue', 'Today'). Default is 13px.").addText(text => text.setValue(this.plugin.settings.taskHeadingFontSize).onChange(async value => { this.plugin.settings.taskHeadingFontSize = value; await this.saveAndUpdate(); }));
         new Setting(containerEl).setName("Task text font size").setDesc("The font size for the individual task items in the list. Default is 14px.").addText(text => text.setValue(this.plugin.settings.taskTextFontSize).onChange(async value => { this.plugin.settings.taskTextFontSize = value; await this.saveAndUpdate(); }));
         new Setting(containerEl).setName("Truncate long task text").setDesc("If enabled, long tasks will be shortened with '...'. If disabled, they will wrap to multiple lines.").addToggle(toggle => toggle.setValue(this.plugin.settings.taskTextTruncate).onChange(async (value) => { this.plugin.settings.taskTextTruncate = value; await this.saveAndUpdate(); }));
-        new Setting(containerEl).setName("Task sort order").setDesc("The default order for tasks within each group.").addDropdown(dropdown => dropdown.addOption('dueDate', 'By Due Date (earliest first)').addOption('a-z', 'A-Z').addOption('z-a', 'Z-A').setValue(this.plugin.settings.taskSortOrder).onChange(async (value) => { this.plugin.settings.taskSortOrder = value; await this.saveAndUpdate(); }));
+        
+        //new Setting(containerEl).setName("Task sort order").setDesc("The default order for tasks within each group. Note tasks with alerts set will take precedence.").addDropdown(dropdown => dropdown.addOption('dueDate', 'By Due Date').addOption('a-z', 'A-Z').addOption('z-a', 'Z-A').setValue(this.plugin.settings.taskSortOrder).onChange(async (value) => { this.plugin.settings.taskSortOrder = value; await this.saveAndUpdate(); }));
+        new Setting(containerEl)
+            .setName("Task sort order")
+            .setDesc("Define how tasks are ordered within their groups. Alerts always appear at the top.")
+            .addDropdown(dropdown => dropdown
+                .addOption('dueDate', 'Due Date → Priority') // Standard for mixed lists
+                .addOption('priority', 'Priority → Due Date') // Good for "Eat the Frog"
+                .addOption('a-z', 'Alphabetical (A-Z)')       // Good for reference lists
+                .addOption('z-a', 'Alphabetical (Z-A)')
+                .setValue(this.plugin.settings.taskSortOrder)
+                .onChange(async (value) => { 
+                    this.plugin.settings.taskSortOrder = value; 
+                    await this.saveAndUpdate(); 
+                }));
+        
+        
+        
         new Setting(containerEl).setName("Group tasks by").setDesc("Choose how to group tasks in the view. Second-clicking the Tasks tab will also toggle this.").addDropdown(dropdown => dropdown.addOption('date', 'Date (Overdue, Today, etc.)').addOption('tag', 'Tag').setValue(this.plugin.settings.taskGroupBy).onChange(async (value) => { this.plugin.settings.taskGroupBy = value; await this.saveAndUpdate(); this.refreshDisplay(); }));
-
+        
         if (this.plugin.settings.taskGroupBy === 'date') {
             new Setting(containerEl).setName("Date groups to show").setHeading();
             const dateGroups = [{ key: 'overdue', name: 'Overdue', desc: 'Show tasks that have a due date before today and are not completed.' }, { key: 'today', name: 'Today', desc: 'Show all tasks that have a due date of today.' }, { key: 'tomorrow', name: 'Tomorrow', desc: 'Show all tasks that have a due date of tomorrow.' }, { key: 'next7days', name: 'Next 7 Days', desc: 'Show all tasks that are due after tomorrow and up to 7 days ahead' }, { key: 'future', name: 'Future', desc: 'Show tasks that have a due date after the next 7 days out.' }, { key: 'noDate', name: 'Someday', desc: 'Show all tasks that due not have a due date.' }];
