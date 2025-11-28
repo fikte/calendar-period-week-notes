@@ -27,8 +27,8 @@ class FolderSuggest extends AbstractInputSuggest {
     }
 
     selectSuggestion(file) {
-        this.inputEl.value = file.path;
-        this.inputEl.trigger("input");
+        this.textInputEl.value = file.path;
+        this.textInputEl.trigger("input");
         this.close();
     }
 }
@@ -68,7 +68,7 @@ export class GoalEditModal extends Modal {
         contentEl.createEl('h2', { text: this.goal.name ? 'Edit goal' : 'Create new goal' });
 
         new Setting(contentEl)
-            .setDesc('If you change a folder location, #tags or goal values to achieve it\'s recommended to perform a \'Reset cache\' to recalculate your progress.')
+            .setDesc('If you change a folder location, #tags or goal values, it\'s recommended to perform a \'Reset cache\' to recalculate your progress.')
 
         // 1. Goal Name
         new Setting(contentEl)
@@ -84,9 +84,9 @@ export class GoalEditModal extends Modal {
         new Setting(contentEl)
             .setName('Goal type')
             .addDropdown(drop => drop
-                .addOption('task-count', 'Daily tasks')
-                .addOption('note-created', 'Daily note created')
-                .addOption('word-count', 'Daily word count')
+                .addOption('task-count', 'Task completed')
+                .addOption('note-created', 'Note created')
+                .addOption('word-count', 'Note word count')
                 .setValue(this.tempGoal.type)
                 .onChange(value => {
                     this.tempGoal.type = value;

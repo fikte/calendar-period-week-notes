@@ -30,6 +30,10 @@ body.theme-dark {
     --cpwn-current-label-highlight-color-themed: var(--cpwn-current-highlight-label-color-dark); 
 }
 
+body .tooltip {
+    z-index: 20000 !important; 
+}
+
 /* Style for the "Month" part (uses existing --cpwn-month-color-themed variable) */
 .cpwn-month-title-month {
     color: var(--cpwn-month-color-themed);
@@ -104,6 +108,11 @@ width: 100%;
 }
 
 .cpwn-month-header-title {
+    
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
     font-size: var(--cpwn-main-month-year-title-font-size);
     white-space: nowrap;
     cursor: pointer;
@@ -792,6 +801,8 @@ padding: 15px;
     flex-direction: column;
     overflow: hidden; /* Hide overflow on the main container */
     max-height: 250px; /* Increased slightly for mobile header */
+    z-index: 1000 !important;
+    overflow: visible !important;
 }
 
 /* Popup header */
@@ -2764,7 +2775,7 @@ body.theme-dark .cpwn-heatmap-cell.cpwn-heatmap-current-week-cell {
 /* -- Task Group Collapse Styles -- */
 .cpwn-task-row {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     padding: 12px 10px 8px 5px;  /* Increase from 4px to 10px for top/bottom padding */
 }
 
@@ -2822,7 +2833,7 @@ body.theme-dark .cpwn-heatmap-cell.cpwn-heatmap-current-week-cell {
     text-overflow: ellipsis;
 }*/
 
-.cpwn-task-row.cpwn-task-truncate .cpwn-task-text {
+.cpwn-task-row.cpwn-task-truncate .cpwn-task-text-markdown {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -2862,15 +2873,15 @@ body.theme-dark .cpwn-heatmap-cell.cpwn-heatmap-current-week-cell {
 }
 
 .cpwn-other-notes-popup-item .cpwn-task-checkbox-symbol {
-    margin-top: 4px !important;  
-    align-self: flex-start;     
+    margin-top: 2px !important;  
+    flex-shrink: 0;
 }
 
 .cpwn-task-text.completed {
-    opacity: 0.6;
-    color: var(--text-muted);
+    opacity: 0.6 !important;
+    color: var(--text-muted) !important;
 }
-    
+ 
 .cpwn-tasks-container.show-full-text .cpwn-task-row {
   align-items: flex-start;
 }
@@ -3960,14 +3971,15 @@ body.is-mobile .cpwn-tabs-content-wrapper {
     display: flex;
     align-items: flex-start;
     gap: 10px;
+    padding: 12px 10px 8px 5px; 
 }
-
+/*
 .cpwn-task-checkbox-symbol {
     flex-shrink: 0;
     margin-left: -4px;
     margin-top: 4px;
 }
-
+*/
 .cpwn-task-text {
     flex: 1;
     min-width: 0;
@@ -4568,5 +4580,113 @@ body.is-mobile .cpwn-tabs-content-wrapper {
     color: var(--text-muted);
 }
 
+.cpwn-header-alert-icon {
+    margin-left: 10px;
+    vertical-align: middle;
+    display: inline-flex; /* Important for alignment */
+    align-items: center;
+    height: 1em;
+    position: relative;
+    color: var(--text-muted);
+    cursor: pointer;
+}
 
+.cpwn-header-alert-icon.is-alerting {
+    color: var(--text-error);
+    animation: cpwn-bell-shake 2s infinite;
+}
 
+/* Simple shake animation */
+@keyframes cpwn-bell-shake {
+    0% { transform: rotate(0); }
+    10% { transform: rotate(15deg); }
+    20% { transform: rotate(-15deg); }
+    30% { transform: rotate(10deg); }
+    40% { transform: rotate(-10deg); }
+    50% { transform: rotate(0); }
+    100% { transform: rotate(0); }
+}
+
+/* Colors for priorities */
+.cpwn-priority-icon[data-priority="0"] { color: var(--text-error); }   /* Red */
+.cpwn-priority-icon[data-priority="1"] { color: var(--text-error); } /* Orange */
+.cpwn-priority-icon[data-priority="2"] { color: var(--text-muted); }   /* Grey */
+.cpwn-priority-icon[data-priority="4"] { color: var(--text-accent); }  /* Blue/Green */
+.cpwn-priority-icon[data-priority="5"] { color: var(--text-faint); }   /* Faint */
+
+/* --- Task Priority & Content Layout --- */
+
+/* Main wrapper for Icon + Text + Alert Badge */
+.cpwn-task-content-wrapper {
+    display: inline-flex;
+    align-items: flex-start; /* Aligns icon with text baseline perfectly */
+    gap: 4px;              /* Space between icon and text */
+    width: 100%;           /* Ensure it takes full width */
+    min-width: 0;          /* Flexbox fix for text overflow */
+}
+
+/* Container for the Priority Icon */
+.cpwn-priority-icon-container {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;      /* Center icon vertically relative to the line height */
+    margin-top: 3px;
+    flex-shrink: 0;        /* Never squish the icon */
+    height: 1em;           /* Match text size */
+    color: var(--text-muted); /* Default color fallback */
+}
+
+/* The actual SVG Icon */
+.cpwn-priority-icon {
+    width: 16px;
+    height: 16px;
+    stroke-width: 2.5px; /* Make them a bit bolder/readable */
+}
+
+/* The Text Container (holds the Markdown) */
+.cpwn-task-text-markdown {
+    flex: 1;               /* Take up remaining space */
+    min-width: 0;
+    line-height: 1.5;
+}
+
+/* Fix Markdown <p> tags causing new lines */
+.cpwn-task-text-markdown p {
+    margin: 0;
+    display: inline;       /* Forces paragraph to behave like a span */
+}
+
+/* Alert Badge Styling */
+.cpwn-task-alert-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 6px;
+    
+    margin-right: 5px;
+    flex-shrink: 0;
+    color: var(--text-accent);
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    margin-top: 3px;
+    vertical-align: middle;
+}
+.cpwn-task-alert-badge svg {
+    width: 14px;
+    height: 14px;
+}
+
+.cpwn-alert-time-text {
+    font-size: 0.85em;
+    line-height: 1;
+    opacity: 0.9;
+}
+
+/* Hide content for ALL minimized states */
+.cpwn-pm-widget-container.cpwn-is-mini .cpwn-widget-content,
+.cpwn-pm-widget-container.cpwn-is-collapsed .cpwn-widget-content,
+.cpwn-pm-widget-container.collapsed .cpwn-widget-content { 
+    display: none !important;
+    pointer-events: none !important;
+}
