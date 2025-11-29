@@ -3179,6 +3179,7 @@ export class PeriodMonthView extends ItemView {
                 await this.updateTaskWidget('upcomingoverdue');
                 await this.updateTaskWidget('taskcompletionheatmap');
                 await this.updateTaskWidget('taskstatusoverview');
+                await this.updateMomentumWidget();
 
                 // 3. Custom Widgets
                 const customWidgets = this.plugin.settings.tasksStatsWidgets || [];
@@ -9752,9 +9753,18 @@ export class PeriodMonthView extends ItemView {
             e.stopPropagation();
         });
 
-        if (isMobile) {
-            const margin = 8;
-
+        //if (isMobile) {
+        if (isMobile && window.innerWidth < 768) { 
+            // Center the popup
+            this.popupEl.style.top = '50%';
+            this.popupEl.style.left = '50%';
+            this.popupEl.style.transform = 'translate(-50%, -50%)';
+            
+            // Ensure visibility
+            this.popupEl.style.visibility = 'visible';
+            return; 
+            
+            /*const margin = 8;
             this.popupEl.classList.add('cpwn-context-menu');
             this.popupEl.style.setProperty('--menu-width', `calc(100% - ${margin * 2}px)`);
             this.popupEl.style.setProperty('--menu-bottom', `${margin}px`);
@@ -9762,7 +9772,7 @@ export class PeriodMonthView extends ItemView {
 
 
             this.popupEl.style.top = '';
-            this.popupEl.style.visibility = 'visible';
+            this.popupEl.style.visibility = 'visible';*/
         } else {
             const popupRect = this.popupEl.getBoundingClientRect();
             const targetRect = targetEl.getBoundingClientRect();

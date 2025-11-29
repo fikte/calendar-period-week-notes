@@ -81,28 +81,39 @@ export class GoalEditModal extends Modal {
                 }));
 
         // 2. Goal Type Dropdown
-        new Setting(contentEl)
+        const typeSetting = new Setting(contentEl)
             .setName('Goal type')
-            .addDropdown(drop => drop
-                .addOption('task-count', 'Task completed')
-                .addOption('note-created', 'Note created')
-                .addOption('word-count', 'Note word count')
-                .setValue(this.tempGoal.type)
-                .onChange(value => {
-                    this.tempGoal.type = value;
-                    
-                    // Set sensible defaults
-                    if (value === 'note-created') {
-                        this.tempGoal.target = 1;
-                    } else if (value === 'word-count' && this.tempGoal.target < 100) {
-                        this.tempGoal.target = 500;
-                    } else if (value === 'task-count' && this.tempGoal.target > 50) {
-                        this.tempGoal.target = 3;
-                    }
+            .addDropdown(drop => {
+                drop
+                    .addOption('task-count', 'Task completed')
+                    .addOption('note-created', 'Note created')
+                    .addOption('word-count', 'Note word count')
+                    .setValue(this.tempGoal.type)
+                    .onChange(value => {
+                        this.tempGoal.type = value;
+                        
+                        // Set sensible defaults
+                        if (value === 'note-created') {
+                            this.tempGoal.target = 1;
+                        } else if (value === 'word-count' && this.tempGoal.target < 100) {
+                            this.tempGoal.target = 500;
+                        } else if (value === 'task-count' && this.tempGoal.target > 50) {
+                            this.tempGoal.target = 3;
+                        }
 
-                    this.updatePointsPreview(); 
-                    this.display();  
-                }));
+                        this.updatePointsPreview(); 
+                        this.display();  
+                    });
+               
+                    if (this.goal.isCore) {
+                        drop.setDisabled(true);
+                    }
+                });
+                
+            // Adds a tooltip or description explaining why it's disabled
+            if (this.goal.isCore) {
+                typeSetting.setDesc('Core goals cannot change their type.');
+            }
 
         // 3. Conditional Input: Tag Query
         if (this.tempGoal.type === 'task-count') {
@@ -119,7 +130,7 @@ export class GoalEditModal extends Modal {
         if (this.tempGoal.type === 'word-count' || this.tempGoal.type === 'note-created') {
             new Setting(contentEl)
                 .setName("Folder location (optional)")
-                .setDesc("Leave blank to use your default Daily Notes folder, or specify a folder.")
+                .setDesc("Leave blank to use your default Daily Notes folder and note title, or specify a folder and title.")
                 .addText(text => {
                     text.setPlaceholder("Example: Journals")
                         .setValue(this.tempGoal.folder || "")
@@ -131,6 +142,45 @@ export class GoalEditModal extends Modal {
                     new FolderSuggest(this.app, text.inputEl);
                 });
         }
+
+        // 4a. Conditional Input: Filename Format
+        if (this.tempGoal.type === 'word-count' || this.tempGoal.type === 'note-created') {
+        new Setting(contentEl)
+            .setName("Filename format")
+            .setDesc("Enter the date format used for the file name.")
+            .addText(text => {
+                text.setPlaceholder("Default (Daily Note)")
+                    .setValue(this.tempGoal.dateFormat || "")
+                    .onChange(value => {
+                        this.tempGoal.dateFormat = value;
+                    });
+            });
+            
+        // Get current date string
+        const now = moment();
+
+        // Policy-Compliant Description
+        const exampleContainer = contentEl.createDiv({ cls: 'setting-item-description' });
+        exampleContainer.style.fontSize = '0.8em';
+        exampleContainer.style.marginBottom = '1em';
+        
+        exampleContainer.createSpan({ text: "Leave blank to use your system Daily Note settings." });
+        exampleContainer.createSpan({ text: "Examples:" });
+        exampleContainer.createEl("br");
+        
+        // Line 2: YYYY-MM-DD
+        exampleContainer.createEl("code", { text: "YYYY-MM-DD" });
+        exampleContainer.createSpan({ text: " matches " });
+        exampleContainer.createEl("strong", { text: now.format("YYYY-MM-DD") });
+        exampleContainer.createEl("br");
+        
+        // Line 3: Custom Format
+        exampleContainer.createEl("code", { text: "[Log] YYYY-MM-DD" });
+        exampleContainer.createSpan({ text: " matches " });
+        exampleContainer.createEl("strong", { text: `Log ${now.format("YYYY-MM-DD")}` });
+        
+    }
+
 
         // 5. Conditional Input: Target Value
         if (this.tempGoal.type !== 'note-created') {

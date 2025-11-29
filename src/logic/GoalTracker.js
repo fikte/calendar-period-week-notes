@@ -256,18 +256,81 @@ export class GoalTracker {
     }
 
     /**
+ * 1. New Helper: Get System Daily Note Settings
+ */
+getDailyNoteSettings() {
+    try {
+        // Try Periodic Notes (Community)
+        const periodicNotes = this.app.plugins.getPlugin('periodic-notes');
+        if (periodicNotes && periodicNotes.settings?.daily?.enabled) {
+            return {
+                folder: periodicNotes.settings.daily.folder,
+                format: periodicNotes.settings.daily.format
+            };
+        }
+
+        // Try Daily Notes (Core)
+        const dailyNotes = this.app.internalPlugins.getPluginById('daily-notes');
+        if (dailyNotes && dailyNotes.instance && dailyNotes.instance.options) {
+            return {
+                folder: dailyNotes.instance.options.folder,
+                format: dailyNotes.instance.options.format
+            };
+        }
+    } catch (err) {
+        console.warn("GoalTracker: Could not retrieve daily note settings", err);
+    }
+    // Fallback
+    return { folder: '', format: 'YYYY-MM-DD' };
+}
+
+/**
+ * 2. New Helper: Calculate Target File Path
+ */
+getGoalTargetFile(goal, date) {
+    let folder = goal.folder;     // User setting
+    let format = goal.dateFormat; // User setting
+
+    // If format is blank, grab system defaults
+    if (!format) {
+        const defaults = this.getDailyNoteSettings();
+        format = defaults.format || 'YYYY-MM-DD';
+        
+        // Only use system folder if user didn't specify one
+        if (!folder) {
+            folder = defaults.folder || '';
+        }
+    }
+
+    const filename = date.format(format);
+    const normalizedFolder = folder ? folder.replace(/\/$/, '') : '';
+    const path = normalizedFolder ? `${normalizedFolder}/${filename}.md` : `${filename}.md`;
+
+    return this.app.vault.getAbstractFileByPath(path);
+}
+
+
+    /**
      * Checks if a daily note exists.
      */
-    async checkNoteCreated(date, folderPath) {
+    async checkNoteCreated(goal, date) {
+    // Use the new helper, passing the FULL goal object
+    const file = this.getGoalTargetFile(goal, date);
+    const exists = file instanceof TFile;
+    return { isMet: exists, current: exists ? 1 : 0 };
+}
+
+   /* async checkNoteCreated(date, folderPath) {
         const path = this.getDailyNotePath(date, folderPath);
         const file = this.app.vault.getAbstractFileByPath(path);
         const exists = file instanceof TFile;
         return { isMet: exists, current: exists ? 1 : 0 };
     }
-
+*/
     /**
      * Checks word count in a daily note.
      */
+    /*
     async checkWordCount(date, folderPath, target) {
         const path = this.getDailyNotePath(date, folderPath);
         const file = this.app.vault.getAbstractFileByPath(path);
@@ -282,6 +345,23 @@ export class GoalTracker {
 
         return { isMet: words >= target, current: words };
     }
+    */
+
+    async checkWordCount(goal, date) {
+    // Use the new helper
+    const file = this.getGoalTargetFile(goal, date);
+
+    if (!file || !(file instanceof TFile)) {
+        return { isMet: false, current: 0 };
+    }
+
+    const content = await this.app.vault.read(file);
+    const contentBody = content.replace(/^---[\s\S]+?---/, ''); 
+    const words = contentBody.trim().split(/\s+/).filter(w => w.length > 0).length;
+
+    return { isMet: words >= goal.target, current: words };
+}
+
 
     /**
      * Checks completed task count.
