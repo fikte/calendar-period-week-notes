@@ -5,7 +5,8 @@ import {
     Notice,
     sanitizeHTMLToDom,
     setIcon,
-    Platform
+    Platform,
+    TFolder 
 } from 'obsidian';
 
 import { BUNDLED_THEMES } from '../data/themes.js';
@@ -86,6 +87,8 @@ export class PeriodSettingsTab extends PluginSettingTab {
         this.triggerDashboardRefresh();
         this.plugin.app.workspace.getLeavesOfType(VIEW_TYPE_PERIOD).forEach(leaf => {
             if (leaf.view instanceof PeriodMonthView) {
+                leaf.view.lastTasksState = '';
+                leaf.view.lastCreationState = '';
                 leaf.view.rebuildAndRender();
             }
         });
@@ -208,8 +211,9 @@ export class PeriodSettingsTab extends PluginSettingTab {
             toggle.setValue(visibilitySettings[key] ?? true)
                 .onChange(async (value) => {
                     visibilitySettings[key] = value;
-                    await this.plugin.saveData(this.plugin.settings);
-                    this.triggerDashboardRefresh();
+                    // await this.plugin.saveData(this.plugin.settings);
+                    //this.triggerDashboardRefresh();
+                    await this.saveAndUpdate();
                 });
         });
 
@@ -236,8 +240,18 @@ export class PeriodSettingsTab extends PluginSettingTab {
                             new WidgetBuilderModal(this.app, this.plugin, widgetConfig, async (updatedConfig) => {
                                 const widgetIndex = this.plugin.settings.tasksStatsWidgets.findIndex(w => w.widgetKey === key);
                                 this.plugin.settings.tasksStatsWidgets[widgetIndex] = updatedConfig;
+
                                 await this.plugin.saveSettings();
                                 this.renderTasksDashboardSettings(containerEl);
+
+                                // FIX: Clear cached state so the dashboard knows to re-render with new config
+                                this.app.workspace.getLeavesOfType(VIEW_TYPE_PERIOD).forEach(leaf => {
+                                    if (leaf.view instanceof PeriodMonthView) {
+                                        leaf.view.lastTasksState = '';
+                                        leaf.view.lastCreationState = '';
+                                    }
+                                });
+
                                 this.triggerDashboardRefresh();
                             }).open();
                         }
@@ -786,7 +800,8 @@ export class PeriodSettingsTab extends PluginSettingTab {
             const suggestions = getSuggestions(query);
             suggestionEl.empty();
 
-            if (suggestions.length === 0 || query.trim() === '') {
+//            if (suggestions.length === 0 || query.trim() === '') {
+            if (suggestions.length === 0) {
                 suggestionEl.style.display = 'none';
                 return;
             }
@@ -2068,7 +2083,7 @@ export class PeriodSettingsTab extends PluginSettingTab {
         new Setting(containerEl).setName("Task group heading font size").setDesc("The font size for the date/tag group headings (e.g., 'Overdue', 'Today'). Default is 13px.").addText(text => text.setValue(this.plugin.settings.taskHeadingFontSize).onChange(async value => { this.plugin.settings.taskHeadingFontSize = value; await this.saveAndUpdate(); }));
         new Setting(containerEl).setName("Task text font size").setDesc("The font size for the individual task items in the list. Default is 14px.").addText(text => text.setValue(this.plugin.settings.taskTextFontSize).onChange(async value => { this.plugin.settings.taskTextFontSize = value; await this.saveAndUpdate(); }));
         new Setting(containerEl).setName("Truncate long task text").setDesc("If enabled, long tasks will be shortened with '...'. If disabled, they will wrap to multiple lines.").addToggle(toggle => toggle.setValue(this.plugin.settings.taskTextTruncate).onChange(async (value) => { this.plugin.settings.taskTextTruncate = value; await this.saveAndUpdate(); }));
-        
+
         //new Setting(containerEl).setName("Task sort order").setDesc("The default order for tasks within each group. Note tasks with alerts set will take precedence.").addDropdown(dropdown => dropdown.addOption('dueDate', 'By Due Date').addOption('a-z', 'A-Z').addOption('z-a', 'Z-A').setValue(this.plugin.settings.taskSortOrder).onChange(async (value) => { this.plugin.settings.taskSortOrder = value; await this.saveAndUpdate(); }));
         new Setting(containerEl)
             .setName("Task sort order")
@@ -2079,15 +2094,15 @@ export class PeriodSettingsTab extends PluginSettingTab {
                 .addOption('a-z', 'Alphabetical (A-Z)')       // Good for reference lists
                 .addOption('z-a', 'Alphabetical (Z-A)')
                 .setValue(this.plugin.settings.taskSortOrder)
-                .onChange(async (value) => { 
-                    this.plugin.settings.taskSortOrder = value; 
-                    await this.saveAndUpdate(); 
+                .onChange(async (value) => {
+                    this.plugin.settings.taskSortOrder = value;
+                    await this.saveAndUpdate();
                 }));
-        
-        
-        
+
+
+
         new Setting(containerEl).setName("Group tasks by").setDesc("Choose how to group tasks in the view. Second-clicking the Tasks tab will also toggle this.").addDropdown(dropdown => dropdown.addOption('date', 'Date (Overdue, Today, etc.)').addOption('tag', 'Tag').setValue(this.plugin.settings.taskGroupBy).onChange(async (value) => { this.plugin.settings.taskGroupBy = value; await this.saveAndUpdate(); this.refreshDisplay(); }));
-        
+
         if (this.plugin.settings.taskGroupBy === 'date') {
             new Setting(containerEl).setName("Date groups to show").setHeading();
             const dateGroups = [{ key: 'overdue', name: 'Overdue', desc: 'Show tasks that have a due date before today and are not completed.' }, { key: 'today', name: 'Today', desc: 'Show all tasks that have a due date of today.' }, { key: 'tomorrow', name: 'Tomorrow', desc: 'Show all tasks that have a due date of tomorrow.' }, { key: 'next7days', name: 'Next 7 Days', desc: 'Show all tasks that are due after tomorrow and up to 7 days ahead' }, { key: 'future', name: 'Future', desc: 'Show tasks that have a due date after the next 7 days out.' }, { key: 'noDate', name: 'Someday', desc: 'Show all tasks that due not have a due date.' }];
@@ -2616,6 +2631,15 @@ export class PeriodSettingsTab extends PluginSettingTab {
                             this.plugin.settings.tasksDashboardOrder.unshift(newHeader.widgetKey);
 
                             await this.plugin.saveSettings();
+
+                            const dashboardView = this.app.workspace.getLeavesOfType('cpwn-calendar-period-week-notes')
+                                .find(leaf => leaf.view instanceof PeriodMonthView)?.view;
+                            if (dashboardView) {
+                                dashboardView.lastTasksState = '';
+                                dashboardView.lastCreationState = '';
+                            }
+                            this.app.workspace.trigger('cpwn-pm-dashboard-refresh');
+
                             this.renderTasksDashboardSettings(container);
                             new Notice('Section header added!');
                         }).open();
@@ -2663,6 +2687,14 @@ export class PeriodSettingsTab extends PluginSettingTab {
                     this.plugin.settings.tasksDashboardOrder.unshift(newWidget.widgetKey);
 
                     await this.plugin.saveSettings();
+
+                    const dashboardView = this.app.workspace.getLeavesOfType('cpwn-calendar-period-week-notes')
+                        .find(leaf => leaf.view instanceof PeriodMonthView)?.view;
+                    if (dashboardView) {
+                        dashboardView.lastTasksState = '';
+                        dashboardView.lastCreationState = '';
+                    }
+                    this.app.workspace.trigger('cpwn-pm-dashboard-refresh');
                     this.renderTasksDashboardSettings(container); // Re-render to show the new widget
                     new Notice('Blank widget added. Click "Configure" to set it up.');
                 }))
@@ -2781,10 +2813,11 @@ export class PeriodSettingsTab extends PluginSettingTab {
 
         // 2. Create the content wrapper for the guide text
         const helpContentWrapper = guideContainer.createDiv({ cls: 'cpwn-note-list-wrapper' });
-        const helpText = helpContentWrapper.createDiv(); // The actual element for the text
+        const helpText = helpContentWrapper.createDiv();
         helpText.setAttr('style', 'user-select: text; font-size: 0.9em; line-height: 1.6; padding: 15px; margin: 0; border-radius: 8px; background-color: var(--background-secondary);');
-
-        helpText.innerHTML = `
+        
+        // FIX: Use sanitizeHTMLToDom instead of innerHTML
+        const guideHtml = `
 
     <div style="padding: 10px; border: 1px solid var(--background-modifier-border); border-radius: 8px; margin-bottom: 20px; background-color: var(--background-secondary-alt);">
     <h4 style="margin-top: 0;">Important: Requires Obsidian Tasks Plugin</h4>
@@ -2890,13 +2923,8 @@ export class PeriodSettingsTab extends PluginSettingTab {
         </ul>
     </li>
 </ol>
-
-
-
         `;
-
-
-
+        helpText.appendChild(sanitizeHTMLToDom(guideHtml));
     }
 
 
@@ -2904,61 +2932,19 @@ export class PeriodSettingsTab extends PluginSettingTab {
     renderCreationDashboardSettings(container) {
         container.empty();
 
-        this.draggedItem = null;
-        this.placeholder = null;
-
-        const handleMouseMove = (e) => {
-            if (!this.draggedItem) return;
-            const draggableContainer = this.draggedItem.closest('.cpwn-pm-draggable-widget-list');
-            if (!draggableContainer) return;
-            const otherItems = Array.from(draggableContainer.children).filter(child => child !== this.draggedItem && child !== this.placeholder);
-            let target = null;
-            for (const item of otherItems) {
-                const rect = item.getBoundingClientRect();
-                if (e.clientY > rect.top && e.clientY < rect.bottom) {
-                    target = item;
-                    break;
-                }
-            }
-            if (target) {
-                const rect = target.getBoundingClientRect();
-                const isAfter = e.clientY > rect.top + rect.height / 2;
-                target.parentNode.insertBefore(this.placeholder, isAfter ? target.nextSibling : target);
-            }
-        };
-
-        const handleMouseUp = async (e) => {
-            if (!this.draggedItem) return;
-            if (this.placeholder && this.placeholder.parentNode) {
-                this.placeholder.parentNode.insertBefore(this.draggedItem, this.placeholder);
-                this.placeholder.remove();
-            }
-            this.draggedItem.removeClass('dragging');
-            const container = this.draggedItem.closest('.cpwn-pm-draggable-widget-list');
-            if (container) {
-                const orderKey = container.dataset.orderKey;
-                const title = container.dataset.title;
-                const newOrder = Array.from(container.children).map(child => child.dataset.widgetKey);
-                this.plugin.settings[orderKey] = newOrder;
-                await this.saveAndUpdate();
-            }
-            this.draggedItem = null;
-            this.placeholder = null;
-        };
-
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
-        this.plugin.register(() => {
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
-        });
-
         container.createEl('div', { cls: 'cpwn-setting-spacer' });
 
-        this.renderFileCreationWidgetSettings(container, 'Creation dashboard widgets (order and toggle display)', 'creationDashboardWidgets', 'creationDashboardOrder', DASHBOARDWIDGETS.creation);
+        // Use the unified, optimized renderWidgetSettings method
+        // This replaces the old renderFileCreationWidgetSettings and the broken manual drag code
+        this.renderWidgetSettings(
+            container,
+            'Creation dashboard widgets (order and toggle display)',
+            'creationDashboardWidgets',   // Visibility setting key
+            'creationDashboardOrder',     // Order setting key
+            DASHBOARDWIDGETS.creation     // Default widgets object
+        );
 
         container.createEl('div', { cls: 'cpwn-setting-spacer' });
-
         container.createEl('div', { cls: 'cpwn-setting-spacer' });
 
         container.createEl('h2', { text: 'Built-in heatmap links' });
@@ -3016,10 +3002,11 @@ export class PeriodSettingsTab extends PluginSettingTab {
 
         // 2. Create the content wrapper for the guide text
         const helpContentWrapper = guideContainer.createDiv({ cls: 'cpwn-note-list-wrapper' });
-        const helpText = helpContentWrapper.createDiv(); // The actual element for the text
+        const helpText = helpContentWrapper.createDiv();
         helpText.setAttr('style', 'user-select: text; font-size: 0.9em; line-height: 1.6; padding: 15px; margin: 0; border-radius: 8px; background-color: var(--background-secondary);');
-
-        helpText.innerHTML = `
+        
+        // FIX: Use sanitizeHTMLToDom instead of innerHTML
+        const guideHtml =  `
 
 <p>Use the Custom Heatmap section to add personalized heatmaps to your <strong>Creation</strong> dashboard. Each heatmap acts as a widget that visually tracks file creation activity based on a set of rules you define.</p>
 
@@ -3088,8 +3075,10 @@ export class PeriodSettingsTab extends PluginSettingTab {
     Operator: <code>matches regex</code><br>
     Value: <code>/^(Projects|Areas)\\//</code></li>
 </ul>
-
         `;
+
+        helpText.appendChild(sanitizeHTMLToDom(guideHtml));
+
 
         this.renderCustomHeatmapsSection(customHeatmapsContainer);
 

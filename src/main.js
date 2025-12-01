@@ -17,8 +17,8 @@ export default class PeriodMonthPlugin extends Plugin {
 
     async onload() {
 
+        this.registerView(VIEW_TYPE_PERIOD, leaf => new PeriodMonthView(leaf, this));
         this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-
         const CORE_GOALS = [
             {
                 id: 'core-daily-note',
@@ -61,9 +61,8 @@ export default class PeriodMonthPlugin extends Plugin {
                 this.settings.goals.unshift({ ...coreGoal });
             }
         });
-
+        await this.saveSettings();
         this.updateStyles();
-        this.registerView(VIEW_TYPE_PERIOD, leaf => new PeriodMonthView(leaf, this));
         this.addRibbonIcon("calendar-check", "Open Calendar Period Week Notes", () => this.activateView());
         this.addCommand({ id: "open-period-month-view", name: "Open Calendar Period Week Notes", callback: () => this.activateView() });
         await this.resetIcsRefreshInterval();
