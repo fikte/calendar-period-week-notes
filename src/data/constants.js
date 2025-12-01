@@ -26,7 +26,7 @@ export const DASHBOARDWIDGETS = {
 // Define the default settings for the plugin. This object is used as a fallback and for resetting configurations.
 export const DEFAULT_SETTINGS = {
     // General Display
-    appliedTheme: "",
+    appliedTheme: "Default-developer", 
     fontSize: "12px",
     customDateFormats: "YYYY-MM-DD,DD-MM-YYYY",
     dayNumberFontSize: "15px",
@@ -189,8 +189,8 @@ export const DEFAULT_SETTINGS = {
 
     // Colors
     selectedTabColor: "rgba(102, 102, 102, 1)",
-    todayHighlightColorLight: "rgba(255, 80, 80, 0.40)",
-    todayHighlightColorDark: "rgba(255, 80, 80, 0.75)",
+    todayHighlightColorLight: "rgba(133, 186, 255, 1)",
+    todayHighlightColorDark: "rgba(82, 157, 255, 1)",
     notesHoverColor: "rgba(171, 171, 171, 0.15)",
     dailyNoteDotColor: "rgba(74, 144, 226, 1)",
     noteCreatedColor: "rgba(76, 175, 80, 1)",
@@ -262,8 +262,8 @@ export const DEFAULT_SETTINGS = {
 
     tasksDashboardOrder: ['goalStatusList', 'weeklyGoalPoints', 'goalStatusListCondensed', 'weeklyGoalPointsCondensed', 'today', 'tomorrow', 'next7days', 'futureNoDue', 'upcomingoverdue', 'taskcompletionheatmap', 'taskstatusoverview'],
     tasksDashboardWidgets: {
-        goalStatusList: true,
-        weeklyGoalPoints: true,
+        goalStatusList: false,
+        weeklyGoalPoints: false,
         goalStatusListCondensed: false,
         weeklyGoalPointsCondensed: false,
         today: true,
@@ -311,6 +311,27 @@ export const DEFAULT_SETTINGS = {
     ],
     goalScoreHistory: {},
     vacationHistory: {},
-    tasksStatsWidgets: []
+    tasksStatsWidgets: [
+        {
+            widgetKey: 'weeklyGoalPoints',
+            widgetName: 'Weekly Goal Points',
+            type: 'goal-widget'
+        },
+        {
+            widgetKey: 'goalStatusList',
+            widgetName: 'Goal Status',
+            type: 'goal-widget'
+        },
+        {
+            widgetKey: 'weeklyGoalPointsCondensed',
+            widgetName: 'Weekly Goal Points (Condensed)',
+            type: 'goal-widget'
+        },
+        {
+            widgetKey: 'goalStatusListCondensed',
+            widgetName: 'Goal Status (Condensed)',
+            type: 'goal-widget'
+        }
+    ]
     
 };

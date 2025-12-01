@@ -1,5 +1,5 @@
 // src/modals/WidgetBuilderModal.js
-import { Modal, DropdownComponent, Notice, Setting, Menu, moment, setIcon  } from 'obsidian';
+import { Modal, DropdownComponent, Notice, Setting, Menu, moment, setIcon } from 'obsidian';
 import { DEFAULT_SETTINGS } from '../data/constants.js';
 
 export class WidgetBuilderModal extends Modal {
@@ -274,6 +274,14 @@ export class WidgetBuilderModal extends Modal {
                 svg.style.color = this.config.kpiIconColor;
             }
         }
+
+        this.createWidgetColorSetting(
+            kpiSettingsContainer,
+            'KPI icon color',
+            'Set the color and transparency for the KPI stat icon.',
+            'kpiIconColor',
+            'rgba(136, 136, 136, 1)' // Default gray color
+        );
 
         // --- 2. Initial State ---
         // Set the initial state of the icon preview when the settings are first opened.
@@ -929,7 +937,7 @@ export class WidgetBuilderModal extends Modal {
                         .addOption('forward', 'Look forward')
                         .addOption('autoLookAhead', 'Auto look ahead')
                         .setValue(this.config.dateRange.endDate === 'forward' ? 'forward' : 'today')
-                        .setValue(this.config.dateRange.endDate || 'today') 
+                        .setValue(this.config.dateRange.endDate || 'today')
                         .onChange(value => {
                             this.config.dateRange.endDate = value;
                             // Just trigger a re-render. Do NOT empty the container here.

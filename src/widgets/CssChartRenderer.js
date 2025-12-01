@@ -219,7 +219,6 @@ export class CssChartRenderer {
         // Add the correct class to the main container. This is what the CSS will use.
         if (showLegend) {
             this.container.addClass(`cpwn-legend-${legendPosition}`);
-            console.log(legendPosition);
         } else {
             // This class is for when the legend is off (e.g., mini/small widgets)
             this.container.addClass('is-pie-only');

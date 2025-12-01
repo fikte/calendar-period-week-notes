@@ -25,10 +25,13 @@ export class GoalTracker {
 
         switch (goal.type) {
             case 'note-created':
-                result = await this.checkNoteCreated(date, goal.folder);
+                //result = await this.checkNoteCreated(date, goal.folder);
+                result = await this.checkNoteCreated(goal, date); 
                 break;
             case 'word-count':
-                result = await this.checkWordCount(date, goal.folder, goal.target);
+                //result = await this.checkWordCount(date, goal.folder, goal.target);
+                result = await this.checkWordCount(goal, date);
+
                 break;
             case 'task-count':
                 result = this.checkTaskCount(date, allTasks, goal.query, goal.target);
