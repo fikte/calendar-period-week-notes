@@ -1,6 +1,6 @@
 /* -- Obsidian Plugin: Calendar Periodic Week Notes -- */
 
-import { Plugin, debounce } from 'obsidian';
+import { Plugin, debounce, Notice } from 'obsidian';
 import { PeriodMonthView, VIEW_TYPE_PERIOD } from './views/PeriodMonthView.js';
 import { PeriodSettingsTab } from './settings/PeriodSettingsTab.js';
 import { DEFAULT_SETTINGS } from './data/constants.js';
@@ -49,9 +49,15 @@ export default class PeriodMonthPlugin extends Plugin {
             }
         ];
 
+        this.app.workspace.onLayoutReady(() => {
+            // Set the initial value from settings, or default to 8
+            const gap = this.settings.checkboxGap ?? 8;
+            document.body.style.setProperty('--cpwn-checkbox-gap', `${gap}px`);
+        });
+
         // Make sure the goals property exists
         if (!this.settings.goals || this.settings.goals.length === 0) {
-             this.settings.goals = [...CORE_GOALS];
+            this.settings.goals = [...CORE_GOALS];
         }
 
         // Always check and inject missing core goals before showing UI
@@ -95,6 +101,43 @@ export default class PeriodMonthPlugin extends Plugin {
 
     async saveSettings() {
         await this.saveData(this.settings);
+    }
+
+    showSystemNotification(title, body) {
+        if (typeof Notification === "undefined") {
+            console.warn("Notification API not available");
+            return;
+        }
+
+        try {
+            if (Notification.permission === "granted") {
+                new Notification(title, { body: body });
+                return;
+            }
+
+            if (Notification.permission !== "denied") {
+                Notification.requestPermission().then(function (permission) {
+                    if (permission === "granted") {
+                        new Notification(title, { body: body });
+                    }
+                });
+            }
+        } catch (e) {
+            console.error("Creating Notification failed", e);
+        }
+    }
+
+    notify(title, body) {
+        if (this.settings && this.settings.useSystemNotifications) {
+            try {
+                this.showSystemNotification(title, body);
+            } catch (e) {
+                console.error("System notification failed", e);
+               //new Notice(title + ": " + body);
+            }
+        //} else {
+            //new Notice(title + ": " + body);
+        }
     }
 
     /**

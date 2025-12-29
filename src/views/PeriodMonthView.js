@@ -16,7 +16,7 @@ import ICAL from 'ical.js';
 import moment from 'moment';
 
 // Constants
-import { VIEW_TYPE_PERIOD, DASHBOARDWIDGETS } from '../data/constants.js';
+import { VIEW_TYPE_PERIOD, DASHBOARDWIDGETS, PINNED_HIGHLIGHT_COLORS } from '../data/constants.js';
 
 // Utilities
 import {
@@ -40,6 +40,8 @@ import { ConfirmationModal } from '../modals/ConfirmationModal.js';
 import { FilterSuggest, TagSuggest } from '../utils/suggesters.js';
 import { GoalDataAggregator } from '../widgets/GoalDataAggregator';
 import { GoalTracker } from "../logic/GoalTracker.js";
+//import { TASK_LAYOUTS } from '../data/taskLayouts.js';
+import { TaskLayoutRenderer } from '../services/TaskLayoutRenderer';
 
 export { VIEW_TYPE_PERIOD };
 
@@ -136,6 +138,8 @@ export class PeriodMonthView extends ItemView {
 
         // --- Mobile Keyboard Handling ---
         this.isEditingMobile = false;
+
+        this.layoutRenderer = new TaskLayoutRenderer(this.app, this, this.plugin);
 
         // Initialize a MutationObserver to watch for theme changes.
         this.themeObserver = new MutationObserver(() => {
@@ -607,6 +611,15 @@ export class PeriodMonthView extends ItemView {
             return;
         }
 
+        if (widgetKey.startsWith('custom-')) {
+            const index = parseInt(widgetKey.split('-')[1], 10);
+            const savedConfig = this.plugin.settings.customHeatmaps[index];
+            if (savedConfig) {
+                // Merge saved config into options, preserving existing date calculations
+                options = { ...savedConfig, ...options };
+            }
+        }
+
         // --- 1. LIVE DATA STORAGE ---
         // We store the latest data in a class-level map. 
         // This allows existing event listeners to always access the "freshest" data 
@@ -641,11 +654,14 @@ export class PeriodMonthView extends ItemView {
         }
 
         let showChevron;
-        if (typeof this.plugin.settings.overrideShowChevron === 'boolean') {
-            showChevron = this.plugin.settings.overrideShowChevron;
-        } else if (typeof this.plugin.settings.showTaskWidgetChevrons === 'boolean') {
+
+        if (options && typeof options.overrideShowChevron === 'boolean') {
+            showChevron = options.overrideShowChevron;
+        }
+        else if (typeof this.plugin.settings.showTaskWidgetChevrons === 'boolean') {
             showChevron = this.plugin.settings.showTaskWidgetChevrons;
-        } else {
+        }
+        else {
             showChevron = true;
         }
 
@@ -656,8 +672,6 @@ export class PeriodMonthView extends ItemView {
             widgetContainer.addClass('cpwn-is-collapsed');
         }
 
-        // Note: Total Count is calculated inside refreshHeatmapVisuals now, 
-        // but we set a placeholder here.
         const header = widgetContainer.createDiv({ cls: 'cpwn-pm-widget-header' });
 
         // 1. Collapse Icon
@@ -890,7 +904,9 @@ export class PeriodMonthView extends ItemView {
                             daily: dailyNotes2,
                             created: createdNotes2,
                             modified: modifiedNotes2,
-                            assets: assets2
+                            assets: assets2,
+                            tasks: [],
+                            suppressTaskFetch: true
                         };
                     }
 
@@ -1411,7 +1427,6 @@ export class PeriodMonthView extends ItemView {
         );
     }
 
-
     /**
      * Renders a single note item row in a given container.
      * @param {TFile} file The note file to render.
@@ -1423,6 +1438,11 @@ export class PeriodMonthView extends ItemView {
 
         const row = container.createDiv({ cls: 'cpwn-note-row' });
         row.dataset.filePath = file.path;
+
+        //if (this.notesViewMode === 'pinned') {
+        row.addClass('cpwn-note-highlight-note-row');
+        this.applyPinnedNoteColorToRow(file.path, row);
+        //}
 
         // --- Mousedown flag for better drag-hover detection ---
         row.addEventListener('mousedown', () => {
@@ -1497,7 +1517,41 @@ export class PeriodMonthView extends ItemView {
         // --- Keyboard Navigation ---
         this.addKeydownListeners(row, searchInputEl);
 
+
         return row;
+    }
+
+    applyPinnedNoteColorToRow(path, existingRow) {
+        const row = existingRow ||
+            this.containerEl?.querySelector(`.cpwn-note-highlight-note-row[data-file-path="${path}"]`);
+        if (!row) return;
+
+        const colors = PINNED_HIGHLIGHT_COLORS;
+
+        const map = this.plugin.settings.pinnedNoteColorsByPath || {};
+        const colorId = map[path];
+        const def = (colors)
+            .find(c => c.id === colorId);
+
+        row.classList.remove(
+            'cpwn-note-highlight-color-row',
+            'cpwn-note-highlight-color-bar',
+            'cpwn-note-highlight-color-border'
+        );
+        row.style.removeProperty('--cpwn-note-highlight-color');
+
+        if (!def) return;
+
+        row.style.setProperty('--cpwn-note-highlight-color', def.rgba);
+
+        const mode = this.plugin.settings.pinnedNoteColorMode || 'row';
+        if (mode === 'row') {
+            row.classList.add('cpwn-note-highlight-color-row');
+        } else if (mode === 'bar') {
+            row.classList.add('cpwn-note-highlight-color-bar');
+        } else if (mode === 'border') {
+            row.classList.add('cpwn-note-highlight-color-border');
+        }
     }
 
     async savePinnedOrder(container) {
@@ -1601,6 +1655,11 @@ export class PeriodMonthView extends ItemView {
             if (this.activeTab === 'tasks') {
                 await this.populateTasks();
             }
+            else if (this.activeTab === "dashboard") {
+                // Force refresh to update relative dates (Today/Tomorrow/Overdue)
+                await this.populateDashboard(true);
+            }
+
 
             // IMPORTANT: Schedule the next refresh for the following day
             this.scheduleDailyRefresh();
@@ -1827,15 +1886,14 @@ export class PeriodMonthView extends ItemView {
         const format = settings.dailyNoteDateFormat || "YYYY-MM-DD";
         const existingNotes = new Set(this.app.vault.getMarkdownFiles().filter(file => !folder || file.path.startsWith(folder + "/")).map(file => file.basename));
 
-        // This new logic correctly calculates the first day to show on the calendar
-        const startDayNumber = this.plugin.settings.weekStartDay === 'monday' ? 1 : 0; // Mon=1, Sun=0
+        const startDayNumber = this.plugin.settings.weekStartDay === 'monday' ? 1 : 0;
         moment.updateLocale('en', { week: { dow: startDayNumber } });
 
-        let dayOfWeek = firstDayOfMonth.getDay(); // JS standard: Sun=0, Mon=1...
+        let dayOfWeek = firstDayOfMonth.getDay();
 
         let diff = dayOfWeek - startDayNumber;
         if (diff < 0) {
-            diff += 7; // Ensure we go back to the previous week
+            diff += 7;
         }
 
         let currentDay = new Date(firstDayOfMonth);
@@ -1906,7 +1964,6 @@ export class PeriodMonthView extends ItemView {
 
                 if (weeklyNoteExists && settings.showWeeklyNoteDot && !settings.showWeekNumbers) {
                     const dotsContainer = pwContent.createDiv({ cls: 'cpwn-dots-container' });
-
                     const layout = this.plugin.settings.calendarLayout || 'normal';
                     dotsContainer.classList.remove('layout-condensed', 'layout-normal', 'layout-spacious');
                     dotsContainer.classList.add(`layout-${layout}`);
@@ -1925,7 +1982,6 @@ export class PeriodMonthView extends ItemView {
 
                 pwCell.addEventListener('mouseenter', handleRowHoverEnter);
                 pwCell.addEventListener('mouseleave', handleRowHoverLeave);
-
             }
 
             if (settings.showWeekNumbers) {
@@ -1949,11 +2005,9 @@ export class PeriodMonthView extends ItemView {
 
                 if (weeklyNoteExists && settings.showWeeklyNoteDot) {
                     const dotsContainer = weekContent.createDiv({ cls: 'cpwn-dots-container' });
-
                     const layout = this.plugin.settings.calendarLayout || 'normal';
                     dotsContainer.classList.remove('layout-condensed', 'layout-normal', 'layout-spacious');
                     dotsContainer.classList.add(`layout-${layout}`);
-
                     dotsContainer.createDiv({ cls: 'cpwn-calendar-dot cpwn-weekly-note-dot' });
                 }
                 weekCell.addEventListener('click', clickHandler);
@@ -1977,11 +2031,12 @@ export class PeriodMonthView extends ItemView {
                 const isOtherMonth = dayDate.getMonth() !== month;
                 const cell = row.createEl("td");
 
-                // Add separator class to first date column
+
                 if (d === 0 && this.plugin.settings.showPWColumnSeparator &&
                     (this.plugin.settings.showPWColumn || this.plugin.settings.showWeekNumbers)) {
                     cell.addClass('first-date-column');
                 }
+
 
                 const contentDiv = cell.createDiv("cpwn-day-content");
                 const dayNumber = contentDiv.createDiv("cpwn-day-number");
@@ -1995,25 +2050,26 @@ export class PeriodMonthView extends ItemView {
                 const dailyNoteFileName = formatDate(dayDate, format);
                 const dailyNoteExists = existingNotes.has(dailyNoteFileName);
 
+
                 let totalTaskCount = tasksForDay ? tasksForDay.length : 0;
                 const calendarEventCount = icsEventsForDay ? icsEventsForDay.length : 0;
                 const eventIndicatorStyle = this.plugin.settings.calendarEventIndicatorStyle;
 
-                // Conditionally add calendar event count to the total count for heatmap/badge
+
                 if (eventIndicatorStyle === 'heatmap' || eventIndicatorStyle === 'badge') {
                     totalTaskCount += calendarEventCount;
                 }
+
 
                 const isToday = isSameDay(dayDate, today)
                 if (totalTaskCount > 0) {
                     if (settings.taskIndicatorStyle === 'badge') {
                         contentDiv.createDiv({ cls: 'cpwn-task-count-badge', text: totalTaskCount.toString() });
-
                     } else if (settings.taskIndicatorStyle === 'heatmap') {
                         const shouldApplyHeatmap = !(isToday && settings.todayHighlightStyle === 'cell');
 
-                        if (shouldApplyHeatmap) {
 
+                        if (shouldApplyHeatmap) {
                             const startColor = parseRgbaString(settings.taskHeatmapStartColor);
                             const midColor = parseRgbaString(settings.taskHeatmapMidColor);
                             const endColor = parseRgbaString(settings.taskHeatmapEndColor);
@@ -2027,51 +2083,44 @@ export class PeriodMonthView extends ItemView {
                                 else if (totalTaskCount >= midPoint) { const factor = (totalTaskCount - midPoint) / (maxPoint - midPoint); finalColor = blendRgbaColors(midColor, endColor, factor); }
                                 else { const divisor = midPoint - 1; const factor = divisor > 0 ? (totalTaskCount - 1) / divisor : 1; finalColor = blendRgbaColors(startColor, midColor, factor); }
 
+
                                 contentDiv.classList.add('cpwn-heatmap-cell');
                                 contentDiv.style.setProperty('--cpwn-heatmap-color', finalColor);
 
-                                // This creates a border using the theme's background color, making a clean gap.
-                                //REMOVED 2025-11-23 
 
                                 const isInHighlightedRow = settings.highlightCurrentWeek &&
                                     row.classList.contains('current-week-row');
 
-                                // Use the row highlight color as border if in highlighted row
+
                                 if (isInHighlightedRow) {
                                     const borderColor = document.body.classList.contains('cpwn-theme-dark')
                                         ? settings.rowHighlightColorDark
                                         : settings.rowHighlightColorLight;
-                                    // contentDiv.style.border = `${this.plugin.settings.contentBorderWidth} solid ${borderColor}`;
                                 } else {
                                     contentDiv.style.border = `${this.plugin.settings.contentBorderWidth} solid var(--background-secondary)`;
                                 }
-
-                                // A slightly smaller radius makes it look neatly inset.
                                 contentDiv.addClass('cpwn-content-heatmap-cell-box');
-
-
                             }
                         }
                     }
                 }
 
+
                 if (isOtherMonth) dayNumber.addClass("cpwn-day-number-other-month");
                 if (isSameDay(dayDate, today) && !isOtherMonth) cell.addClass("cpwn-today-cell");
+
 
                 const dotsContainer = contentDiv.createDiv({ cls: 'cpwn-dots-container' });
                 const layout = this.plugin.settings.calendarLayout || 'normal';
 
-                // Ensure no old layout classes are lingering
-                dotsContainer.classList.remove('layout-condensed', 'layout-normal', 'layout-spacious');
 
-                // Apply the correct class based on the current setting
+                dotsContainer.classList.remove('layout-condensed', 'layout-normal', 'layout-spacious');
                 dotsContainer.classList.add(`layout-${layout}`);
 
 
                 if (dailyNoteExists) { dotsContainer.createDiv({ cls: "cpwn-period-month-daily-note-dot cpwn-calendar-dot" }); }
                 if (settings.showOtherNoteDot && createdFiles.length > 0) { dotsContainer.createDiv({ cls: 'cpwn-other-note-dot cpwn-calendar-dot' }); }
                 if (settings.showModifiedFileDot && modifiedFiles.length > 0) { dotsContainer.createDiv({ cls: 'cpwn-modified-file-dot cpwn-calendar-dot' }); }
-
                 if (settings.showAssetDot && assetsCreated.length > 0) { dotsContainer.createDiv({ cls: 'cpwn-asset-dot cpwn-calendar-dot' }); }
                 if (settings.showTaskDot && totalTaskCount > 0) { dotsContainer.createDiv({ cls: 'cpwn-task-dot cpwn-calendar-dot' }); }
 
@@ -2080,7 +2129,9 @@ export class PeriodMonthView extends ItemView {
                     dotsContainer.createDiv({ cls: 'cpwn-calendar-dot cpwn-ics-event-dot' });
                 }
 
+
                 const hasPopupContent = dailyNoteExists || (totalTaskCount > 0) || (createdFiles.length > 0) || (modifiedFiles.length > 0) || (assetsCreated.length > 0) || (calendarEventCount > 0);
+
 
                 let dataToShow = {};
                 if (hasPopupContent) {
@@ -2095,94 +2146,148 @@ export class PeriodMonthView extends ItemView {
                     };
                 }
 
+
                 let longPressOccurred = false;
                 let touchTimer = null;
 
+
+                // --- 1. TOUCH HANDLING (Long Press) ---
                 if (Platform.isMobile) {
-                    // --- MOBILE: Long-press for popup, tap for daily note ---
                     cell.addEventListener('touchstart', (e) => {
-                        longPressOccurred = false; // Reset on new touch
+                        longPressOccurred = false;
                         if (hasPopupContent) {
                             touchTimer = window.setTimeout(() => {
                                 longPressOccurred = true;
-                                this.showFilePopup(cell, dataToShow, dayDate, true); // Pass 'true' for mobile
-                                e.preventDefault(); // Prevents context menu and text selection
-                            }, 500); // 500ms for a long-press
+
+                                // Shows popup AND sets state so next tap opens note
+                                this.hideFilePopup();
+                                this.showFilePopup(cell, dataToShow, dayDate, true);
+                                this.activeHoverCell = cell;
+
+                            }, 500);
                         }
                     });
+
 
                     const cancelLongPress = () => window.clearTimeout(touchTimer);
                     cell.addEventListener('touchend', cancelLongPress);
                     cell.addEventListener('touchmove', cancelLongPress);
-
-                } else {
-                    // --- DESKTOP: Hover for popup ---
-
-                    if (hasPopupContent) {
-                        const cellDate = dayDate;
-
-                        // --- MOUSE ENTER LISTENER ---
-                        cell.addEventListener('mouseenter', () => {
-                            // PREVENT re-triggering if this cell is already the active one
-                            if (cell === this.activeHoverCell) return;
-
-                            // Store this cell as the new active one
-                            this.activeHoverCell = cell;
-
-                            if (this.isPopupLocked || this.isMouseDown) return;
-
-                            window.clearTimeout(this.hideTimeout);
-                            this.hideFilePopup(); // This will now correctly clear activeHoverCell
-
-                            this.hoverTimeout = window.setTimeout(() => {
-                                // Check AGAIN if the mouse is still meant to be over this cell
-                                if (this.activeHoverCell !== cell) return;
-
-                                const liveTasksForDay = this.allTasks.filter(task => {
-                                    const isDone = task.status.type === 'DONE';
-                                    if (isDone) {
-                                        return task.done?.moment?.isSame(cellDate, 'day');
-                                    } else {
-                                        const matchesStartDate = task.start?.moment?.isSame(cellDate, 'day');
-                                        const matchesScheduledDate = task.scheduled?.moment?.isSame(cellDate, 'day');
-                                        const matchesDueDate = task.due?.moment?.isSame(cellDate, 'day');
-                                        return matchesStartDate || matchesScheduledDate || matchesDueDate;
-                                    }
-                                });
-
-                                const freshDataToShow = { ...dataToShow, tasks: liveTasksForDay };
-                                this.showFilePopup(cell, freshDataToShow, cellDate, false);
-
-                            }, this.plugin.settings.otherNoteHoverDelay);
-                        });
-
-                        // --- MOUSE LEAVE LISTENER ---
-                        cell.addEventListener('mouseleave', () => {
-                            // If the mouse leaves this cell, it's no longer the active one
-                            if (this.activeHoverCell === cell) {
-                                this.activeHoverCell = null;
-                            }
-
-                            window.clearTimeout(this.hoverTimeout);
-                            this.hideTimeout = window.setTimeout(() => {
-                                // Only hide the popup if it's not locked
-                                if (!this.isPopupLocked) {
-                                    this.hideFilePopup();
-                                }
-                            }, this.plugin.settings.popupHideDelay);
-                        });
-                    }
                 }
 
-                // --- UNIFIED CLICK HANDLER ---
+
+                // --- 2. MOUSE HOVER HANDLING (Desktop + iPad) ---
+                if (hasPopupContent) {
+                    const cellDate = dayDate;
+
+
+                    cell.addEventListener('mouseenter', () => {
+                        // Safety: Don't run hover logic on phones if Platform.isMobile is true
+                        if (Platform.isMobile) return;
+
+
+                        if (this.activeHoverCell !== cell) {
+                            window.clearTimeout(this.hideTimeout);
+                            window.clearTimeout(this.hoverTimeout);
+                            this.hideFilePopup();
+                            this.activeHoverCell = cell;
+                        }
+
+
+                        if (this.isPopupLocked || this.isMouseDown) return;
+
+
+                        this.hoverTimeout = window.setTimeout(() => {
+                            if (this.activeHoverCell !== cell) return;
+
+
+                            const liveTasksForDay = this.allTasks.filter(task => {
+                                const isDone = task.status.type === 'DONE';
+                                if (isDone) {
+                                    return task.done?.moment?.isSame(cellDate, 'day');
+                                } else {
+                                    const matchesStartDate = task.start?.moment?.isSame(cellDate, 'day');
+                                    const matchesScheduledDate = task.scheduled?.moment?.isSame(cellDate, 'day');
+                                    const matchesDueDate = task.due?.moment?.isSame(cellDate, 'day');
+                                    return matchesStartDate || matchesScheduledDate || matchesDueDate;
+                                }
+                            });
+
+
+                            const freshDataToShow = { ...dataToShow, tasks: liveTasksForDay };
+                            this.showFilePopup(cell, freshDataToShow, cellDate, false);
+
+
+                        }, this.plugin.settings.otherNoteHoverDelay);
+                    });
+
+
+                    cell.addEventListener('mouseleave', () => {
+                        if (Platform.isMobile) return;
+
+
+                        window.clearTimeout(this.hoverTimeout);
+
+
+                        if (this.activeHoverCell === cell) {
+                            this.hideTimeout = window.setTimeout(() => {
+                                if (!this.isPopupLocked) {
+                                    this.hideFilePopup();
+                                    if (this.activeHoverCell === cell) {
+                                        this.activeHoverCell = null;
+                                    }
+                                }
+                            }, this.plugin.settings.popupHideDelay);
+                        }
+                    });
+                }
+
+
+                // --- 3. UNIFIED CLICK HANDLER ---
                 cell.addEventListener('click', (event) => {
-                    if (longPressOccurred) {
-                        // A long-press just happened and showed a popup, so ignore this subsequent 'click' event.
-                        return;
+                    if (longPressOccurred) return;
+
+
+                    const popupsEnabled = this.plugin.settings.listPopupTrigger !== 'none';
+
+
+                    // --- MOBILE LOGIC ---
+                    if (Platform.isMobile) {
+                        if (!popupsEnabled) {
+                            this.openDailyNote(dayDate);
+                            return;
+                        }
+
+
+                        if (hasPopupContent) {
+                            const isAlreadyOpen = (this.activeHoverCell === cell);
+
+
+                            if (isAlreadyOpen) {
+                                // SECOND TAP: Open Note
+                                this.hideFilePopup();
+                                this.openDailyNote(dayDate);
+                            } else {
+                                // FIRST TAP: Show Popup
+                                event.preventDefault();
+                                event.stopPropagation();
+
+
+                                this.hideFilePopup();
+                                this.showFilePopup(cell, dataToShow, dayDate, true);
+                                this.activeHoverCell = cell;
+                            }
+                            return;
+                        }
                     }
+
+
+                    // --- DESKTOP / DEFAULT LOGIC ---
                     this.hideFilePopup();
                     this.openDailyNote(dayDate);
                 });
+
+
+                // --- ROW HIGHLIGHT ---
                 cell.addEventListener('mouseenter', () => {
                     if (!this.plugin.settings.enableRowToDateHighlight) return;
                     const highlightColor = document.body.classList.contains('cpwn-theme-dark')
@@ -2198,8 +2303,7 @@ export class PeriodMonthView extends ItemView {
                         if (cellToHighlight) {
                             cellToHighlight.classList.add('cpwn-highlighted');
                             cellToHighlight.style.setProperty('--highlight-color', highlightColor);
-
-                        } c
+                        }
                     }
                     for (let i = 0; i < rowIndex; i++) {
                         const priorRow = allRows[i];
@@ -2229,6 +2333,8 @@ export class PeriodMonthView extends ItemView {
                     }
                 });
             }
+
+
             currentDay.setDate(currentDay.getDate() + 7);
         }
     }
@@ -2878,17 +2984,20 @@ export class PeriodMonthView extends ItemView {
 
         // This listener checks the date when the app window gets focus.
         // This solves a 'stale date highlight after a device sleep' issue.
-        this.registerDomEvent(window, 'focus', () => {
+        this.registerDomEvent(window, 'focus', async () => {
             const now = new Date();
             // Only proceed if the day has actually changed.
             if (!isSameDay(now, this.lastKnownToday)) {
-                console.log("Window focus detected: Day has changed. Refreshing calendar.");
+                //console.log("Window focus detected: Day has changed. Refreshing calendar.");
 
                 // Update our tracker to the new date.
                 this.lastKnownToday = now;
 
                 // Efficiently re-render just the calendar grid.
                 this.renderCalendar();
+                if (this.activeTab === "dashboard") {
+                    await this.populateDashboard(true);
+                }
             }
         });
 
@@ -3959,6 +4068,49 @@ export class PeriodMonthView extends ItemView {
         }
         infoWrapper.createDiv({ text: `Tags: ${tagsText}`, cls: 'cpwn-note-path' });
 
+
+        // --- 2b. Pinned note highlight colors ---
+        const colors = PINNED_HIGHLIGHT_COLORS;
+        if (colors.length > 0) {
+
+            const colorSection = contentWrapper.createEl('h6', { text: 'Highlight note', cls: 'cpwn-popup-section-header' });
+            const swatchRow = colorSection.createDiv({ cls: 'cpwn-note-highlight-color-row' });
+
+            const currentId =
+                (this.plugin.settings.pinnedNoteColorsByPath || {})[noteFile.path] || null;
+
+            colors.forEach(color => {
+                const swatch = swatchRow.createDiv({ cls: 'cpwn-note-highlight-color-swatch' });
+                swatch.style.backgroundColor = color.rgba;
+                swatch.dataset.colorId = color.id;
+                swatch.dataset.label = color.label;
+                swatch.setAttr('title', color.label || 'Highlight note');
+
+
+                if (color.id === currentId) swatch.addClass('is-selected');
+
+                swatch.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+
+                    const map = this.plugin.settings.pinnedNoteColorsByPath || {};
+                    if (map[noteFile.path] === color.id) {
+                        delete map[noteFile.path];
+                        swatchRow.querySelectorAll('.cpwn-note-highlight-color-swatch')
+                            .forEach(el => el.removeClass('is-selected'));
+                    } else {
+                        map[noteFile.path] = color.id;
+                        swatchRow.querySelectorAll('.cpwn-note-highlight-color-swatch')
+                            .forEach(el => el.removeClass('is-selected'));
+                        swatch.addClass('is-selected');
+                    }
+                    this.plugin.settings.pinnedNoteColorsByPath = map;
+                    await this.plugin.saveSettings();
+
+                    this.applyPinnedNoteColorToRow(noteFile.path);
+                });
+            });
+        }
+
         // --- 3. CONDITIONAL SEPARATOR & ASSETS SECTION ---
         // Only add the separator and the assets section if there are assets to show.
         if (hasAdditionalContent) {
@@ -4036,32 +4188,117 @@ export class PeriodMonthView extends ItemView {
         this.popupEl.style.setProperty('--menu-left', `${finalLeft}px`);
     }
 
+    getFileIconInfo(extension) {
+        if (!extension) return { icon: 'file', color: 'var(--text-muted)' };
+
+        switch (extension.toLowerCase()) {
+            // Word / Documents
+            case 'doc': case 'docx': case 'rtf': case 'txt': case 'md':
+                return { icon: 'file-text', color: '#4b8bbd' };
+
+            // Excel / Spreadsheets
+            case 'xls': case 'xlsx': case 'csv': case 'ods':
+                return { icon: 'file-spreadsheet', color: '#217346' };
+
+            // PowerPoint
+            case 'ppt': case 'pptx': case 'odp':
+                // 'presentation' is standard Lucide, but 'monitor-play' or 'projection' are safe fallbacks
+                return { icon: 'presentation', color: '#d24726' };
+
+            // PDF Use 'file-text' as safe fallback if 'file-type-pdf' is missing
+            // Or try 'file-digit' / 'file-scan' if available. 
+            // For now, 'file-text' with Red color is the safest semantic match if specific icon missing.
+            case 'pdf':
+                return { icon: 'file-text', color: '#f40f02' };
+
+            // Archives
+            case 'zip': case 'rar': case '7z':
+                return { icon: 'archive', color: '#e6c62f' }; // 'archive' is safer than 'file-archive'
+
+            // Code
+            case 'js': case 'css': case 'html': case 'json': case 'ts':
+                return { icon: 'code', color: '#9d34da' };
+
+            default:
+                return { icon: 'file', color: 'var(--text-muted)' };
+        }
+    }
 
     _createAssetListItem(container, assetFile) {
         const itemEl = container.createDiv({ cls: 'cpwn-other-notes-popup-item is-clickable' });
+        // Ensure flex layout works for the row
+        itemEl.style.display = 'flex';
+        itemEl.style.alignItems = 'center';
+        itemEl.style.gap = '10px';
+        itemEl.style.padding = '8px';
 
-        // Show a thumbnail preview if it's an image asset
+        // --- 1. THUMBNAIL / ICON AREA ---
+        // Create a dedicated wrapper with FIXED dimensions to prevent shifting
+        const mediaWrapper = itemEl.createDiv({ cls: 'cpwn-list-media-wrapper' });
+        mediaWrapper.style.width = '40px';
+        mediaWrapper.style.height = '40px';
+        mediaWrapper.style.minWidth = '40px'; // Prevent shrinking
+        mediaWrapper.style.borderRadius = '4px';
+        mediaWrapper.style.overflow = 'hidden';
+        mediaWrapper.style.display = 'flex';
+        mediaWrapper.style.alignItems = 'center';
+        mediaWrapper.style.justifyContent = 'center';
+        mediaWrapper.style.backgroundColor = 'var(--background-secondary-alt)';
+        mediaWrapper.style.border = '1px solid var(--background-modifier-border)';
+
         if (this.isImageAsset(assetFile)) {
-            const thumbnail = itemEl.createEl('img', { cls: 'cpwn-popup-asset-thumbnail' });
+            const thumbnail = mediaWrapper.createEl('img');
             thumbnail.src = this.app.vault.getResourcePath(assetFile);
+            thumbnail.style.width = '100%';
+            thumbnail.style.height = '100%';
+            thumbnail.style.objectFit = 'cover';
         } else {
-            setIcon(itemEl, 'file-text'); // Fallback icon for non-image files
+            // NON-IMAGE ICON
+            const { icon, color } = this.getFileIconInfo(assetFile.extension);
+
+            const iconEl = mediaWrapper.createDiv();
+            setIcon(iconEl, icon);
+
+            // Force icon size to fit nicely in the 40px box
+            const svg = iconEl.querySelector('svg');
+            if (svg) {
+                svg.style.width = '24px';
+                svg.style.height = '24px';
+            }
+            iconEl.style.color = color;
         }
 
-        // Display the asset's name and parent folder path
+        // --- 2. TEXT AREA ---
         const titlePathWrapper = itemEl.createDiv({ cls: 'cpwn-note-title-path-wrapper' });
-        titlePathWrapper.createDiv({ text: assetFile.basename, cls: 'cpwn-note-title' });
+        titlePathWrapper.style.flex = '1';
+        titlePathWrapper.style.minWidth = '0'; // Allow text truncation
+        titlePathWrapper.style.display = 'flex';
+        titlePathWrapper.style.flexDirection = 'column';
+        titlePathWrapper.style.lineHeight = '1.2';
+
+        const titleEl = titlePathWrapper.createDiv({ text: assetFile.basename, cls: 'cpwn-note-title' });
+        titleEl.style.fontWeight = 'var(--font-semibold)';
+        titleEl.style.fontSize = 'var(--font-ui-small)';
+        titleEl.style.whiteSpace = 'nowrap';
+        titleEl.style.overflow = 'hidden';
+        titleEl.style.textOverflow = 'ellipsis';
+
         if (assetFile.parent && assetFile.parent.path !== '/') {
-            titlePathWrapper.createDiv({ text: assetFile.parent.path, cls: 'cpwn-note-path' });
+            const pathEl = titlePathWrapper.createDiv({ text: assetFile.parent.path, cls: 'cpwn-note-path' });
+            pathEl.style.color = 'var(--text-muted)';
+            pathEl.style.fontSize = 'var(--font-ui-smaller)';
+            pathEl.style.whiteSpace = 'nowrap';
+            pathEl.style.overflow = 'hidden';
+            pathEl.style.textOverflow = 'ellipsis';
         }
 
         // Add a click listener to open the asset file
         itemEl.addEventListener('click', (e) => {
-            this.handleFileClick(assetFile, e); // Use the new handler
-            this.hideFilePopup(); // Close the popup after clicking
+            this.handleFileClick(assetFile, e);
+            this.hideFilePopup();
         });
-
     }
+
 
     async showAssetPopup(targetEl, assetFile) {
         this.hideFilePopup();
@@ -4078,24 +4315,87 @@ export class PeriodMonthView extends ItemView {
 
         const contentWrapper = this.popupEl.createDiv({ cls: 'cpwn-popup-content-wrapper' });
 
-        // --- 2. Asset Details & Preview ---
+        // --- 2. Asset Details & Preview (REFACTORED FOR CLEANER LAYOUT) ---
         contentWrapper.createEl('h6', { text: 'Details', cls: 'cpwn-popup-section-header' });
-        const infoContainer = contentWrapper.createDiv({ cls: 'cpwn-other-notes-popup-item' });
-        infoContainer.addEventListener('click', (e) => {
+
+        // Create a dedicated container for details that allows stacking (Column Layout)
+        const detailsContainer = contentWrapper.createDiv({ cls: 'cpwn-asset-details-container' });
+        detailsContainer.style.display = 'flex';
+        detailsContainer.style.flexDirection = 'column';
+        detailsContainer.style.gap = '12px';
+        detailsContainer.style.marginBottom = '15px';
+        detailsContainer.style.cursor = 'pointer';
+
+        // A. PREVIEW AREA (Top Box)
+        const previewContainer = detailsContainer.createDiv({ cls: 'cpwn-asset-preview-large' });
+        previewContainer.style.width = '100%';
+        previewContainer.style.height = '140px';
+        previewContainer.style.backgroundColor = 'var(--background-secondary-alt)';
+        previewContainer.style.borderRadius = '8px';
+        previewContainer.style.display = 'flex';
+        previewContainer.style.alignItems = 'center';
+        previewContainer.style.justifyContent = 'center';
+        previewContainer.style.overflow = 'hidden';
+        previewContainer.style.border = '1px solid var(--background-modifier-border)';
+
+        if (this.isImageAsset(assetFile)) {
+            const thumbnail = previewContainer.createEl('img', { cls: 'cpwn-popup-asset-thumbnail-large' });
+            thumbnail.src = this.app.vault.getResourcePath(assetFile);
+            thumbnail.style.maxWidth = '100%';
+            thumbnail.style.maxHeight = '100%';
+            thumbnail.style.objectFit = 'contain';
+        } else {
+            // NON-IMAGE PREVIEW
+            const { icon, color } = this.getFileIconInfo(assetFile.extension);
+
+            const iconWrapper = previewContainer.createDiv();
+            iconWrapper.style.display = 'flex';
+            iconWrapper.style.flexDirection = 'column';
+            iconWrapper.style.alignItems = 'center';
+            iconWrapper.style.gap = '8px';
+
+            const iconEl = iconWrapper.createDiv();
+            setIcon(iconEl, icon);
+
+            // Force large icon size
+            const svg = iconEl.querySelector('svg');
+            if (svg) {
+                svg.style.width = '64px';
+                svg.style.height = '64px';
+            }
+            iconEl.style.color = color;
+
+            // Extension Label
+            iconWrapper.createDiv({
+                text: assetFile.extension ? assetFile.extension.toUpperCase() : 'FILE',
+                style: 'font-size: 12px; font-weight: bold; color: var(--text-muted);'
+            });
+        }
+
+        // B. INFO TEXT AREA (Bottom Rows)
+        const infoWrapper = detailsContainer.createDiv({ cls: 'cpwn-asset-info-text' });
+        infoWrapper.style.display = 'flex';
+        infoWrapper.style.flexDirection = 'column';
+        infoWrapper.style.gap = '6px';
+
+        // Helper to create consistent data rows
+        const createInfoRow = (label, value) => {
+            const row = infoWrapper.createDiv({ style: 'display: flex; justify-content: space-between; font-size: var(--font-ui-smaller);' });
+            row.createSpan({ text: label, style: 'color: var(--text-muted);' });
+            row.createSpan({ text: value, style: 'color: var(--text-normal); font-family: var(--font-monospace); text-align: right;' });
+        };
+
+        createInfoRow('Modified:', this.formatDateTime(new Date(assetFile.stat.mtime)));
+        createInfoRow('Size:', this.formatFileSize(assetFile.stat.size));
+        // Use shorter path display for cleanliness (parent folder only)
+        const parentPath = assetFile.parent.path === '/' ? 'Root' : assetFile.parent.path;
+        createInfoRow('Folder:', parentPath);
+
+        // Click handler for the whole container
+        detailsContainer.addEventListener('click', (e) => {
             this.handleFileClick(assetFile, e);
             this.hideFilePopup();
         });
-
-        if (this.isImageAsset(assetFile)) {
-            const thumbnail = infoContainer.createEl('img', { cls: 'cpwn-popup-asset-thumbnail' });
-            thumbnail.src = this.app.vault.getResourcePath(assetFile);
-        } else {
-            setIcon(infoContainer, 'file-question');
-        }
-        const infoWrapper = infoContainer.createDiv({ cls: 'cpwn-note-title-path-wrapper' });
-        infoWrapper.createDiv({ text: `Modified: ${this.formatDateTime(new Date(assetFile.stat.mtime))}`, cls: 'cpwn-note-path' });
-        infoWrapper.createDiv({ text: `Size: ${this.formatFileSize(assetFile.stat.size)}`, cls: 'cpwn-note-path' });
-        infoWrapper.createDiv({ text: `Path: ${assetFile.path}`, cls: 'cpwn-note-path' });
 
         // --- 3. Backlinks Section ---
         if (backlinks.length > 0) {
@@ -4348,16 +4648,13 @@ export class PeriodMonthView extends ItemView {
         const searchTerm = this.assetsSearchTerm.toLowerCase();
         let filteredAssets;
 
-
         if (searchTerm === 'status:unlinked') {
             filteredAssets = allAssets.filter(file => unusedAssetPaths.has(file.path));
         } else if (searchTerm) {
-            //filteredAssets = allAssets.filter(file => file.name.toLowerCase().includes(searchTerm));
             const parsedGroups = this.parseSearchQuery(searchTerm);
             filteredAssets = allAssets.filter(file =>
                 searchTerm === "" ? true : this.searchMatches(file.name.toLowerCase(), parsedGroups)
             );
-
         } else {
             filteredAssets = allAssets;
         }
@@ -4371,7 +4668,6 @@ export class PeriodMonthView extends ItemView {
             lastWeek: [],
         };
 
-        // Initialize the display order with the fixed recent categories.
         const groupOrder = [
             { key: 'today', label: 'Today' },
             { key: 'yesterday', label: 'Yesterday' },
@@ -4383,8 +4679,6 @@ export class PeriodMonthView extends ItemView {
         const startOfThisWeek = now.clone().startOf('week');
         const startOfLastWeek = now.clone().subtract(1, 'week').startOf('week');
 
-        // Dynamically add the last 12 months to our groups and order.
-        // We start from the current month and go back.
         for (let i = 0; i < 12; i++) {
             const month = now.clone().subtract(i, 'months');
             const monthKey = month.format('YYYY-MM');
@@ -4394,30 +4688,24 @@ export class PeriodMonthView extends ItemView {
             }
         }
 
-        groups['older'] = []; // Catch-all for anything older than 12 months.
+        groups['older'] = [];
         groupOrder.push({ key: 'older', label: 'Older' });
 
-        // Iterate through the filtered assets and sort them into the groups.
         filteredAssets.forEach(file => {
             const modTime = moment(file.stat.mtime);
-            // Prioritize the special recent groups first.
             if (modTime.isSame(now, 'day')) {
                 groups.today.push(file);
             } else if (modTime.isSame(now.clone().subtract(1, 'day'), 'day')) {
                 groups.yesterday.push(file);
             } else if (modTime.isAfter(startOfThisWeek)) {
-                // More reliable check for This Week
                 groups.thisWeek.push(file);
             } else if (modTime.isAfter(startOfLastWeek)) {
-                // More reliable check for Last Week
                 groups.lastWeek.push(file);
             } else {
-                // If it's not in a recent group, find the correct month bucket.
                 const monthKey = modTime.format('YYYY-MM');
                 if (groups[monthKey]) {
                     groups[monthKey].push(file);
                 } else {
-                    // If it's older than our 12-month window, put it in the older bucket.
                     groups.older.push(file);
                 }
             }
@@ -4429,7 +4717,6 @@ export class PeriodMonthView extends ItemView {
             return;
         }
 
-        // --- CHANGE 2: Initialize the IntersectionObserver ---
         this.assetObserver = new IntersectionObserver((entries, observer) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
@@ -4448,7 +4735,7 @@ export class PeriodMonthView extends ItemView {
         });
 
         groupOrder.forEach(groupInfo => {
-            const assetsInGroup = groups[groupInfo.key];  // This line should already exist or add it here if missing
+            const assetsInGroup = groups[groupInfo.key];
 
             if (assetsInGroup.length > 0) {
                 const groupContainer = this.assetsContentEl.createDiv({ cls: 'cpwn-note-group-container' });
@@ -4462,7 +4749,6 @@ export class PeriodMonthView extends ItemView {
                 }
                 if (isCollapsed) groupContainer.addClass('cpwn-is-collapsed');
 
-                // Header creation and click handler (unchanged from previous)
                 const header = groupContainer.createDiv({ cls: 'cpwn-note-group-header' });
                 const headerContent = header.createDiv({ cls: 'cpwn-note-group-header-content' });
                 const collapseIcon = headerContent.createDiv({ cls: 'cpwn-note-group-collapse-icon' });
@@ -4475,16 +4761,15 @@ export class PeriodMonthView extends ItemView {
                     this.collapsedAssetGroups[groupInfo.key] = isCurrentlyCollapsed;
                     this.plugin.saveSettings();
 
-                    // NEW: Re-observe lazy-loaded images after expansion (fixes cutoff/blank images)
                     if (!isCurrentlyCollapsed && this.isAssetsGridView) {
                         window.setTimeout(() => {
                             const gridItems = groupContainer.querySelectorAll('.cpwn-asset-grid-item img[data-src]');
                             gridItems.forEach(img => {
-                                if (img.dataset.src) {  // Only observe unloaded images
+                                if (img.dataset.src) {
                                     this.assetObserver.observe(img.closest('.cpwn-asset-grid-item'));
                                 }
                             });
-                        }, 150);  // Slightly longer delay for smooth CSS transition
+                        }, 150);
                     }
                 });
 
@@ -4497,33 +4782,97 @@ export class PeriodMonthView extends ItemView {
                         this.applyPopupTrigger(item, file, 'asset');
 
                         const preview = item.createDiv({ cls: 'cpwn-asset-grid-preview' });
+
+                        // --- UPDATED GRID VIEW LOGIC ---
                         if (this.isImageAsset(file)) {
                             const thumbnail = preview.createEl('img', { attr: { 'data-src': this.app.vault.getResourcePath(file) } });
-                            thumbnail.alt = file.name;  // For accessibility
-                            // Observer will load this on visibility
+                            thumbnail.alt = file.name;
                         } else {
-                            setIcon(preview, 'file-question');
-                        }
-                        item.createDiv({ text: file.name, cls: 'cpwn-asset-grid-name' });
+                            // NEW: Use getFileIconInfo for Grid
+                            const { icon, color } = this.getFileIconInfo(file.extension);
 
-                        // NEW: Initially observe all new grid items for lazy loading
+                            const iconWrapper = preview.createDiv({ cls: 'cpwn-asset-icon-wrapper' });
+                            // Apply centering styling inline or via class
+                            iconWrapper.style.display = 'flex';
+                            iconWrapper.style.flexDirection = 'column';
+                            iconWrapper.style.alignItems = 'center';
+                            iconWrapper.style.justifyContent = 'center';
+                            iconWrapper.style.width = '100%';
+                            iconWrapper.style.height = '100%';
+                            iconWrapper.style.backgroundColor = 'var(--background-secondary)';
+
+                            const iconEl = iconWrapper.createDiv();
+                            setIcon(iconEl, icon);
+                            iconEl.style.color = color;
+
+                            // Make SVG larger for grid view
+                            const svg = iconEl.querySelector('svg');
+                            if (svg) {
+                                svg.style.width = '48px';
+                                svg.style.height = '48px';
+                            }
+
+                            // Extension label
+                            iconWrapper.createDiv({
+                                text: file.extension ? file.extension.toUpperCase() : 'FILE',
+                                style: 'font-size: 10px; font-weight: bold; color: var(--text-muted); margin-top: 6px;'
+                            });
+                        }
+                        // --------------------------------
+
+                        item.createDiv({ text: file.name, cls: 'cpwn-asset-grid-name' });
                         this.assetObserver.observe(item);
                     });
                 } else {
+                    // --- LIST VIEW ---
                     listWrapper.removeClass('assets-grid-view');
                     assetsInGroup.forEach(file => {
                         const row = listWrapper.createDiv({ cls: 'cpwn-note-row' });
                         this.applyPopupTrigger(row, file, 'asset');
 
+                        // Ensure row alignment
+                        row.style.display = 'flex';
+                        row.style.alignItems = 'center'; // Center vertically
+
                         const isUnused = unusedAssetPaths.has(file.path);
+
+                        // 1. TITLE WRAPPER (Icon + Title)
                         const titleWrapper = row.createDiv({ cls: 'cpwn-note-title-wrapper' });
+                        titleWrapper.style.display = 'flex';
+                        titleWrapper.style.alignItems = 'center';
+                        titleWrapper.style.flex = '1';
+                        titleWrapper.style.minWidth = '0'; // Allow title truncation
+
+                        // 2. ICON CONTAINER (Fixed Width)
                         const iconContainer = titleWrapper.createDiv({ cls: 'cpwn-asset-icon-container' });
+                        // CRITICAL: Force dimensions so icon doesn't collapse
+                        iconContainer.style.width = '24px';
+                        iconContainer.style.height = '24px';
+                        iconContainer.style.minWidth = '24px';
+                        iconContainer.style.display = 'flex';
+                        iconContainer.style.alignItems = 'center';
+                        iconContainer.style.justifyContent = 'center';
+                        iconContainer.style.marginRight = '8px';
 
                         if (this.isImageAsset(file)) {
                             const thumbnail = iconContainer.createEl('img', { cls: 'cpwn-asset-thumbnail' });
                             thumbnail.src = this.app.vault.getResourcePath(file);
+                            thumbnail.style.width = '100%';
+                            thumbnail.style.height = '100%';
+                            thumbnail.style.objectFit = 'cover';
+                            thumbnail.style.borderRadius = '3px';
                         } else {
-                            setIcon(iconContainer, 'file-text');
+                            // NEW: Specific File Icons
+                            const { icon, color } = this.getFileIconInfo(file.extension);
+                            setIcon(iconContainer, icon);
+
+                            // Style the SVG directly
+                            const svg = iconContainer.querySelector('svg');
+                            if (svg) {
+                                svg.style.width = '18px';
+                                svg.style.height = '18px';
+                            }
+                            iconContainer.style.color = color;
                         }
 
                         iconContainer.addEventListener('click', (e) => {
@@ -4531,22 +4880,33 @@ export class PeriodMonthView extends ItemView {
                             this.handleFileClick(file, e);
                         });
 
+                        // 3. UNUSED INDICATOR
                         if (isUnused && settings.showUnusedAssetsIndicator) {
                             const actionIconContainer = titleWrapper.createDiv({ cls: 'cpwn-asset-action-icon' });
                             setIcon(actionIconContainer, 'trash');
+                            actionIconContainer.style.marginRight = '5px'; // Spacing
                             actionIconContainer.addEventListener('click', (e) => {
                                 e.stopPropagation();
                                 this.handleDeleteFile(file);
                             });
                         }
 
-                        titleWrapper.createDiv({ text: file.name, cls: 'cpwn-note-title' });
+                        // 4. TITLE TEXT
+                        const titleEl = titleWrapper.createDiv({ text: file.name, cls: 'cpwn-note-title' });
+                        // Remove padding/margins that might be throwing off alignment
+                        titleEl.style.margin = '0';
+                        titleEl.style.lineHeight = '1.2';
 
+                        // 5. METADATA (Right Side)
                         const metaContainer = row.createDiv({ cls: 'note-meta-container' });
+                        // Ensure meta container doesn't shrink
+                        metaContainer.style.flexShrink = '0';
+                        metaContainer.style.marginLeft = '10px';
                         metaContainer.createSpan({ text: this.formatFileSize(file.stat.size), cls: 'note-file-size' });
                         metaContainer.createSpan({ text: this.formatDateTime(new Date(file.stat.mtime)), cls: 'note-mod-date' });
                     });
                 }
+
             }
         });
         this.assetsContentEl.style.opacity = '0';
@@ -5107,7 +5467,6 @@ export class PeriodMonthView extends ItemView {
         }
     }
 
-
     updateAlertHeader() {
         // FIX 1: DETACHMENT CHECK
         // If we have a reference to an icon, but it's no longer in the document body 
@@ -5153,6 +5512,44 @@ export class PeriodMonthView extends ItemView {
                 this.isAlertSnoozed = false;
             }
         }
+
+        //Code for OS notifications
+        if (!this.lastAlertNotifyTimestamp) {
+            this.lastAlertNotifyTimestamp = null;
+        }
+
+        /*
+        if (!this.isAlertSnoozed && alerts.length > 0) {
+            var newestTime = alerts.reduce(function (max, a) {
+                return !max || a.time.isAfter(max) ? a.time : max;
+            }, null);
+
+            if (!this.lastAlertNotifyTimestamp || newestTime.isAfter(this.lastAlertNotifyTimestamp)) {
+                const first = alerts[0];
+                var body = (first.task && (first.task.description || first.task.text)) ||
+                    (alerts.length + " alerting task(s)");
+                this.plugin.notify("Task alert", body);
+                this.lastAlertNotifyTimestamp = newestTime;
+            }
+        }
+        */
+        if (!this.isAlertSnoozed && alerts.length > 0) {
+            var newestTime = alerts.reduce(function (max, a) {
+                return !max || a.time.isAfter(max) ? a.time : max;
+            }, null);
+
+            if (!this.lastAlertNotifyTimestamp || newestTime.isAfter(this.lastAlertNotifyTimestamp)) {
+                // Use the first alerting task for the notification body
+                const first = alerts[0];
+
+                // --- CHANGED LINE ---
+                const body = this.formatTaskForNotification(first);
+
+                this.plugin.notify("Task alert", body);
+                this.lastAlertNotifyTimestamp = newestTime;
+            }
+        }
+
 
         // 3. UPDATE UI STATE
         // Show icon in all cases if alerts > 0
@@ -5202,7 +5599,8 @@ export class PeriodMonthView extends ItemView {
                 this.isAlertSnoozed = true;
                 this.snoozedAlertsTimestamp = moment();
                 this.headerAlertIconEl.removeClass('is-alerting');
-                new Notice("Alerts snoozed.");
+
+                this.plugin.notify("Alerts snoozed", "You can re-open them from the alert icon.");
             }
 
             // ACTION: TOGGLE POPUP (Always allow checking alerts)
@@ -5213,6 +5611,43 @@ export class PeriodMonthView extends ItemView {
             }
         };
     }
+
+
+    formatTaskForNotification(alertEntry) {
+        const task = alertEntry.task || {};
+
+        // --- DEFINE YOUR TEMPLATE HERE ---
+        const template = "{title} · {due} · {note}";
+
+        let rawTitle =
+            task.description ||
+            task.text ||
+            alertEntry.text ||
+            '(untitled task)';
+
+        // 1. STRIP ALERTS (Emoji & Dataview)
+        // - Matches ⏰ followed by date/time (e.g. "⏰ 2025-01-01 10:00" or "⏰ 10:00")
+        // - Matches Dataview inline field [alert:: ...]
+        const alertRegex = /⏰\s*(\d{4}-\d{2}-\d{2})?\s*(\d{1,2}:\d{2})|\[alert::[^\]]*\]/gi;
+
+        // Clean and trim extra spaces left behind
+        const title = rawTitle.replace(alertRegex, '').replace(/\s{2,}/g, ' ').trim();
+
+        const due =
+            (task.dueDate && moment(task.dueDate).format('YYYY-MM-DD')) ||
+            '';
+
+        const noteTitle =
+            task.file && task.file.basename ? task.file.basename : '';
+
+        let output = template
+            .replace('{title}', title)
+            .replace('{due}', due ? due : 'No due date')
+            .replace('{note}', noteTitle);
+
+        return output;
+    }
+
 
 
 
@@ -5525,7 +5960,7 @@ export class PeriodMonthView extends ItemView {
         );
 
         this.updateScratchpadSearchCount();
-        
+
 
         switchTabs(this.activeTab);
 
@@ -5679,66 +6114,40 @@ export class PeriodMonthView extends ItemView {
      * @returns {Promise<object>} An object containing unified labels and multiple datasets.
      */
     async getCustomWidgetData(config, allTasks) {
-
         const tagFilterString = config.tags || '';
 
-        // 1. Create a mutable list of tasks to be filtered.
+        // ---------------------------------------------------------------------
+        // 1. Tag Filtering
+        // ---------------------------------------------------------------------
         let filteredTasks = allTasks;
-
-        // 2. Parse the single tag string into inclusion and exclusion lists.
         const rawTags = tagFilterString.split(',').map(t => t.trim()).filter(t => t);
+        const inclusionTags = rawTags.filter(t => !t.startsWith('-')).map(t => t.replace(/^#/, '').toLowerCase());
+        const exclusionTags = rawTags.filter(t => t.startsWith('-')).map(t => t.substring(1).replace(/^#/, '').toLowerCase());
 
-        const inclusionTags = rawTags
-            .filter(t => !t.startsWith('-'))
-            .map(t => t.replace(/^#/, '').toLowerCase());
-
-        const exclusionTags = rawTags
-            .filter(t => t.startsWith('-'))
-            .map(t => t.substring(1).replace(/^#/, '').toLowerCase());
-
-
-        // 3. Apply Inclusion Tag Filter first.
-        // If there are any inclusion tags, a task MUST have at least one of them.
         if (inclusionTags.length > 0) {
             filteredTasks = filteredTasks.filter(task => {
-                // If task has no tags, it can't be included.
-                if (!task.tags || task.tags.length === 0) {
-                    return false;
-                }
+                if (!task.tags || task.tags.length === 0) return false;
                 const taskTags = task.tags.map(t => t.replace(/^#/, '').toLowerCase());
-                // Return true if any of the task's tags are in our inclusion list.
                 return taskTags.some(t => inclusionTags.includes(t));
             });
         }
 
-        // 4. Apply Exclusion Tag Filter on the remaining tasks.
-        // A task must NOT have any of the exclusion tags.
         if (exclusionTags.length > 0) {
             filteredTasks = filteredTasks.filter(task => {
-                // If task has no tags, it can't be excluded, so it's safe.
-                if (!task.tags || task.tags.length === 0) {
-                    return true;
-                }
+                if (!task.tags || task.tags.length === 0) return true;
                 const taskTags = task.tags.map(t => t.replace(/^#/, '').toLowerCase());
-                // Return true only if NONE of the task's tags are in our exclusion list.
                 return !taskTags.some(t => exclusionTags.includes(t));
             });
         }
 
         allTasks = filteredTasks;
 
-        const {
-            metrics,
-            dateRange,
-            groupBy,
-            chartType,
-            tag: filterTag,
-            legend
-        } = config;
-
+        const { metrics, dateRange, groupBy, chartType, tag: filterTag, legend } = config;
         const now = moment();
 
-        // --- 1. Determine Date Range for All Metrics ---
+        // ---------------------------------------------------------------------
+        // 2. Determine Date Range
+        // ---------------------------------------------------------------------
         let startDate, endDate;
         const lookMode = dateRange?.look || 'back';
         const lookValue = parseInt(dateRange?.value, 10) || 30;
@@ -5753,7 +6162,6 @@ export class PeriodMonthView extends ItemView {
             startDate = allRelevantDates.length > 0 ? moment.min(allRelevantDates) : now.clone().subtract(30, 'days');
             endDate = allRelevantDates.length > 0 ? moment.max(allRelevantDates) : now.clone();
 
-
         } else if (lookMode === 'back') {
             startDate = now.clone().subtract(lookValue, lookUnit).startOf('day');
             endDate = now.clone().endOf('day');
@@ -5767,11 +6175,7 @@ export class PeriodMonthView extends ItemView {
             endDate = now.clone().add(forwardValue, forwardUnit).endOf('day');
         } else if (lookMode === 'fixedStart') {
             const fixedStartDate = moment(dateRange.startDate, 'YYYY-MM-DD');
-            if (fixedStartDate.isValid()) {
-                startDate = fixedStartDate.startOf('day');
-            } else {
-                startDate = now.clone().subtract(30, 'days').startOf('day'); // Fallback
-            }
+            startDate = fixedStartDate.isValid() ? fixedStartDate.startOf('day') : now.clone().subtract(30, 'days').startOf('day');
 
             if (dateRange.endDate === 'forward') {
                 const forwardBase = config.lookForwardFrom === 'currentDate' ? now : startDate;
@@ -5781,62 +6185,72 @@ export class PeriodMonthView extends ItemView {
             } else {
                 endDate = now.clone().endOf('day');
             }
-
-        } else { // Fallback for any unexpected value
+        } else {
             startDate = now.clone().subtract(30, 'days').startOf('day');
             endDate = now.clone().endOf('day');
+        }
+
+        // ---------------------------------------------------------------------
+        // FIX 1: Auto-Extend Logic (Replaces broken flatMap block)
+        // ---------------------------------------------------------------------
+        if (chartType === 'cumulative' && lookMode === 'fixedStart' && ['day', 'week', 'month'].includes(groupBy)) {
+            let maxDateFound = null;
+
+            // Iterate manually to find max date across all relevant fields
+            for (const t of allTasks) {
+                const datesToCheck = [t.created?.moment, t.due?.moment, t.done?.moment, t.start?.moment];
+                for (const d of datesToCheck) {
+                    if (d && d.isValid()) {
+                        if (!maxDateFound || d.isAfter(maxDateFound)) {
+                            maxDateFound = d.clone();
+                        }
+                    }
+                }
+            }
+
+            if (maxDateFound) {
+                const lookAheadEnd = maxDateFound.clone().add(2, 'weeks').endOf('day');
+                if (lookAheadEnd.isAfter(endDate)) {
+                    endDate = lookAheadEnd;
+                }
+            }
         }
 
         const allLabels = new Set();
         const datasets = [];
 
-        // --- 2. Process Each Metric Individually ---
+        // ---------------------------------------------------------------------
+        // 3. Process Each Metric
+        // ---------------------------------------------------------------------
         for (const metricConfig of metrics) {
-            const {
-                type: metricType,
-                label,
-                color
-            } = metricConfig;
-
+            const { type: metricType, label, color } = metricConfig;
             const groupedData = new Map();
 
-            // a) Filter tasks based on the presence of the correct date property
+            // a) Filter tasks based on metric type
             let preFilteredTasks = [];
             switch (metricType) {
                 case 'completed':
-                    //preFilteredTasks = allTasks.filter(t => t.isDone);
-
                     preFilteredTasks = allTasks.filter(t => t.isDone && t.created?.moment && t.done?.moment);
-
                     break;
                 case 'created':
                     preFilteredTasks = allTasks.filter(t => t.created?.moment);
                     break;
                 case 'open':
                     preFilteredTasks = allTasks.filter(t => {
-                        const isNotDone = !t.isDone;
-                        const isNotCompleted = t.status.symbol !== 'x';
-                        const isNotCancelled = t.status.symbol !== '-';
-                        // Include TODO and IN_PROGRESS tasks
-                        const isOpenStatus = t.status.type === 'TODO' || t.status.type === 'IN_PROGRESS';
-                        return isNotDone && isNotCompleted && isNotCancelled && isOpenStatus;
+                        return !t.isDone && t.status.symbol !== 'x' && t.status.symbol !== '-' &&
+                            (t.status.type === 'TODO' || t.status.type === 'IN_PROGRESS');
                     });
-
                     break;
-
                 case 'due':
-                    // ONLY tasks with due date that are NOT overdue and NOT in-progress
                     preFilteredTasks = allTasks.filter(t => {
                         const hasDueDate = t.due && t.due.moment;
-                        const isOverdue = hasDueDate && t.due.moment.isBefore(window.moment(), 'day');
                         const isCompleted = t.status && (t.status.type === 'DONE' || t.status.symbol === 'x');
                         const isInProgress = t.status && t.status.symbol === '/';
-                        return hasDueDate && !isOverdue && !isCompleted && !isInProgress;
+                        // Removed !isOverdue check so the chart shows ALL remaining due tasks
+                        return hasDueDate && !isCompleted; // && !isInProgress;
                     });
                     break;
-
                 case 'overdue':
-                    // Tasks that are past due and not completed
                     preFilteredTasks = allTasks.filter(t => {
                         const hasDueDate = t.due && t.due.moment;
                         const isOverdue = hasDueDate && t.due.moment.isBefore(window.moment(), 'day');
@@ -5844,26 +6258,16 @@ export class PeriodMonthView extends ItemView {
                         return isOverdue && !isCompleted;
                     });
                     break;
-
                 case 'in-progress':
-                    // ONLY tasks with in-progress status (forward slash)
-                    preFilteredTasks = allTasks.filter(t => {
-                        const isInProgress = t.status && t.status.symbol === '/';
-                        return isInProgress;
-                    });
-
+                    preFilteredTasks = allTasks.filter(t => t.status && t.status.symbol === '/');
                     break;
-
                 case 'someday':
-                    // ONLY tasks with NO due date that are NOT completed
                     preFilteredTasks = allTasks.filter(t => {
                         const hasDueDate = t.due && t.due.moment;
                         const isCompleted = t.status && (t.status.type === 'DONE' || t.status.symbol === 'x');
                         return !hasDueDate && !isCompleted;
                     });
                     break;
-
-
                 case 'by-tag':
                     preFilteredTasks = allTasks.filter(t => t.tags?.some(tag => tag.toLowerCase().includes(filterTag?.toLowerCase())));
                     break;
@@ -5871,18 +6275,16 @@ export class PeriodMonthView extends ItemView {
                     preFilteredTasks = allTasks;
             }
 
-            //Calculate opening balance for cumulative "created" metric
+            // Calculate opening balance for cumulative charts
             let openingBalance = 0;
             if (chartType === 'cumulative') {
                 if (metricType === 'created') {
-                    // Count all tasks created BEFORE the startDate that are not cancelled
                     openingBalance = preFilteredTasks.filter(t => {
                         const createdMoment = moment(t.created.moment);
                         const isCancelled = t.status?.type === 'CANCELLED';
                         return createdMoment.isBefore(startDate, 'day') && !isCancelled;
                     }).length;
                 } else if (metricType === 'completed') {
-                    // Count all tasks completed BEFORE the startDate
                     openingBalance = preFilteredTasks.filter(t => {
                         const completedMoment = moment(t.done.moment);
                         return completedMoment.isBefore(startDate, 'day');
@@ -5890,84 +6292,63 @@ export class PeriodMonthView extends ItemView {
                 }
             }
 
-            // b) Apply date range filtering if not an "All Time" chart
+            // b) Apply date range filtering (except for 'someday' or 'all' mode)
             const isDateRelevant = ['completed', 'created', 'due', 'overdue', 'in-progress'].includes(metricType);
             let finalFilteredTasks = preFilteredTasks;
+
             if (!lookMode.startsWith('all') && isDateRelevant) {
                 finalFilteredTasks = preFilteredTasks.filter(task => {
                     let dateToTest = null;
                     switch (metricType) {
-                        case 'completed':
-                            dateToTest = task.done?.moment;
-                            break;
-                        case 'created':
-                            dateToTest = task.created?.moment;
-                            break;
+                        case 'completed': dateToTest = task.done?.moment; break;
+                        case 'created': dateToTest = task.created?.moment; break;
                         case 'due':
                         case 'overdue':
-                            dateToTest = task.due?.moment;
-                            break;
-                        case 'in-progress':
-                            dateToTest = task.due?.moment;
-                            break;
+                        case 'in-progress': dateToTest = task.due?.moment; break;
                     }
 
-                    return dateToTest && moment(dateToTest).isBetween(startDate, endDate, null, '[]');
+                    // FIX 3: End-of-Period Logic
+                    // Use groupBy in isBetween so tasks due at end of week/month are included
+                    return dateToTest && moment(dateToTest).isBetween(startDate, endDate, groupBy, '[]');
                 });
             }
 
+            // Handle KPI logic
             if (config.chartType === 'kpi') {
-                //console.log(`Count of completed tasks (final filtered)2 : ${finalFilteredTasks.length}`);
                 if (config.kpiPriorities && typeof config.kpiPriorities === 'object') {
                     const activePriorities = Object.keys(config.kpiPriorities).filter(key => config.kpiPriorities[key] === true);
-
                     if (activePriorities.length > 0) {
-                        finalFilteredTasks = finalFilteredTasks.filter(task => {
-                            const taskPriority = String(task.priority);
-                            return activePriorities.includes(taskPriority);
-                        });
+                        finalFilteredTasks = finalFilteredTasks.filter(task => activePriorities.includes(String(task.priority)));
                     }
                 }
-
                 const totalCount = finalFilteredTasks.length;
-
-                // For KPIs, we return a very simple structure.
-                // The calling function will expect something like this to render the number.
                 return {
-                    datasets: [{
-                        label: label, // The label for this specific metric (e.g., "Open")
-                        data: [totalCount],
-                        total: totalCount // Explicitly provide the total
-                    }],
+                    datasets: [{ label: label, data: [totalCount], total: totalCount }],
                     labels: [label],
                     legend: [{ label: label, color: color }],
                     filteredTasks: finalFilteredTasks
                 };
-
             }
 
-            // c) Aggregate data based on groupBy
+            // c) Group Data
             if (metricType === 'someday') {
-                // For 'someday' tasks, the grouping logic is simple: just count them.
-                // We can assign them to a single label.
-                const count = finalFilteredTasks.length;
-                groupedData.set('Someday', count);
-
+                groupedData.set('Someday', finalFilteredTasks.length);
             } else {
-
-                // c) Group the filtered data
+                // Initialize Group Keys
                 if (['day', 'week', 'month'].includes(groupBy) && isDateRelevant) {
                     let current = startDate.clone();
                     while (current.isSameOrBefore(endDate, groupBy)) {
-                        const key = current.format(groupBy === 'day' ? 'YYYY-MM-DD' : 'YYYY-[W]WW');
+                        // FIX 2: Use GGGG for ISO Weeks to prevent year mismatch bugs
+                        const formatString = groupBy === 'week' ? 'GGGG-[W]WW' : (groupBy === 'day' ? 'YYYY-MM-DD' : 'YYYY-MM');
+                        const key = current.format(formatString);
                         groupedData.set(key, 0);
                         current.add(1, groupBy);
                     }
                 }
 
+                // Fill Group Data
                 for (const task of finalFilteredTasks) {
                     let key;
-
                     switch (groupBy) {
                         case 'day':
                         case 'week':
@@ -5975,25 +6356,21 @@ export class PeriodMonthView extends ItemView {
                             if (isDateRelevant) {
                                 let dateField = null;
                                 switch (metricType) {
-                                    case 'completed':
-                                        dateField = task.done?.moment;
-                                        break;
-                                    case 'created':
-                                        dateField = task.created?.moment;
-                                        break;
+                                    case 'completed': dateField = task.done?.moment; break;
+                                    case 'created': dateField = task.created?.moment; break;
                                     case 'due':
                                     case 'overdue':
-                                        dateField = task.due?.moment;
-                                        break;
-                                    case 'in-progress':
-                                        dateField = task.due?.moment;
-                                        break;
+                                    case 'in-progress': dateField = task.due?.moment; break;
                                 }
+
                                 if (dateField) {
                                     const dateMoment = moment(dateField);
-                                    // CRITICAL: Only add to groupedData if within the chart's date range
-                                    if (dateMoment.isBetween(startDate, endDate, null, '[]')) {
-                                        key = dateMoment.format(groupBy === 'day' ? 'YYYY-MM-DD' : 'YYYY-[W]WW');
+
+                                    // FIX 3: End-of-Period Logic in assignment
+                                    if (dateMoment.isBetween(startDate, endDate, groupBy, '[]')) {
+                                        // FIX 2: Consistent Formatting
+                                        const formatString = groupBy === 'week' ? 'GGGG-[W]WW' : (groupBy === 'day' ? 'YYYY-MM-DD' : 'YYYY-MM');
+                                        key = dateMoment.format(formatString);
                                     }
                                 }
                             }
@@ -6009,7 +6386,6 @@ export class PeriodMonthView extends ItemView {
                         groupedData.set(key, (groupedData.get(key) || 0) + 1);
                     }
                 }
-
             }
 
             groupedData.forEach((_, label) => allLabels.add(label));
@@ -6017,46 +6393,24 @@ export class PeriodMonthView extends ItemView {
                 label,
                 color,
                 dataMap: groupedData,
-                openingBalance: openingBalance || 0  // NEW: Store opening balance
+                openingBalance: openingBalance || 0
             });
         }
 
+        // Ensure allLabels covers the full range (for empty weeks/days)
         if (chartType === 'cumulative' && lookMode === 'fixedStart' && ['day', 'week', 'month'].includes(groupBy)) {
-            // Find the maximum date across all tasks in the filtered dataset
-            const allTaskDates = allTasks
-                .flatMap(t => [
-                    t.created?.moment,
-                    t.due?.moment,
-                    t.done?.moment,
-                    t.start?.moment
-                ])
-                .filter(Boolean)
-                .map(d => moment(d));
-
-            if (allTaskDates.length > 0) {
-                const maxDataDate = moment.max(allTaskDates);
-
-                // Calculate the look-ahead end: max date + 2 weeks
-                const lookAheadEnd = maxDataDate.clone().add(2, 'weeks').endOf('day');
-
-                // Only extend if the look-ahead end is beyond the current endDate
-                if (lookAheadEnd.isAfter(endDate)) {
-                    endDate = lookAheadEnd;
-                }
-            }
-        }
-
-        if (chartType === 'cumulative' && lookMode === 'fixedStart' && ['day', 'week', 'month'].includes(groupBy)) {
-            // Ensure all dates from startDate to endDate are in allLabels
             let current = startDate.clone();
             while (current.isSameOrBefore(endDate, groupBy)) {
-                const key = current.format(groupBy === 'day' ? 'YYYY-MM-DD' : 'YYYY-[W]WW');
+                const formatString = groupBy === 'week' ? 'GGGG-[W]WW' : (groupBy === 'day' ? 'YYYY-MM-DD' : 'YYYY-MM');
+                const key = current.format(formatString);
                 allLabels.add(key);
                 current.add(1, groupBy);
             }
         }
 
-        // --- 3. Unify Datasets ---
+        // ---------------------------------------------------------------------
+        // 4. Unify Datasets
+        // ---------------------------------------------------------------------
         const sortedLabels = Array.from(allLabels).sort();
         const formattedDatasets = datasets.map(ds => {
             return {
@@ -6068,9 +6422,7 @@ export class PeriodMonthView extends ItemView {
 
         if (chartType === 'cumulative') {
             formattedDatasets.forEach((ds, index) => {
-                // NEW: Start with opening balance if this dataset has one
                 let cumulativeTotal = datasets[index]?.openingBalance || 0;
-
                 ds.data = ds.data.map(value => {
                     cumulativeTotal += value;
                     return cumulativeTotal;
@@ -6078,87 +6430,60 @@ export class PeriodMonthView extends ItemView {
             });
         }
 
-        // --- 4. Add Projected Completion Line (if configured) ---
+        // ---------------------------------------------------------------------
+        // 5. Projected Line (Cumulative Only)
+        // ---------------------------------------------------------------------
         if (chartType === 'cumulative' && config.projection?.show) {
-
-            // The previous logic to find the completed dataset was too complex.
-            // This is a more direct approach: find the dataset with the exact label "Completed".
             const completedDataset = formattedDatasets.find(ds => ds.label === 'Completed');
 
-            // If there is a different label for completed tasks (e.g., "Done"),
-            // remember to change the string above to match it exactly.
-
             if (completedDataset) {
-
-                // a) Filter for 'due' tasks that are not yet complete
+                // Determine Due Data using consistent logic
                 const dueTasks = allTasks.filter(t => {
                     const hasDueDate = t.due && t.due.moment;
-                    const isOverdue = hasDueDate && t.due.moment.isBefore(window.moment(), 'day');
                     const isCompleted = t.status && (t.status.type === 'DONE' || t.status.symbol === 'x');
                     const isInProgress = t.status && t.status.symbol === '/';
-                    // The projection should only count tasks that are due but not overdue or in-progress
-                    return hasDueDate && !isOverdue && !isCompleted && !isInProgress;
+                    // Removed overdue check to be consistent with main "Due" line
+                    return hasDueDate && !isCompleted; // && !isInProgress;
                 });
 
-                // b) Group due tasks by the specified period
                 const dueGroupedData = new Map();
                 for (const task of dueTasks) {
                     const dateMoment = moment(task.due.moment);
-                    if (dateMoment.isBetween(startDate, endDate, null, '[]')) {
-                        const key = dateMoment.format(groupBy === 'day' ? 'YYYY-MM-DD' : 'YYYY-[W]WW');
+                    if (dateMoment.isBetween(startDate, endDate, groupBy, '[]')) {
+                        const formatString = groupBy === 'week' ? 'GGGG-[W]WW' : (groupBy === 'day' ? 'YYYY-MM-DD' : 'YYYY-MM');
+                        const key = dateMoment.format(formatString);
                         dueGroupedData.set(key, (dueGroupedData.get(key) || 0) + 1);
                     }
                 }
 
-                // c) Create a cumulative data array for due tasks
                 let cumulativeDueTotal = 0;
                 const dueData = sortedLabels.map(label => {
                     cumulativeDueTotal += dueGroupedData.get(label) || 0;
                     return cumulativeDueTotal;
                 });
 
-                const dueDataset = formattedDatasets.find(
-                    (ds) => ds.label === "Due"
-                );
-
+                const dueDataset = formattedDatasets.find((ds) => ds.label === "Due");
                 if (dueDataset) {
                     dueDataset.data = dueData;
                 }
 
-                // d) Create the projected data by adding cumulative due tasks to cumulative completed tasks
-                // The projection represents: all completed tasks + all remaining due tasks
+                // Projection = Completed + Remaining Due
                 const projectedData = completedDataset.data.map((completedValue, index) => {
-                    // Get the current cumulative completed count
-                    const completed = completedValue;
-                    // Get the current cumulative due count
                     const due = dueData[index] || 0;
-
-                    // Projection = Completed + Due (this should equal Created total)
-                    return completed + due;
+                    return completedValue + due;
                 });
 
-                // e) Get styling from config or use defaults
                 const projectionConfig = config.projection || {};
-                const projectionColor = projectionConfig.color || 'rgba(128, 128, 128, 0.7)';
-                const projectionLabel = projectionConfig.label || 'Projected';
-
-                // f) Create and add the new dataset for the projected line
-                const projectedDataset = {
-                    label: projectionLabel,
-                    color: projectionColor,
+                formattedDatasets.push({
+                    label: projectionConfig.label || 'Projected',
+                    color: projectionConfig.color || 'rgba(128, 128, 128, 0.7)',
                     data: projectedData,
-                    borderColor: projectionColor,
+                    borderColor: projectionConfig.color || 'rgba(128, 128, 128, 0.7)',
                     borderDash: [5, 5],
                     pointRadius: 0,
                     tension: 0.1,
                     backgroundColor: 'transparent'
-                };
-
-                formattedDatasets.push(projectedDataset);
-
-            } else {
-                // This message will now appear if the lookup fails.
-                console.error("PROJECTION FAILED: Could not find a dataset with the label 'Completed'. Please ensure one of your metrics has this exact label.");
+                });
             }
         }
 
@@ -6167,66 +6492,39 @@ export class PeriodMonthView extends ItemView {
             color: ds.color
         }));
 
-
-        if (chartType === 'cumulative' && config.projection?.show && formattedDatasets.some(ds => ds.label === (config.projection.label || 'Projected'))) {
-            // We re-create the object here just to be safe.
-            const projectionConfig = config.projection || {};
-            const projectionLabel = projectionConfig.label || 'Projected';
-            const projectionColor = projectionConfig.color || 'rgba(128, 128, 128, 0.7)';
-            legendData.push({ label: projectionLabel, color: projectionColor });
-        }
-
+        // Handle Line Chart clipping logic (unchanged)
         if (chartType === 'line' && lookMode.startsWith('all')) {
-            // Find first AND last labels where ANY metric has a non-zero value
             let firstNonZeroIndex = -1;
             let lastNonZeroIndex = -1;
 
             for (let i = 0; i < sortedLabels.length; i++) {
-                const hasData = formattedDatasets.some(ds => ds.data[i] > 0);
-                if (hasData) {
-                    if (firstNonZeroIndex === -1) {
-                        firstNonZeroIndex = i;
-                    }
+                if (formattedDatasets.some(ds => ds.data[i] > 0)) {
+                    if (firstNonZeroIndex === -1) firstNonZeroIndex = i;
                     lastNonZeroIndex = i;
                 }
             }
 
             if (firstNonZeroIndex !== -1) {
-                // Calculate buffer (2 weeks worth of labels)
                 const bufferSize = groupBy === 'day' ? 14 : (groupBy === 'week' ? 2 : 1);
-
-                // Start index with buffer
                 const startIndex = Math.max(0, firstNonZeroIndex - bufferSize);
-
-                // For end, we need to EXTEND beyond the existing data
                 const extendBeyondData = Math.max(0, bufferSize - (sortedLabels.length - 1 - lastNonZeroIndex));
 
-                // Slice existing data
                 let trimmedLabels = sortedLabels.slice(startIndex);
-                let trimmedDatasets = formattedDatasets.map(ds => ({
-                    ...ds,
-                    data: ds.data.slice(startIndex)
-                }));
+                let trimmedDatasets = formattedDatasets.map(ds => ({ ...ds, data: ds.data.slice(startIndex) }));
 
-                // Add extra labels for the end buffer if needed
                 if (extendBeyondData > 0) {
                     const lastLabel = sortedLabels[sortedLabels.length - 1];
                     const lastDate = moment(lastLabel, groupBy === 'day' ? 'YYYY-MM-DD' : 'YYYY-[W]WW');
-
                     for (let i = 1; i <= extendBeyondData; i++) {
                         const newDate = lastDate.clone().add(i, groupBy);
                         const newLabel = newDate.format(groupBy === 'day' ? 'YYYY-MM-DD' : 'YYYY-[W]WW');
                         trimmedLabels.push(newLabel);
-
-                        // Add 0 values for all datasets at this new label
                         trimmedDatasets.forEach(ds => ds.data.push(0));
                     }
                 }
-
                 return { datasets: trimmedDatasets, labels: trimmedLabels, legend: legendData, dateRange: { startDate, endDate } };
             }
         }
-
 
         return {
             datasets: formattedDatasets,
@@ -6302,7 +6600,13 @@ export class PeriodMonthView extends ItemView {
             showChevron = true; // default fallback
         }
 
-        const header = widgetContainer.createDiv({ cls: 'cpwn-widget-header' });
+        // Check the initial collapsed state.
+        const isCollapsed = this.plugin.settings.collapsedWidgets[config.widgetKey] || false;
+        if (isCollapsed) {
+            widgetContainer.addClass('collapsed');
+        }
+
+        const header = widgetContainer.createDiv({ cls: 'cpwn-pm-widget-header' });
         let toggleIcon = '';
 
         if (showChevron) {
@@ -6313,13 +6617,15 @@ export class PeriodMonthView extends ItemView {
             this.plugin.settings.collapsedWidgets = {};
         }
 
-        // Check the initial collapsed state.
-        const isCollapsed = this.plugin.settings.collapsedWidgets[config.widgetKey] || false;
-
         if (showChevron) {
-            setIcon(toggleIcon, isCollapsed ? 'chevron-right' : 'chevron-down');
-        }
+            setIcon(toggleIcon, 'chevron-down');
 
+        }
+        /*
+                if (showChevron) {
+                    setIcon(toggleIcon, isCollapsed ? 'chevron-right' : 'chevron-down');
+                }
+        */
         if (showTitle) {
             let title = config.widgetName;
             if (config.appendTimePeriod !== false) {
@@ -6333,14 +6639,11 @@ export class PeriodMonthView extends ItemView {
                     title = `${config.widgetName} (Since ${config.dateRange.startDate})`;
                 }
             }
-            header.createDiv({ cls: 'cpwn-widget-title' }).setText(title);
+            //header.createDiv({ cls: 'cpwn-widget-title' }).setText(title);          
+            header.createEl('h3', { text: title });
         }
 
         const contentWrapper = widgetContainer.createDiv({ cls: 'cpwn-widget-content' });
-
-        if (isCollapsed) {
-            widgetContainer.addClass('collapsed');
-        }
 
         header.addEventListener('click', async () => {
             const isCurrentlyCollapsed = widgetContainer.classList.toggle('collapsed');
@@ -6348,7 +6651,9 @@ export class PeriodMonthView extends ItemView {
             await this.plugin.saveSettings(); // Save the settings
 
             if (showChevron && toggleIcon) {
-                setIcon(toggleIcon, isCurrentlyCollapsed ? 'chevron-right' : 'chevron-down');
+                setIcon(toggleIcon, 'chevron-down');
+                //setIcon(toggleIcon, isCurrentlyCollapsed ? 'chevron-right' : 'chevron-down');
+
             }
             if (config.chartType === 'kpi') {
                 const kpiWrapper = widgetContainer.querySelector('.cpwn-pm-kpi-wrapper');
@@ -6807,9 +7112,9 @@ export class PeriodMonthView extends ItemView {
 
 
     /**
- * Renders a single custom heatmap.
- * UPDATED: Accepts modifiedFile and passes it to the widget.
- */
+    * Renders a single custom heatmap.
+    * UPDATED: Accepts modifiedFile and passes it to the widget.
+    */
     async renderSingleHeatmap(widgetGrid, heatmapConfig, index, modifiedFile = null) {
         // 1. Find or create container
         const widgetContainerId = `cpwn-creation-widget-custom-${index}`;
@@ -6819,7 +7124,7 @@ export class PeriodMonthView extends ItemView {
             widgetContainer = widgetGrid.createDiv({ cls: 'cpwn-pm-widget-container cpwn-pm-widget-medium' });
             widgetContainer.id = widgetContainerId;
         } else {
-            widgetContainer.style.display = ''; // Ensure visible
+            widgetContainer.style.display = '';
         }
 
         // 2. Gather Files
@@ -6871,7 +7176,7 @@ export class PeriodMonthView extends ItemView {
                 {
                     startDate,
                     endDate,
-                    modifiedFile, // <--- Must be present here
+                    modifiedFile,
                     dateSource: heatmapConfig.dateSource
                 },
                 widgetKey
@@ -7197,7 +7502,7 @@ export class PeriodMonthView extends ItemView {
         const metCount = goals.filter(g => g.isActiveToday && g.isMet).length;
 
         // 2. Recalculate Level (Points) & History
-        const historySettings = { ...this.plugin.settings, vacationModeGlobal: false };
+        const historySettings = { ...this.plugin.settings };
         const rawHistory = await GoalDataAggregator.getPointsHistory(this.app, historySettings, this.allTasks);
 
         let totalPoints = 0;
@@ -7270,7 +7575,7 @@ export class PeriodMonthView extends ItemView {
         if (targets.length === 0) return; // No widgets found to update
 
         // 2. RE-CALCULATE DATA (Done once for efficiency)
-        const historySettings = { ...this.plugin.settings, vacationModeGlobal: false };
+        const historySettings = { ...this.plugin.settings };
         const fullHistory = await GoalDataAggregator.getPointsHistory(this.app, historySettings, this.allTasks);
 
         let lifetimeTotal = 0;
@@ -7303,7 +7608,7 @@ export class PeriodMonthView extends ItemView {
             labels: labels,
             breakdowns: breakdowns,
             datasets: [{
-                label: 'Weekly Momentum',
+                label: 'Week goal momentum',
                 data: dataPoints,
                 borderColor: 'var(--text-accent)',
                 backgroundColor: 'rgba(var(--text-accent-rgb), 0.1)',
@@ -7324,10 +7629,8 @@ export class PeriodMonthView extends ItemView {
                 container.classList.contains('collapsed');
 
             if (isMinimized) {
-                // Forcefully disable interactions.
-                // This prevents the invisible/hidden chart elements from capturing mouse events.
-                contentWrapper.style.pointerEvents = 'none';
-                contentWrapper.style.visibility = 'hidden'; // Optional extra safety
+
+                continue;
             } else {
                 // Restore interactions when expanded
                 contentWrapper.style.pointerEvents = '';
@@ -7746,21 +8049,18 @@ export class PeriodMonthView extends ItemView {
         return false;
     }
 
-    // Render the section header
     renderSectionHeader(container, config) {
         if (config.isVisible === false) {
-            return; // Don't render if not visible
+            const placeholder = container.createDiv({ cls: 'cpwn-section-header cpwn-section-placeholder' });
+            placeholder.style.display = 'none';
+            return;
         }
 
         const sectionHeader = container.createDiv({ cls: 'cpwn-pm-section-header' });
-
         const textAlign = config.textAlign || 'left';
-
         sectionHeader.classList.add('cpwn-section-header');
 
-        if (textAlign === 'center') {
-            sectionHeader.classList.add('cpwn-section-header-center');
-        }
+        if (textAlign === 'center') sectionHeader.classList.add('cpwn-section-header-center');
         if (textAlign === 'right') {
             sectionHeader.classList.add('cpwn-section-header-right');
             sectionHeader.classList.add('cpwn-section-icon-left');
@@ -7769,42 +8069,26 @@ export class PeriodMonthView extends ItemView {
         const shouldShowChevron = config.showChevron === 'show' ||
             (config.showChevron === 'global' && this.plugin.settings.showSectionHeaderChevrons);
 
-        // Only render collapse icon if chevron is enabled
+        // Store reference to icon container so we can update it on click
+        let collapseIcon = null;
         if (shouldShowChevron) {
-
-            // Collapse icon
-            const collapseIcon = sectionHeader.createDiv({ cls: 'cpwn-pm-section-collapse-icon' });
-            //setIcon(collapseIcon, config.isCollapsed ? 'chevron-right' : 'chevron-down');
+            collapseIcon = sectionHeader.createDiv({ cls: 'cpwn-pm-section-collapse-icon' });
             setIcon(collapseIcon, config.isCollapsed ? (textAlign === 'right' ? 'chevron-left' : 'chevron-right') : 'chevron-down');
-
-
-
         }
 
-        // Section icon (if configured)
         if (config.icon) {
             const iconEl = sectionHeader.createDiv({ cls: 'cpwn-pm-section-icon' });
             setIcon(iconEl, config.icon);
             if (config.iconColor) {
-                // Apply color to the SVG element inside the icon container
                 const svgEl = iconEl.querySelector('svg');
-                if (svgEl) {
-                    svgEl.style.setProperty('color', config.iconColor, 'important');
-                }
+                if (svgEl) svgEl.style.setProperty('color', config.iconColor, 'important');
             }
         }
 
-        // Section name
         const nameEl = sectionHeader.createSpan({ text: config.name, cls: 'cpwn-pm-section-name' });
-
         nameEl.style.flexGrow = '1';
         nameEl.style.textAlign = textAlign;
-
-        // Apply ALL the configured styles with !important to ensure they take effect
-        if (config.textColor) {
-            nameEl.style.setProperty('color', config.textColor, 'important');
-        }
-
+        if (config.textColor) nameEl.style.setProperty('color', config.textColor, 'important');
         if (config.fontWeight) {
             const weight = config.fontWeight === 'bold' ? 'bold' : config.fontWeight === 'italic' ? 'normal' : 'normal';
             nameEl.style.setProperty('font-weight', weight, 'important');
@@ -7813,21 +8097,57 @@ export class PeriodMonthView extends ItemView {
             const style = config.fontWeight === 'italic' ? 'italic' : 'normal';
             nameEl.style.setProperty('font-style', style, 'important');
         }
+        if (config.fontSize) nameEl.style.setProperty('font-size', `${config.fontSize}px`, 'important');
 
-        if (config.fontSize) {
-            nameEl.style.setProperty('font-size', `${config.fontSize}px`, 'important');
-        }
+        sectionHeader.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
 
-        // Click to toggle collapse
-        sectionHeader.addEventListener('click', async () => {
+            // 1. Toggle State
             config.isCollapsed = !config.isCollapsed;
-            await this.plugin.saveSettings();
-            // Call the main dashboard populate function to re-render
-            this.lastTasksState = ''; // Reset last state to force re-render
-            await this.populateDashboard();
+
+            // 2. Update Icon Immediately
+            if (collapseIcon) {
+                const iconName = config.isCollapsed
+                    ? (textAlign === 'right' ? 'chevron-left' : 'chevron-right')
+                    : 'chevron-down';
+                setIcon(collapseIcon, iconName);
+            }
+
+            // 3. Save Settings Silently (Do not await if you want instant UI)
+            this.plugin.saveData(this.plugin.settings);
+
+            // 4. Toggle Visibility of Siblings (The "No-Flash" Fix)
+            // This loop grabs every element after the header until it hits the next header
+            let sibling = sectionHeader.nextElementSibling;
+            let foundWidgets = false;
+
+            while (sibling) {
+                // Stop if we reach the next section header
+                if (sibling.classList.contains('cpwn-section-header')) {
+                    break;
+                }
+
+                // Toggle display based on new collapsed state
+                if (config.isCollapsed) {
+                    sibling.style.display = 'none';
+                } else {
+                    sibling.style.display = ''; // Revert to CSS default (usually block/flex)
+                }
+
+                sibling = sibling.nextElementSibling;
+                foundWidgets = true;
+            }
+
+            // 5. Fallback for "Expand" (Optimization Safety)
+            // If we tried to expand, but found no widgets (likely because populateDashboard skipped 
+            // rendering them when collapsed), we MUST trigger a full refresh to create them.
+            if (!config.isCollapsed && !foundWidgets) {
+                this.lastTasksState = '';
+                await this.populateDashboard(true);
+            }
         });
     }
-
 
     // Populates the dashboard in "Tasks" mode.
     async populateTasksDashboard(widgetGrid) {
@@ -7903,9 +8223,9 @@ export class PeriodMonthView extends ItemView {
 
                 // Check if this widget should be hidden (in a collapsed section)
                 const isInCollapsedSection = this.isWidgetInCollapsedSection(widgetKey, finalOrder, this.plugin.settings);
-                if (isInCollapsedSection) {
-                    continue; // Skip rendering this widget
-                }
+                //if (isInCollapsedSection) {
+                //    continue; // Skip rendering this widget
+                //}
 
                 switch (widgetKey) {
                     case 'today':
@@ -8000,8 +8320,8 @@ export class PeriodMonthView extends ItemView {
                         break;
                     }
 
-                    case 'goalStatusListCondensed': {
 
+                    case 'goalStatusListCondensed': {
                         try {
                             // 1. Create Container (Medium/Half-Width)
                             const widgetContainer = widgetGrid.createDiv({
@@ -8022,13 +8342,14 @@ export class PeriodMonthView extends ItemView {
                             const headerTitle = header.createDiv({ cls: 'cpwn-pm-widget-header-title' });
 
                             let toggleIcon = null;
+
                             if (showChevron) {
                                 toggleIcon = headerTitle.createDiv({ cls: 'cpwn-widget-toggle-icon' });
-                                setIcon(toggleIcon, isCollapsed ? 'chevron-right' : 'chevron-down');
+                                setIcon(toggleIcon, 'chevron-down');
                             }
 
                             if (showTitle) {
-                                header.createDiv({ cls: 'cpwn-widget-title' }).setText('Daily goals');
+                                header.createEl('h3', { text: 'Daily goals' });
                             }
 
                             // 5. Toggle Logic
@@ -8036,7 +8357,7 @@ export class PeriodMonthView extends ItemView {
                                 const currentlyCollapsed = widgetContainer.classList.toggle('collapsed');
                                 this.plugin.settings.collapsedWidgets[widgetKey] = currentlyCollapsed;
                                 await this.plugin.saveSettings();
-                                if (showChevron && toggleIcon) setIcon(toggleIcon, currentlyCollapsed ? 'chevron-right' : 'chevron-down');
+                                if (showChevron && toggleIcon) setIcon(toggleIcon, 'chevron-down');
                             });
 
                             // 6. Render Content
@@ -8044,23 +8365,32 @@ export class PeriodMonthView extends ItemView {
 
                             // --- DATA FETCHING ---
                             const goals = await GoalDataAggregator.getTodaysGoals(this.app, this.plugin.settings, this.allTasks);
-                            const historySettings = { ...this.plugin.settings, vacationModeGlobal: false };
-                            const rawHistory = await GoalDataAggregator.getPointsHistory(this.app, historySettings, this.allTasks);
 
-                            let calculatedTotal = 0;
-                            if (Array.isArray(rawHistory)) {
-                                calculatedTotal = rawHistory.reduce((acc, day) => acc + (day.totalPoints || 0), 0);
-                            } else if (rawHistory && rawHistory.datasets && rawHistory.datasets[0]) {
-                                calculatedTotal = rawHistory.datasets[0].data.reduce((acc, val) => acc + (Number(val) || 0), 0);
-                            }
-                            const totalPoints = calculatedTotal;
+                            // --- FIX 1: GET TRUE TOTAL POINTS (Source of Truth) ---
+                            // Instantiate Tracker
+                            const trackerForLevels = new GoalTracker(this.app, this.plugin.settings);
+
+                            // Get Definitive Lifetime Total
+                            const totalPoints = await GoalTracker.getLifetimePoints(
+                                this.app,
+                                this.plugin.settings,
+                                this.allTasks
+                            );
+
+                            // --- FIX 2: RECONSTRUCT rawHistory FOR TOOLTIPS & AVERAGES ---
+                            const historyObj = this.plugin.settings.goalScoreHistory || {};
+                            const rawHistory = Object.keys(historyObj)
+                                .sort()
+                                .map(dateKey => ({
+                                    date: dateKey,
+                                    totalPoints: historyObj[dateKey].totalPoints || 0
+                                }));
+
 
                             // --- LEVEL CALCULATION ---
-                            const trackerForLevels = new GoalTracker(this.app, this.plugin.settings);
+                            // (trackerForLevels is already instantiated above)
                             const lifetimeTargetRaw = trackerForLevels.getLifetimeTargetPoints && trackerForLevels.getLifetimeTargetPoints();
-
                             const todayScore = await trackerForLevels.calculateDailyScore(moment(), this.allTasks);
-
                             const effectiveTarget = lifetimeTargetRaw && lifetimeTargetRaw > 0 ? lifetimeTargetRaw : 300000;
 
                             const LEVEL_BANDS = [
@@ -8093,22 +8423,20 @@ export class PeriodMonthView extends ItemView {
                             const nextLevel = currentIndex > 0 ? levelsDesc[currentIndex - 1] : { min: currentLevel.min * 1.5, title: 'Max Level' };
                             const percentage = Math.min(100, Math.max(0, ((totalPoints - currentLevel.min) / (nextLevel.min - currentLevel.min)) * 100));
 
+
                             // --- GENERATE PROJECTION TEXT & HEADLINE (Required for Tooltip) ---
                             let projectionText = '';
                             {
+                                // --- FIX 3: CLEAN DAILY AVERAGE ---
                                 let dailyAverage = 0;
+
+                                // We use 'rawHistory' which we reconstructed above from settings
                                 if (Array.isArray(rawHistory) && rawHistory.length > 0) {
+                                    // Get last 7 days from sorted array
                                     const recent = rawHistory.slice(-7);
-                                    const sum = recent.reduce((acc, d) => acc + (d.totalPoints || 0), 0);
-                                    dailyAverage = sum / (recent.length || 1);
-                                } else if (rawHistory && rawHistory.datasets && rawHistory.datasets[0]) {
-                                    // Quick check for chart data format too
-                                    const d = rawHistory.datasets[0].data || [];
-                                    if (d.length >= 2) {
-                                        // Basic diff logic if needed, or just take the last value if cumulative
-                                        // Assuming simple average for now to match logic
-                                        dailyAverage = Number(d[d.length - 1]) || 0;
-                                    }
+                                    let sum = 0;
+                                    recent.forEach(d => sum += (d.totalPoints || 0));
+                                    dailyAverage = sum / recent.length;
                                 }
 
                                 const pointsRemaining = Math.max(0, nextLevel.min - totalPoints);
@@ -8152,74 +8480,51 @@ export class PeriodMonthView extends ItemView {
                             if (this.plugin.settings.vacationModeGlobal) {
                                 // Show Vacation Icon
                                 const iconContainer = listEl.createDiv({
-                                    cls: 'cpwn-summary-icon-rest' // Reuse the same large icon class
+                                    cls: 'cpwn-summary-icon-rest'
                                 });
-                                setIcon(iconContainer, 'plane'); // Palm tree icon
+                                setIcon(iconContainer, 'plane');
 
                                 listEl.createDiv({
                                     cls: 'cpwn-summary-sub',
                                     text: 'On Vacation'
                                 });
                             } else {
-                                // 1. Analyze Active vs Off goals
                                 const totalGoals = goals.length;
                                 const offGoalsCount = goals.filter(g => !g.isActiveToday).length;
-                                const activeGoalsCount = totalGoals - offGoalsCount;
+                                const metCount = goals.filter(g => g.isActiveToday && g.isMet).length;
 
-                                // LEFT: Summary Text
-                                const listEl = splitContainer.createDiv({ cls: 'cpwn-goal-list-left' });
-
-                                if (this.plugin.settings.vacationModeGlobal) {
-                                    // Show Vacation Icon
+                                if (offGoalsCount === totalGoals && totalGoals > 0) {
+                                    // CASE A: Rest Day (All Off) -> Show Coffee Icon
                                     const iconContainer = listEl.createDiv({
-                                        cls: 'cpwn-summary-icon-rest' // Reuse the same large icon class
+                                        cls: 'cpwn-summary-icon-rest'
                                     });
-                                    setIcon(iconContainer, 'tree-plam'); // Palm tree icon
+                                    setIcon(iconContainer, 'coffee');
 
                                     listEl.createDiv({
                                         cls: 'cpwn-summary-sub',
-                                        text: 'On Vacation'
+                                        text: 'All goals off'
                                     });
+
                                 } else {
-                                    const totalGoals = goals.length;
-                                    const offGoalsCount = goals.filter(g => !g.isActiveToday).length;
-                                    const metCount = goals.filter(g => g.isActiveToday && g.isMet).length;
+                                    // CASE B: Normal Counting
+                                    const summaryLarge = listEl.createDiv({
+                                        cls: 'cpwn-summary-large',
+                                        text: `${metCount}/${totalGoals}`
+                                    });
+                                    summaryLarge.id = 'cpwn-daily-summary-large-condensed';
 
-                                    if (offGoalsCount === totalGoals && totalGoals > 0) {
-                                        // CASE A: Rest Day (All Off) -> Show Coffee Icon
-                                        const iconContainer = listEl.createDiv({
-                                            cls: 'cpwn-summary-icon-rest'
-                                        });
-                                        setIcon(iconContainer, 'coffee'); // Uses the standard Obsidian 'coffee' icon
-
-                                        listEl.createDiv({
-                                            cls: 'cpwn-summary-sub',
-                                            text: 'All goals off'
-                                        });
-
-                                    } else {
-                                        // CASE B: Normal Counting
-                                        const summaryLarge = listEl.createDiv({
-                                            cls: 'cpwn-summary-large',
-                                            text: `${metCount}/${totalGoals}`
-                                        });
-                                        summaryLarge.id = 'cpwn-daily-summary-large-condensed';
-
-
-                                        // Dynamic Subtext
-                                        let subText = 'goals met';
-                                        if (offGoalsCount > 0) {
-                                            subText = `${offGoalsCount} off today`;
-                                        }
-
-                                        const summarySub = listEl.createDiv({
-                                            cls: 'cpwn-summary-sub',
-                                            text: subText
-                                        });
-                                        summarySub.id = 'cpwn-daily-summary-sub-condensed';
+                                    // Dynamic Subtext
+                                    let subText = 'goals met';
+                                    if (offGoalsCount > 0) {
+                                        subText = `${offGoalsCount} off today`;
                                     }
-                                }
 
+                                    const summarySub = listEl.createDiv({
+                                        cls: 'cpwn-summary-sub',
+                                        text: subText
+                                    });
+                                    summarySub.id = 'cpwn-daily-summary-sub-condensed';
+                                }
                             }
 
                             // Right Ring
@@ -8253,10 +8558,7 @@ export class PeriodMonthView extends ItemView {
                             const iconInner = svgWrapper.createDiv({ cls: 'cpwn-level-icon-inner' });
                             iconInner.id = 'cpwn-daily-level-icon-condensed';
                             setIcon(iconInner, currentLevel.icon || 'sprout');
-                            const titleEl = levelCol.createDiv({ text: currentLevel.title, cls: 'cpwn-level-title-text' });
-                            titleEl.id = 'cpwn-daily-level-title-condensed';
 
-                            // --- FULL TOOLTIP LOGIC (With Mini-Ring and Styling) ---
                             let goalTooltipEl = null;
 
                             const buildTooltipContent = (
@@ -8265,7 +8567,6 @@ export class PeriodMonthView extends ItemView {
                                 pointsIn = totalPoints,
                                 historyIn = rawHistory
                             ) => {
-                                // Use local variables inside the function
                                 const todayScore = scoreIn;
                                 const currentLevel = levelIn;
                                 const totalPoints = pointsIn;
@@ -8280,7 +8581,7 @@ export class PeriodMonthView extends ItemView {
 
                                 const header = goalTooltipEl.createDiv({ cls: 'cpwn-goal-tooltip-header' });
 
-                                // Mini Ring in Tooltip
+                                // Mini Ring
                                 const ringWrapper = header.createDiv({ cls: 'cpwn-goal-tooltip-ring-wrapper' });
                                 const miniSize = 28; const miniStroke = 3;
                                 const miniR = (miniSize - miniStroke) / 2;
@@ -8321,43 +8622,35 @@ export class PeriodMonthView extends ItemView {
 
                                     const makeRow = (label, pts, icon) => {
                                         const row = breakdownDiv.createDiv({ cls: 'cpwn-breakdown-row' });
-                                        // Ensure the row itself aligns its children (left vs right)
                                         row.style.display = 'flex';
                                         row.style.justifyContent = 'space-between';
-                                        row.style.alignItems = 'center'; // Vertically center the Left vs Right groups
+                                        row.style.alignItems = 'center';
                                         row.style.fontSize = '0.9em';
                                         row.style.marginBottom = '4px';
 
-                                        // LEFT SIDE: Icon + Label
                                         const left = row.createDiv();
-                                        // Make this a flex container too so the Icon aligns with the Text
                                         left.style.display = 'flex';
-                                        left.style.alignItems = 'center'; // Critical for Icon/Text alignment
-                                        left.style.gap = '6px'; // Add a small consistent gap
+                                        left.style.alignItems = 'center';
+                                        left.style.gap = '6px';
 
                                         if (icon) {
                                             const iconSpan = left.createSpan({ cls: 'cpwn-bd-icon' });
                                             setIcon(iconSpan, icon);
-                                            // Optional: ensure icon doesn't shrink
                                             iconSpan.style.display = 'flex';
                                         }
 
-                                        // The label text
                                         left.createSpan({ text: label });
 
-                                        // RIGHT SIDE: Points
                                         const right = row.createDiv({ cls: 'cpwn-bd-pts', text: `+${pts}` });
                                         if (pts > 0) right.style.color = 'var(--text-accent)';
                                         else right.style.color = 'var(--text-muted)';
                                     };
-
 
                                     if (bd.goals !== 0) makeRow("Goals", bd.goals, "target");
                                     if (bd.allMet > 0) makeRow("All Met Bonus", bd.allMet, "star");
                                     if (bd.streak > 0) makeRow("Streak Bonus", bd.streak, "flame");
                                     if (bd.multiplier > 0) makeRow("Multiplier", bd.multiplier, "zap");
 
-                                    // Total for Today
                                     const totalRow = breakdownDiv.createDiv({ cls: 'cpwn-breakdown-total' });
                                     totalRow.style.display = 'flex';
                                     totalRow.style.justifyContent = 'space-between';
@@ -8369,8 +8662,6 @@ export class PeriodMonthView extends ItemView {
                                     totalRow.createDiv({ text: `${todayScore.totalPoints}`, style: 'color: var(--text-accent)' });
                                 }
 
-
-                                // Render full projection text lines
                                 projectionText.split('\n').forEach(line => {
                                     const trimmed = line.trim();
                                     if (!trimmed) {
@@ -8380,9 +8671,7 @@ export class PeriodMonthView extends ItemView {
                                     if (trimmed.startsWith('At this pace')) {
                                         body.createDiv({ cls: 'cpwn-goal-tooltip-spacer-large' });
                                     }
-
                                     const isEmphasis = trimmed.startsWith('Level:') || trimmed.startsWith('Current:') || trimmed.startsWith('Next:') || trimmed.startsWith('Nice and steady') || trimmed.startsWith('Good momentum') || trimmed.startsWith("You're on fire") || trimmed.startsWith('Absolutely crushing');
-
                                     body.createDiv({
                                         cls: isEmphasis ? 'cpwn-goal-tooltip-line-strong' : 'cpwn-goal-tooltip-line',
                                         text: trimmed
@@ -8395,29 +8684,18 @@ export class PeriodMonthView extends ItemView {
                                 const padding = 12;
                                 let x = evt.clientX + padding;
                                 let y = evt.clientY + padding;
-
-                                // Measure tooltip
                                 const rect = goalTooltipEl.getBoundingClientRect();
                                 if (x + rect.width + padding > window.innerWidth) x = evt.clientX - rect.width - padding;
                                 if (y + rect.height + padding > window.innerHeight) y = evt.clientY - rect.height - padding;
-
                                 goalTooltipEl.style.left = `${x}px`;
                                 goalTooltipEl.style.top = `${y}px`;
                             };
 
                             svgWrapper.addEventListener('mouseenter', (evt) => {
-
-
-                                //buildTooltipContent();
-
                                 if (svgWrapper._freshData) {
-                                    // Update the variables in the local scope with the fresh ones
-                                    // Note: You might need to refactor 'buildTooltipContent' to accept arguments instead of using closures.
                                     const data = svgWrapper._freshData;
-                                    // Call a builder that accepts data
                                     buildTooltipContent(data.todayScore, data.currentLevel, data.totalPoints, data.rawHistory);
                                 } else {
-                                    // Fallback to initial data
                                     buildTooltipContent(todayScore, currentLevel, totalPoints, rawHistory);
                                 }
                                 requestAnimationFrame(() => {
@@ -8442,8 +8720,6 @@ export class PeriodMonthView extends ItemView {
                         } catch (err) {
                             console.error(`❌ [ERROR] Failed to render widget ${widgetKey}:`, err);
                             console.error(err.stack);
-
-                            // Render a visible error box so the dashboard doesn't just look empty
                             if (widgetGrid) {
                                 const errorBox = widgetGrid.createDiv({ cls: 'cpwn-pm-widget-error' });
                                 errorBox.createDiv({ text: `Error rendering ${widgetKey}` });
@@ -8454,7 +8730,6 @@ export class PeriodMonthView extends ItemView {
                     }
 
                     case 'weeklyGoalPointsCondensed': {
-
                         try {
                             // 1. Create Container (Medium/Half-Width)
                             const widgetContainer = widgetGrid.createDiv({
@@ -8463,14 +8738,8 @@ export class PeriodMonthView extends ItemView {
                             widgetContainer.id = 'cpwn-weekly-momentum-widget-condensed';
 
                             // 2. Determine Settings
-                            const showTitle =
-                                typeof this.plugin.settings.showTaskWidgetTitles === 'boolean'
-                                    ? this.plugin.settings.showTaskWidgetTitles
-                                    : true;
-                            const showChevron =
-                                typeof this.plugin.settings.showTaskWidgetChevrons === 'boolean'
-                                    ? this.plugin.settings.showTaskWidgetChevrons
-                                    : true;
+                            const showTitle = typeof this.plugin.settings.showTaskWidgetTitles === 'boolean' ? this.plugin.settings.showTaskWidgetTitles : true;
+                            const showChevron = typeof this.plugin.settings.showTaskWidgetChevrons === 'boolean' ? this.plugin.settings.showTaskWidgetChevrons : true;
 
                             // 3. Check Collapsed State
                             if (!this.plugin.settings.collapsedWidgets) {
@@ -8486,11 +8755,11 @@ export class PeriodMonthView extends ItemView {
                             let toggleIcon = null;
                             if (showChevron) {
                                 toggleIcon = headerTitle.createDiv({ cls: 'cpwn-widget-toggle-icon' });
-                                setIcon(toggleIcon, isCollapsed ? 'chevron-right' : 'chevron-down');
+                                setIcon(toggleIcon, 'chevron-down');
                             }
 
                             if (showTitle) {
-                                header.createDiv({ cls: 'cpwn-widget-title' }).setText('Weekly momentum');
+                                header.createEl('h3', { text: 'Week goal momentum' });
                             }
 
                             // 5. Toggle Logic
@@ -8499,7 +8768,11 @@ export class PeriodMonthView extends ItemView {
                                 this.plugin.settings.collapsedWidgets[widgetKey] = currentlyCollapsed;
                                 await this.plugin.saveSettings();
                                 if (showChevron && toggleIcon) {
-                                    setIcon(toggleIcon, currentlyCollapsed ? 'chevron-right' : 'chevron-down');
+                                    setIcon(toggleIcon, 'chevron-down');
+                                }
+
+                                if (!widgetContainer.classList.contains('collapsed')) {
+                                    await this.updateMomentumWidget();
                                 }
                             });
 
@@ -8508,49 +8781,22 @@ export class PeriodMonthView extends ItemView {
                                 cls: 'cpwn-widget-content'
                             });
 
-                            // --- DATA FETCHING LOGIC (Identical to full widget) ---
-                            const beforeCount =
-                                Object.keys(this.plugin.settings.goalScoreHistory || {}).length;
+                            // --- DATA FETCHING ---
+                            const historySettings = { ...this.plugin.settings };
 
-                            // FIX: Force vacation mode OFF for history retrieval
-                            const historySettings = { ...this.plugin.settings, vacationModeGlobal: false };
-
-                            const fullHistory = await GoalDataAggregator.getPointsHistory(
+                            // FIX: Get TRUE Lifetime Total (Source of Truth)
+                            // We replace the faulty manual summation with the robust method.
+                            const lifetimeTotal = await GoalTracker.getLifetimePoints(
                                 this.app,
                                 historySettings,
                                 this.allTasks
                             );
 
-                            const afterCount =
-                                Object.keys(this.plugin.settings.goalScoreHistory || {}).length;
-                            if (afterCount > beforeCount) {
-                                await this.plugin.saveSettings();
-                            }
-
-                            let lifetimeTotal = 0;
-                            if (Array.isArray(fullHistory)) {
-                                lifetimeTotal = fullHistory.reduce(
-                                    (acc, day) => acc + (day.totalPoints || 0),
-                                    0
-                                );
-                            } else if (
-                                fullHistory &&
-                                fullHistory.datasets &&
-                                fullHistory.datasets[0] &&
-                                Array.isArray(fullHistory.datasets[0].data)
-                            ) {
-                                lifetimeTotal = fullHistory.datasets[0].data.reduce(
-                                    (acc, val) => acc + (Number(val) || 0),
-                                    0
-                                );
-                            }
-
-                            // Generate Weekly Data
+                            // Generate Weekly Data (Backwards Calculation)
                             const labels = [];
                             const dataPoints = [];
                             const breakdowns = [];
 
-                            // FIX: Initialize GoalTracker with 'historySettings'
                             const tracker = new GoalTracker(this.app, historySettings);
 
                             let currentRunningTotal = lifetimeTotal;
@@ -8575,7 +8821,7 @@ export class PeriodMonthView extends ItemView {
                                 breakdowns: breakdowns,
                                 datasets: [
                                     {
-                                        label: 'Weekly Momentum',
+                                        label: 'Week goal momentum',
                                         breakdowns: breakdowns,
                                         data: dataPoints,
                                         borderColor: 'var(--text-accent)',
@@ -8588,7 +8834,7 @@ export class PeriodMonthView extends ItemView {
                                 ]
                             };
 
-                            // 7. Render (The Chart Renderer will adapt to the narrower 'medium' container)
+                            // 7. Render
                             const renderer = new CssChartRenderer(contentWrapper);
                             renderer.renderWeeklyGoalMomentum(chartDataObj, { labelClass: 'cpwn-axis-label-large' });
 
@@ -8596,14 +8842,12 @@ export class PeriodMonthView extends ItemView {
                             console.error(`❌ [ERROR] Failed to render widget ${widgetKey}:`, err);
                             console.error(err.stack);
 
-                            // Render a visible error box so the dashboard doesn't just look empty
                             if (widgetGrid) {
                                 const errorBox = widgetGrid.createDiv({ cls: 'cpwn-pm-widget-error' });
                                 errorBox.createDiv({ text: `Error rendering ${widgetKey}` });
                                 errorBox.createDiv({ text: err.message, cls: 'error-details' });
                             }
                         }
-
                         break;
                     }
 
@@ -8649,13 +8893,15 @@ export class PeriodMonthView extends ItemView {
                             let toggleIcon = null;
                             if (showChevron) {
                                 toggleIcon = headerTitle.createDiv({ cls: 'cpwn-widget-toggle-icon' });
-                                setIcon(toggleIcon, isCollapsed ? 'chevron-right' : 'chevron-down');
+                                setIcon(toggleIcon, 'chevron-down');
+                                //setIcon(toggleIcon, isCollapsed ? 'chevron-right' : 'chevron-down');
                             }
 
                             if (showTitle) {
                                 const titleText =
-                                    widgetKey === 'weeklyGoalPoints' ? 'Weekly momentum' : 'Daily goals';
-                                header.createDiv({ cls: 'cpwn-widget-title' }).setText(titleText);
+                                    widgetKey === 'weeklyGoalPoints' ? 'Week goal momentum' : 'Daily goals';
+                                //header.createDiv({ cls: 'cpwn-widget-title' }).setText(titleText);
+                                header.createEl('h3', { text: titleText });
                             }
 
                             // 5. Toggle Logic
@@ -8664,7 +8910,11 @@ export class PeriodMonthView extends ItemView {
                                 this.plugin.settings.collapsedWidgets[widgetKey] = currentlyCollapsed;
                                 await this.plugin.saveSettings();
                                 if (showChevron && toggleIcon) {
-                                    setIcon(toggleIcon, currentlyCollapsed ? 'chevron-right' : 'chevron-down');
+                                    setIcon(toggleIcon, 'chevron-down');
+                                }
+                                if (!widgetContainer.classList.contains('collapsed')) {
+                                    // Widget was just expanded, re-render momentum
+                                    await this.updateMomentumWidget();
                                 }
                             });
 
@@ -8684,51 +8934,28 @@ export class PeriodMonthView extends ItemView {
                                     Object.keys(this.plugin.settings.goalScoreHistory || {}).length;
 
                                 // FIX 1: Create a settings object that forces vacation mode OFF
-                                const historySettings = { ...this.plugin.settings, vacationModeGlobal: false };
+                                const historySettings = { ...this.plugin.settings };
 
                                 if (devDebug) console.log('🎯 [DEBUG] Fetching history...');
 
-                                // FIX 2: Use 'historySettings' here to get the correct Lifetime Total
-                                const fullHistory = await GoalDataAggregator.getPointsHistory(
+
+                                const lifetimeTotal = await GoalTracker.getLifetimePoints(
                                     this.app,
                                     historySettings,
                                     this.allTasks
                                 );
 
-                                if (devDebug) console.log('🎯 [DEBUG] History fetched:', fullHistory);
-
-                                const afterCount =
-                                    Object.keys(this.plugin.settings.goalScoreHistory || {}).length;
-                                if (afterCount > beforeCount) {
-                                    await this.plugin.saveSettings();
-                                }
-
-                                let lifetimeTotal = 0;
-                                if (Array.isArray(fullHistory)) {
-                                    lifetimeTotal = fullHistory.reduce(
-                                        (acc, day) => acc + (day.totalPoints || 0),
-                                        0
-                                    );
-                                } else if (
-                                    fullHistory &&
-                                    fullHistory.datasets &&
-                                    fullHistory.datasets[0] &&
-                                    Array.isArray(fullHistory.datasets[0].data)
-                                ) {
-                                    lifetimeTotal = fullHistory.datasets[0].data.reduce(
-                                        (acc, val) => acc + (Number(val) || 0),
-                                        0
-                                    );
-                                }
 
                                 // 2. Generate Weekly Data (Backwards from Total)
                                 const labels = [];
                                 const dataPoints = [];
                                 const breakdowns = [];
 
-                                // FIX 3: Initialize GoalTracker with 'historySettings'
+                                // 3: Initialize GoalTracker with 'historySettings'
                                 // This ensures it can calculate past days' scores even if Vacation Mode is ON today.
+                                // const tracker = new GoalTracker(this.app, historySettings);
                                 const tracker = new GoalTracker(this.app, historySettings);
+
 
                                 let currentRunningTotal = lifetimeTotal;
                                 const today = moment();
@@ -8752,7 +8979,7 @@ export class PeriodMonthView extends ItemView {
                                     breakdowns: breakdowns,
                                     datasets: [
                                         {
-                                            label: 'Weekly Momentum',
+                                            label: 'Week goal momentum',
                                             data: dataPoints,
                                             borderColor: 'var(--text-accent)',
                                             backgroundColor: 'rgba(var(--text-accent-rgb), 0.1)',
@@ -8771,7 +8998,8 @@ export class PeriodMonthView extends ItemView {
                                 const renderer = new CssChartRenderer(contentWrapper);
                                 renderer.renderWeeklyGoalMomentum(chartDataObj);
 
-                                if (devDebug) console.log('🎯 [DEBUG] Weekly momentum rendered successfully');
+
+                                if (devDebug) console.log('🎯 [DEBUG] Week goal momentum rendered successfully');
                             }
 
                             // ---------------------------------------------------------------------
@@ -8807,63 +9035,26 @@ export class PeriodMonthView extends ItemView {
                                 if (devDebug) console.log('🎯 [DEBUG] Today\'s goals fetched:', goals);
 
                                 // --- Get Points History ---
-                                const beforeCount =
-                                    Object.keys(this.plugin.settings.goalScoreHistory || {}).length;
+                                // 1. Instantiate Tracker
+                                const trackerForLevels = new GoalTracker(this.app, this.plugin.settings);
 
-                                const historySettings = { ...this.plugin.settings, vacationModeGlobal: false };
-
-                                if (devDebug) console.log('🎯 [DEBUG] Fetching points history...');
-
-                                const rawHistory = await GoalDataAggregator.getPointsHistory(
+                                // 2. Get Definitive Lifetime Total
+                                const totalPoints = await GoalTracker.getLifetimePoints(
                                     this.app,
-                                    historySettings, // Use the temporary settings here
+                                    this.plugin.settings,
                                     this.allTasks
                                 );
 
-                                const afterCount =
-                                    Object.keys(this.plugin.settings.goalScoreHistory || {}).length;
-                                if (afterCount > beforeCount) {
-                                    await this.plugin.saveSettings();
-                                }
+                                const historyObj = this.plugin.settings.goalScoreHistory || {};
+                                const rawHistory = Object.keys(historyObj)
+                                    .sort()
+                                    .map(dateKey => ({
+                                        date: dateKey,
+                                        totalPoints: historyObj[dateKey].totalPoints || 0
+                                        // Add breakdown if your tooltips need it, but usually totalPoints is enough for the simple chart
+                                    }));
 
-                                let calculatedTotal = 0;
-
-                                // Array format (ideal): [{ date, totalPoints }, ...]
-                                if (Array.isArray(rawHistory)) {
-                                    calculatedTotal = rawHistory.reduce(
-                                        (acc, day) => acc + (day.totalPoints || 0),
-                                        0
-                                    );
-                                }
-                                // Chart object format: { labels: [], datasets: [{ data: [...] }] }
-                                else if (
-                                    rawHistory &&
-                                    rawHistory.datasets &&
-                                    rawHistory.datasets[0] &&
-                                    Array.isArray(rawHistory.datasets[0].data)
-                                ) {
-                                    calculatedTotal = rawHistory.datasets[0].data.reduce(
-                                        (acc, val) => acc + (Number(val) || 0),
-                                        0
-                                    );
-                                } else {
-                                    console.warn(
-                                        'Daily Goals: Could not parse history data for total points',
-                                        rawHistory
-                                    );
-                                }
-
-                                const totalPoints = calculatedTotal;
-
-                                if (devDebug) console.log('🎯 [DEBUG] Calculating levels...');
-                                // -------------------------------
-                                // Dynamic level thresholds
-                                // -------------------------------
-                                const trackerForLevels = new GoalTracker(this.app, this.plugin.settings);
-                                const lifetimeTargetRaw =
-                                    trackerForLevels.getLifetimeTargetPoints &&
-                                    trackerForLevels.getLifetimeTargetPoints();
-
+                                const lifetimeTargetRaw = trackerForLevels.getLifetimeTargetPoints && trackerForLevels.getLifetimeTargetPoints();
                                 const todayScore = await trackerForLevels.calculateDailyScore(moment(), this.allTasks);
 
                                 const effectiveTarget =
@@ -8920,36 +9111,19 @@ export class PeriodMonthView extends ItemView {
                                 let dailyAverage = 0;
                                 let projectionText = 'Start completing tasks to generate a projection!';
 
-                                if (Array.isArray(rawHistory) && rawHistory.length > 0) {
-                                    const recentHistory = rawHistory.slice(-7);
-                                    const sumRecent = recentHistory.reduce(
-                                        (acc, day) => acc + (day.totalPoints || 0),
-                                        0
-                                    );
-                                    dailyAverage = sumRecent / (recentHistory.length || 1);
-                                } else if (
-                                    rawHistory &&
-                                    rawHistory.datasets &&
-                                    rawHistory.datasets[0]
-                                ) {
-                                    const data = rawHistory.datasets[0].data || [];
+                                // --- Clean Daily Average Calculation ---
+                                // const historyObj = this.plugin.settings.goalScoreHistory || {};
+                                const sortedDays = Object.keys(historyObj).sort();
+                                const recentDays = sortedDays.slice(-7);
 
-                                    if (data.length >= 2) {
-                                        const recentCumulative = data.slice(-8);
-                                        const dailyDiffs = [];
-                                        for (let i = 1; i < recentCumulative.length; i++) {
-                                            const todayTotal = Number(recentCumulative[i]) || 0;
-                                            const yesterdayTotal = Number(recentCumulative[i - 1]) || 0;
-                                            dailyDiffs.push(todayTotal - yesterdayTotal);
-                                        }
-                                        const sumRecent = dailyDiffs.reduce((acc, val) => acc + val, 0);
-                                        dailyAverage = sumRecent / (dailyDiffs.length || 1);
-                                    } else if (data.length === 1) {
-                                        dailyAverage = Number(data[0]) || 0;
-                                    } else {
-                                        dailyAverage = 0;
-                                    }
+                                if (recentDays.length > 0) {
+                                    let sumRecent = 0;
+                                    recentDays.forEach(dateKey => {
+                                        sumRecent += (historyObj[dateKey].totalPoints || 0);
+                                    });
+                                    dailyAverage = sumRecent / recentDays.length;
                                 }
+
 
                                 // 6. Generate Motivating Message (tiered)
                                 let tooltipIcon = 'circle';
@@ -9021,19 +9195,46 @@ export class PeriodMonthView extends ItemView {
 
                                 // Left: list of goals
                                 const listEl = splitContainer.createDiv({ cls: 'cpwn-goal-list-left' });
-                                if (this.plugin.settings.vacationModeGlobal) {
+                                //if (this.plugin.settings.vacationModeGlobal) {
+                                const isVacationEffective = this.plugin.settings.vacationModeGlobal || (goals.length > 0 && goals[0].isVacationToday);
+
+                                if (isVacationEffective) {
                                     // Vacation mode ON: show override message
                                     // Show Vacation Icon
                                     const iconContainer = listEl.createDiv({
                                         cls: 'cpwn-summary-icon-rest' // Reuse the same large icon class
                                     });
-                                    setIcon(iconContainer, 'plane'); // Palm tree icon
+                                    //const vacationIcons = ['plane', 'palmtree', 'sun', 'umbrella', 'camera', 'map', 'tent', 'waves'];
+                                    const vacationIcons = [
+                                        'plane',
+                                        'palmtree',
+                                        'sun',
+                                        'camera',
+                                        'map',
+                                        'tent',
+                                        'waves',
+                                        'sailboat',    // Sailing
+                                        'compass',      // Exploration
+                                        'binoculars',   // Sightseeing
+                                        'luggage',       // Travel
+                                        'caravan',       // Road trip [web:35]
+                                        'mountain',      // Hiking/Nature
+                                        'sofa',          // Staycation/Rest [web:34]
+                                        'party-popper'   // Celebration
+                                    ];
+
+                                    // Pick a random one
+                                    const randomIcon = vacationIcons[Math.floor(Math.random() * vacationIcons.length)];
+
+                                    // Set it
+                                    setIcon(iconContainer, randomIcon);
 
 
                                     listEl.createDiv({
-                                        text: 'All goals paused, enjoy your vacation!',
-                                        cls: 'cpwn-muted-text'
+                                        text: 'All goals paused, enjoy your break',
+                                        cls: 'cpwn-vacation-banner'
                                     });
+
                                 } else if (goals.length === 0) {
                                     listEl.createDiv({
                                         text: 'No goals set.',
@@ -9067,13 +9268,8 @@ export class PeriodMonthView extends ItemView {
                                             return; // Skip the rest of the rendering for this goal
                                         }
 
-
-
                                         setIcon(iconSpan, g.isMet ? 'square-check' : 'square');
                                         iconSpan.addClass(g.isMet ? 'is-completed' : 'is-incomplete');
-
-
-
 
                                         const textContainer = left.createDiv({
                                             cls: 'cpwn-goal-text'
@@ -9158,7 +9354,6 @@ export class PeriodMonthView extends ItemView {
                                     cls: 'cpwn-level-title-text'
                                 });
                                 titleEl.id = 'cpwn-daily-level-title-condensed';
-
 
                                 // -----------------------------------------
                                 // Custom tooltip styled like popup
@@ -9438,6 +9633,82 @@ export class PeriodMonthView extends ItemView {
                         break;
                     }
 
+                    case 'swipeableMomentum': {
+                        const widgetContainer = widgetGrid.createDiv({
+                            cls: 'cpwn-pm-widget-container cpwn-pm-widget-large cpwn-swipeable-widget',
+                            attr: { id: 'cpwn-swipeable-momentum-widget' }
+                        });
+
+                        // 2. Determine Settings
+                        const showTitle = typeof this.plugin.settings.showTaskWidgetTitles === 'boolean' ? this.plugin.settings.showTaskWidgetTitles : true;
+                        const showChevron = typeof this.plugin.settings.showTaskWidgetChevrons === 'boolean' ? this.plugin.settings.showTaskWidgetChevrons : true;
+
+                        // 3. Check Collapsed State
+                        if (!this.plugin.settings.collapsedWidgets) {
+                            this.plugin.settings.collapsedWidgets = {};
+                        }
+                        const isCollapsed = this.plugin.settings.collapsedWidgets[widgetKey] || false;
+                        if (isCollapsed) widgetContainer.addClass('collapsed');
+
+                        // 4. Render Header
+                        const header = widgetContainer.createDiv({ cls: 'cpwn-pm-widget-header' });
+                        const headerTitle = header.createDiv({ cls: 'cpwn-pm-widget-header-title' });
+
+                        let toggleIcon = null;
+                        if (showChevron) {
+                            toggleIcon = headerTitle.createDiv({ cls: 'cpwn-widget-toggle-icon' });
+                            // Set initial icon state based on isCollapsed
+                            setIcon(toggleIcon, isCollapsed ? 'chevron-right' : 'chevron-down');
+                        }
+
+                        if (showTitle) {
+                            header.createEl('h3', { text: 'Goal momentum' });
+                        }
+
+                        // 5. Render Content Wrapper
+                        const contentWrapper = widgetContainer.createDiv({
+                            cls: 'cpwn-widget-content'
+                        });
+
+                        // Apply initial visibility based on collapsed state
+                        if (isCollapsed) {
+                            contentWrapper.style.display = 'none';
+                        }
+
+                        // 6. Toggle Logic
+                        header.addEventListener('click', async () => {
+                            // Toggle class
+                            const currentlyCollapsed = widgetContainer.classList.toggle('collapsed');
+
+                            // Update Settings
+                            this.plugin.settings.collapsedWidgets[widgetKey] = currentlyCollapsed;
+                            await this.plugin.saveSettings();
+
+                            // Update Icon
+                            if (showChevron && toggleIcon) {
+                                setIcon(toggleIcon, 'chevron-down');
+                            }
+
+                            // Explicitly Toggle Content Visibility
+                            if (currentlyCollapsed) {
+                                contentWrapper.style.display = 'none';
+                            } else {
+                                contentWrapper.style.display = 'block';
+                                // Only re-render if we are showing it and data might be stale
+                                await this.updateMomentumWidget();
+                            }
+                        });
+
+                        // Fetch Data & Initial Render (only if visible)
+                        if (!isCollapsed) {
+                            const chartDataObj = await GoalDataAggregator.getAllHistory(this.app, this.plugin.settings, this.allTasks);
+                            const renderer = new CssChartRenderer(contentWrapper);
+                            renderer.renderSwipeableMomentum(chartDataObj);
+                        }
+
+                        break;
+                    }
+
                     case 'taskstatusoverview': {
                         const metrics = await this.getTaskMetrics();
                         // This passes the entire metrics object as the second argument
@@ -9454,6 +9725,13 @@ export class PeriodMonthView extends ItemView {
                             await this.renderCustomStatsWidget(widgetGrid, customWidgetConfig, this.allTasks);
                         }
                         break;
+                    }
+                }
+
+                if (isInCollapsedSection) {
+                    const lastWidget = widgetGrid.lastElementChild;
+                    if (lastWidget) {
+                        lastWidget.style.display = 'none';
                     }
                 }
 
@@ -9629,28 +9907,27 @@ export class PeriodMonthView extends ItemView {
 
         this.hideFilePopup();
 
-        // Query fresh task data for calendar dates
+        // --- Task Fetching Logic (Unchanged) ---
         if (dateOrTitle && typeof dateOrTitle !== 'string') {
-            const dateKey = moment(dateOrTitle).format('YYYY-MM-DD');
-
-            const freshTasks = (this.allTasks || []).filter(task => {
-                if (!task.due?.moment) return false;
-                return task.due.moment.format('YYYY-MM-DD') === dateKey;
-            });
-
-            if (!dataByType.isCompletionHeatmap && dateOrTitle && typeof dateOrTitle !== 'string') {
+            if (!dataByType.suppressTaskFetch) {
                 const dateKey = moment(dateOrTitle).format('YYYY-MM-DD');
-
                 const freshTasks = (this.allTasks || []).filter(task => {
                     if (!task.due?.moment) return false;
                     return task.due.moment.format('YYYY-MM-DD') === dateKey;
                 });
 
-                dataByType.tasks = freshTasks;
+                if (!dataByType.isCompletionHeatmap && dateOrTitle && typeof dateOrTitle !== 'string') {
+                    const dateKey = moment(dateOrTitle).format('YYYY-MM-DD');
+                    const freshTasks = (this.allTasks || []).filter(task => {
+                        if (!task.due?.moment) return false;
+                        return task.due.moment.format('YYYY-MM-DD') === dateKey;
+                    });
+                    dataByType.tasks = freshTasks;
+                }
             }
         }
 
-        this.activePopupArgs = { targetEl, dataByType, dateOrTitle, isMobile }; // Store args for the new popup
+        this.activePopupArgs = { targetEl, dataByType, dateOrTitle, isMobile };
         this.popupEl = createDiv({ cls: 'cpwn-other-notes-popup' });
         const { settings } = this.plugin;
 
@@ -9658,9 +9935,7 @@ export class PeriodMonthView extends ItemView {
             this.popupEl.addClass('cpwn-is-mobile-popup');
         }
 
-        // Store the listener so we can remove it later
         this.popupFileChangeListener = (file) => {
-            // Check if the modified file is relevant to the content of our popup
             const relevantPaths = new Set([
                 ...(dataByType.daily || []).map(f => f.path),
                 ...(dataByType.created || []).map(f => f.path),
@@ -9668,19 +9943,12 @@ export class PeriodMonthView extends ItemView {
                 ...(dataByType.assets || []).map(f => f.path),
                 ...(dataByType.tasks || []).map(t => t.path)
             ]);
-
             if (relevantPaths.has(file.path)) {
-                // If a relevant file changes, refresh the popup content
                 this.refreshPopupContent(dateOrTitle);
             }
         };
 
-
-        // Add header with a close button and dynamic date/title
         const headerRow = this.popupEl.createDiv({ cls: 'cpwn-popup-header' });
-
-        // This logic now correctly uses the 'dateOrTitle' parameter to handle
-        // both Date objects (from heatmaps) and title strings (from summary widgets).
         let headerText;
         if (typeof dateOrTitle === 'string') {
             headerText = dateOrTitle;
@@ -9693,10 +9961,8 @@ export class PeriodMonthView extends ItemView {
         setIcon(closeBtn, 'x');
         headerRow.addEventListener('click', () => this.hideFilePopup());
 
-        // Create a scrollable wrapper for the content
         const contentWrapper = this.popupEl.createDiv({ cls: 'cpwn-popup-content-wrapper' });
 
-        // logic for ICS events
         if (dataByType.ics && dataByType.ics.length > 0) {
             contentWrapper.createEl('h6', { text: "Calendar events", cls: "cpwn-popup-section-header" });
             dataByType.ics.forEach(event => {
@@ -9716,9 +9982,16 @@ export class PeriodMonthView extends ItemView {
             }
         }
 
+        // --- UPDATED ITEM RENDERER ---
         const addFileToList = (container, file, type) => {
-            const itemEl = container.createDiv({ cls: 'cpwn-other-notes-popup-item' });
-            const settings = this.plugin.settings;
+            const itemEl = container.createDiv({ cls: 'cpwn-other-notes-popup-item cpwn-note-highlight-note-row' });
+
+            itemEl.dataset.filePath = file.path;
+
+            // Apply the note highlight color if applicable
+            this.applyPinnedNoteColorToRow(file.path, itemEl);
+
+            // 1. ALWAYS CREATE THE STATUS DOT
             const dot = itemEl.createDiv({ cls: 'cpwn-popup-file-dot' });
             if (type === 'daily') {
                 dot.style.backgroundColor = settings.dailyNoteDotColor;
@@ -9729,10 +10002,53 @@ export class PeriodMonthView extends ItemView {
             } else if (type === 'asset') {
                 dot.style.backgroundColor = settings.assetDotColor;
             }
-            if (type === 'asset' && this.isImageAsset(file)) {
-                const thumbnail = itemEl.createEl('img', { cls: 'cpwn-popup-asset-thumbnail' });
-                thumbnail.src = this.app.vault.getResourcePath(file);
+
+            // 2. IF ASSET, ADD ICON OR THUMBNAIL
+            if (type === 'asset') {
+                const iconWrapper = itemEl.createDiv({ cls: 'cpwn-popup-file-icon' });
+
+                // --- ALIGNMENT FIX ---
+                iconWrapper.style.display = 'inline-flex'; // Sit inline with text/dot
+                iconWrapper.style.alignItems = 'start';
+                iconWrapper.style.justifyContent = 'center';
+
+                // Fixed dimensions
+                iconWrapper.style.width = '24px';
+                iconWrapper.style.height = '24px';
+
+                // Margins relative to dot and text
+                iconWrapper.style.marginLeft = '8px';  // Push away from red dot
+                iconWrapper.style.marginRight = '8px'; // Push away from text title
+
+                // Prevent shrinking
+                iconWrapper.style.flexShrink = '0';
+
+                if (this.isImageAsset(file)) {
+                    const thumbnail = iconWrapper.createEl('img', { cls: 'cpwn-popup-asset-thumbnail' });
+                    thumbnail.src = this.app.vault.getResourcePath(file);
+
+                    // Force image to fill the 24x24 box exactly
+                    thumbnail.style.width = '100%';
+                    thumbnail.style.height = '100%';
+                    thumbnail.style.objectFit = 'cover';
+                    thumbnail.style.borderRadius = '3px';
+                    thumbnail.style.display = 'block'; // Remove inline image gap
+                    thumbnail.style.margin = '0';
+                } else {
+                    const { icon, color } = this.getFileIconInfo(file.extension);
+                    setIcon(iconWrapper, icon);
+                    iconWrapper.style.color = color;
+
+                    const svg = iconWrapper.querySelector('svg');
+                    if (svg) {
+                        svg.style.width = '18px'; // 18px fits well in 24px box
+                        svg.style.height = '18px';
+                        svg.style.display = 'block';
+                    }
+                }
             }
+
+            // 3. TITLE & PATH
             const titlePathWrapper = itemEl.createDiv({ cls: 'cpwn-note-title-path-wrapper' });
             const displayName = file.path.toLowerCase().endsWith('.md') ? file.basename : file.name;
             titlePathWrapper.createDiv({ text: displayName, cls: 'cpwn-note-title' });
@@ -9749,75 +10065,26 @@ export class PeriodMonthView extends ItemView {
         };
 
         const addTaskToList = async (container, task, view) => {
-            // 1. Create the main item container. Make it a flexbox.
             const itemEl = container.createDiv({ cls: 'cpwn-other-notes-popup-item' });
+            itemEl.style.display = 'block';
+            itemEl.style.padding = '0';
+            itemEl.style.border = 'none';
 
-            itemEl.style.display = 'flex';
-            itemEl.style.alignItems = 'baseline'; // Use baseline alignment.
-            itemEl.style.gap = '6px';             // Add a gap between all items.
-
-            // Add dataset properties
             itemEl.dataset.taskStatus = task.status.type;
             itemEl.dataset.taskPath = task.path;
             itemEl.dataset.lineNumber = task.lineNumber;
 
-            // 2. Create the Checkbox
-            const checkbox = itemEl.createDiv({ cls: 'cpwn-task-checkbox-symbol' });
-            await view.renderTaskSymbol(checkbox, task);
+            const layoutId = view.plugin.settings.taskLayout || 'default';
+            const customConfig = view.plugin.settings.customLayoutConfig;
 
-
-            // 3. Create the Text Span for the description
-            const textSpan = itemEl.createSpan({ cls: 'cpwn-task-text' });
-            textSpan.classList.add('cpwn-task-text')
-
-            if (task.status.type === 'DONE') {
-                textSpan.classList.add('completed');
-            }
-
-            // A. Parse Alerts First
-            let rawDescription = task.description;
-            const parsed = view.parseAndStripAlerts(rawDescription, task.dueDate);
-            let descriptionToRender = parsed.text; // Clean text
-
-            // B. Create a wrapper for Icon + Text
-            const contentWrapper = textSpan.createSpan({ cls: 'cpwn-task-content-wrapper' });
-
-            // C. Render Priority Icon (Directly to DOM)
-            const priority = task.priority ?? 2; // Default 2 (Medium)
-            if (priority !== 2) {
-                const iconSpan = contentWrapper.createSpan({ cls: 'cpwn-priority-icon-container' });
-                view.renderPriorityIcon(iconSpan, priority);
-            }
-
-            // D. Render Markdown Text
-            const markdownSpan = contentWrapper.createSpan({ cls: 'cpwn-task-text-markdown' });
-            await MarkdownRenderer.render(view.app, descriptionToRender, markdownSpan, task.path, view);
-
-            // E. Render Alert Badge (Optional - consistent with other views)
-            if (parsed.alert) {
-                const badge = contentWrapper.createSpan({ cls: 'cpwn-task-alert-badge' });
-                setIcon(badge, 'alarm-clock');
-
-                badge.createSpan({
-                    text: parsed.alert.time,
-                    cls: 'cpwn-alert-time-text'
-                });
-
-                // Tooltip for full details
-                badge.setAttribute('aria-label', `Alert: ${parsed.alert.date} at ${parsed.alert.time}`);
-
-            }
+            view.layoutRenderer.render(itemEl, task, layoutId, customConfig);
 
             itemEl.addEventListener('click', (e) => {
-                if (e.target.closest('.cpwn-task-checkbox-symbol')) {
-                    e.stopPropagation();
-                    view.toggleTaskCompletion(task);
+                if (e.target.closest('.cpwn-task-checkbox') ||
+                    e.target.closest('.cpwn-task-tag-pill')) {
                     return;
                 }
-
                 e.stopPropagation();
-                e.stopImmediatePropagation();
-
                 const file = view.app.vault.getAbstractFileByPath(task.path);
                 if (file) {
                     view.handleFileClick(file, e, { line: task.lineNumber });
@@ -9826,17 +10093,13 @@ export class PeriodMonthView extends ItemView {
             });
         };
 
-        // logic for populating the content
         const allFiles = [...(dataByType.daily || []), ...(dataByType.created || []), ...(dataByType.modified || []), ...(dataByType.assets || [])];
         const hasTasks = dataByType.tasks && dataByType.tasks.length > 0;
         const hasFiles = allFiles.length > 0;
 
         if (hasTasks) {
             contentWrapper.createEl('h6', { text: 'Tasks', cls: 'cpwn-popup-section-header' });
-
-            // Sorts the tasks array in place by date, in ascending order.
             this.sortTasks(dataByType.tasks);
-
             for (const task of dataByType.tasks) {
                 await addTaskToList(contentWrapper, task, this);
             }
@@ -9847,10 +10110,8 @@ export class PeriodMonthView extends ItemView {
         if (hasFiles) {
             contentWrapper.createEl('h6', { text: 'Notes & assets', cls: 'cpwn-popup-section-header' });
 
-            // Create a Set to keep track of the paths of files already added to the popup.
             const renderedFilePaths = new Set();
 
-            // Helper function to render a file only if it hasn't been rendered yet.
             const addUniqueFile = (file, type) => {
                 if (file && file.path && !renderedFilePaths.has(file.path)) {
                     addFileToList(contentWrapper, file, type);
@@ -9858,14 +10119,10 @@ export class PeriodMonthView extends ItemView {
                 }
             };
 
-            // Process daily notes first to give them priority.
             (dataByType.daily || []).forEach(file => addUniqueFile(file, 'daily'));
-
-            // Process created, modified, and asset notes, skipping any that are already rendered.
             (dataByType.created || []).forEach(file => addUniqueFile(file, 'created'));
             (dataByType.modified || []).forEach(file => addUniqueFile(file, 'modified'));
             (dataByType.assets || []).forEach(file => addUniqueFile(file, 'asset'));
-
         }
 
         if (!contentWrapper.hasChildNodes()) {
@@ -9873,7 +10130,6 @@ export class PeriodMonthView extends ItemView {
             return;
         }
 
-        // event listeners and positioning logic
         this.popupEl.addEventListener('mouseenter', () => window.clearTimeout(this.hideTimeout));
         this.popupEl.addEventListener('mouseleave', () => {
             this.hideTimeout = window.setTimeout(() => this.hideFilePopup(), this.plugin.settings.popupHideDelay);
@@ -9885,26 +10141,12 @@ export class PeriodMonthView extends ItemView {
             e.stopPropagation();
         });
 
-        //if (isMobile) {
         if (isMobile && window.innerWidth < 768) {
-            // Center the popup
             this.popupEl.style.top = '50%';
             this.popupEl.style.left = '50%';
             this.popupEl.style.transform = 'translate(-50%, -50%)';
-
-            // Ensure visibility
             this.popupEl.style.visibility = 'visible';
             return;
-
-            /*const margin = 8;
-            this.popupEl.classList.add('cpwn-context-menu');
-            this.popupEl.style.setProperty('--menu-width', `calc(100% - ${margin * 2}px)`);
-            this.popupEl.style.setProperty('--menu-bottom', `${margin}px`);
-            this.popupEl.style.setProperty('--menu-left', `${margin}px`);
-
-
-            this.popupEl.style.top = '';
-            this.popupEl.style.visibility = 'visible';*/
         } else {
             const popupRect = this.popupEl.getBoundingClientRect();
             const targetRect = targetEl.getBoundingClientRect();
@@ -9922,6 +10164,7 @@ export class PeriodMonthView extends ItemView {
             this.popupEl.style.visibility = 'visible';
         }
     }
+
 
     /**
      * Hides and destroys the file popup element.
@@ -10020,6 +10263,36 @@ export class PeriodMonthView extends ItemView {
         });
     }
 
+    getCurrentlyVisibleNotes() {
+        const settings = this.plugin.settings;
+
+        if (this.notesViewMode === 'pinned') {
+            const pinValue = settings.pinTag.toLowerCase();
+            // Use your actual pinning logic here:
+            return this.app.vault.getMarkdownFiles().filter(file => {
+                const cache = this.app.metadataCache.getFileCache(file);
+                if (!cache) return false;
+                if (cache.tags?.some(tag => tag.tag.toLowerCase().includes(pinValue))) return true;
+                const frontmatter = cache.frontmatter;
+                if (frontmatter) {
+                    for (const key in frontmatter) {
+                        const value = frontmatter[key];
+                        if (typeof value === 'string' && value.toLowerCase().includes(pinValue)) return true;
+                        if (Array.isArray(value) && value.some(item => typeof item === 'string' && item.toLowerCase().includes(pinValue))) return true;
+                    }
+                }
+                return false;
+            });
+        } else {
+            // Recent notes logic
+            const cutoff = moment().subtract(settings.notesLookbackDays, 'days').valueOf();
+            return this.app.vault.getMarkdownFiles()
+                .filter(file => !settings.ignoreFolders.some(f => file.path.startsWith(f)) &&
+                    (file.stat.mtime >= cutoff || file.stat.ctime >= cutoff));
+        }
+    }
+
+
     /**
      * Populates the "Notes" tab with either recent or pinned notes.
      */
@@ -10028,34 +10301,11 @@ export class PeriodMonthView extends ItemView {
         this.notesContentEl.empty();
 
         const settings = this.plugin.settings;
-        let notesToShow = [];
+        //let notesToShow = [];
+        let notesToShow = this.getCurrentlyVisibleNotes();
 
         // --- 1. FILTER AND SORT NOTES ---
         if (this.notesViewMode === 'pinned') {
-            const pinValue = settings.pinTag.toLowerCase();
-            notesToShow = this.app.vault.getMarkdownFiles().filter(file => {
-                const cache = this.app.metadataCache.getFileCache(file);
-                if (!cache) return false;
-
-                if (cache.tags?.some(tag => tag.tag.toLowerCase().includes(pinValue))) {
-                    return true;
-                }
-
-                const frontmatter = cache.frontmatter;
-                if (frontmatter) {
-                    for (const key in frontmatter) {
-                        const value = frontmatter[key];
-                        if (typeof value === 'string' && value.toLowerCase().includes(pinValue)) {
-                            return true;
-                        }
-                        if (Array.isArray(value) && value.some(item => typeof item === 'string' && item.toLowerCase().includes(pinValue))) {
-                            return true;
-                        }
-                    }
-                }
-                return false;
-            });
-
             if (this.pinnedSortOrder === 'z-a') {
                 notesToShow.sort((a, b) => b.basename.localeCompare(a.basename));
             } else if (this.pinnedSortOrder === 'custom') {
@@ -10090,6 +10340,7 @@ export class PeriodMonthView extends ItemView {
         // --- 2. APPLY SEARCH TERM ---
         // --- Filtering Logic ---
         const searchTerm = this.notesSearchTerm.toLowerCase();
+        const colorMap = this.plugin.settings.pinnedNoteColorsByPath || {}; // Get the color map
 
         let filteredNotes;
 
@@ -10120,6 +10371,13 @@ export class PeriodMonthView extends ItemView {
                 }
 
                 return false;
+            });
+        } else if (searchTerm.startsWith('c:')) {
+            const targetColorId = searchTerm.replace('c:', '').trim();
+            filteredNotes = notesToShow.filter(file => {
+                const noteColor = colorMap[file.path];
+                // Checks if the note's stored color ID (e.g., "red-highlight") matches the filter
+                return noteColor && noteColor.includes(targetColorId);
             });
         } else if (searchTerm === 'status:unlinked') {
             // This is a placeholder for the unlinked notes logic you might add
@@ -10513,25 +10771,6 @@ export class PeriodMonthView extends ItemView {
 
         ];
 
-        /*
-        const finalGroups = {};
-        groupOrder.forEach(g => {
-            const showGroup = settings.taskDateGroupsToShow.includes(g.key);
-            const tasksInGroup = groupsData[g.key];
-
-            const shouldShowCompleted = (g.key === 'completed' && this.tasksSearchTerm && tasksInGroup && tasksInGroup.length > 0);
-
-            if ((showGroup || shouldShowCompleted) && tasksInGroup && tasksInGroup.length > 0) {
-                finalGroups[g.key] = {
-                    ...g,
-                    tasks: tasksInGroup
-                };
-            }
-
-        });
-        
-            */
-
         const finalGroups = {};
         groupOrder.forEach(g => {
             const showGroup = settings.taskDateGroupsToShow.includes(g.key);
@@ -10577,8 +10816,6 @@ export class PeriodMonthView extends ItemView {
             }
         });
 
-
-
         return finalGroups;
     }
 
@@ -10623,9 +10860,11 @@ export class PeriodMonthView extends ItemView {
 
         const header = groupContainer.createDiv({ cls: 'cpwn-task-group-header' });
         header.addEventListener('click', () => {
+
             const isCurrentlyCollapsed = groupContainer.classList.toggle('cpwn-is-collapsed');
             this.plugin.settings.collapsedTaskGroups[key] = isCurrentlyCollapsed;
             this.plugin.saveSettings();
+
             setIcon(collapseIcon, isCurrentlyCollapsed ? 'chevron-right' : 'chevron-down');
 
         });
@@ -10647,78 +10886,37 @@ export class PeriodMonthView extends ItemView {
         return groupContainer;
     }
 
-    // Renders a single task row.
+    /**
+    * Main entry point for rendering a task based on settings
+    */
     renderTaskItem(task) {
-        const taskRow = createDiv({ cls: 'cpwn-task-row' });
-        taskRow.dataset.key = this.getTaskKey(task);
+        // Create the container
+        const taskRow = createDiv({ cls: 'cpwn-task-row  cpwn-tasks-tab-row' });
+
+        // Add dataset for your existing click logic/CSS
         taskRow.dataset.taskStatus = task.status.type;
+        taskRow.dataset.key = this.getTaskKey(task);
 
-        taskRow.classList.add('cpwn-task-row');
+        //identifiers so toggleTaskCompletion can find this exact row
+        taskRow.dataset.taskPath = task.path;
+        taskRow.dataset.lineNumber = String(task.lineNumber);
 
-        if (this.plugin.settings.taskTextTruncate) {
+        // Use the new renderer
+        // This replaces the call to 'this.renderTaskFromLayout'
+        const layoutId = this.plugin.settings.taskLayout || 'default';
+        const customConfig = this.plugin.settings.customLayoutConfig;
 
-            console.log('Adding truncate class to task row');
-            taskRow.addClass('cpwn-task-truncate');
-        }
+        this.layoutRenderer.render(taskRow, task, layoutId, customConfig);
 
-        const checkbox = taskRow.createDiv({ cls: 'cpwn-task-checkbox-symbol' });
-        checkbox.classList.add('cpwn-task-checkbox-symbol');
+        // Re-attach the row-level click handler (from your old code)
+        taskRow.addEventListener('click', (e) => {
+            // Don't open file if clicking a checkbox or tag
+            if (!e.target.closest('.cpwn-task-checkbox') &&
+                !e.target.closest('.cpwn-task-checkbox-symbol') &&
+                !e.target.closest('.cpwn-task-tag-pill')) {
 
-        this.renderTaskSymbol(checkbox, task);
-        checkbox.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            await this.toggleTaskCompletion(task);
-        });
-
-        const textEl = taskRow.createSpan({ cls: 'cpwn-task-text' });
-        textEl.classList.add('cpwn-task-text');
-        if (task.status.type === 'DONE') {
-            textEl.classList.add('completed');
-        }
-
-        // 1. PARSE & STRIP ALERTS first
-        let rawDescription = task.description;
-        const parsed = this.parseAndStripAlerts(rawDescription, task.dueDate);
-        let descriptionToRender = parsed.text;
-
-        // Store alert data
-        if (parsed.alert) {
-            taskRow.dataset.alertTime = parsed.alert.time;
-            taskRow.dataset.alertDate = parsed.alert.date;
-        }
-
-        // 2. Create a flex wrapper inside textEl
-        const contentWrapper = textEl.createSpan({ cls: 'cpwn-task-content-wrapper' });
-
-
-        // 3. Render Priority Icon Element directly 
-        const priority = task.priority ?? 2;
-        if (priority !== 2) { // If not Normal/Medium
-            const iconSpan = contentWrapper.createSpan({ cls: 'cpwn-priority-icon-container' });
-            this.renderPriorityIcon(iconSpan, priority);
-        }
-
-        // 4. Render Clean Text into its own span
-        const textSpan = contentWrapper.createSpan({ cls: 'cpwn-task-text-markdown' });
-        // Use 'await' if this function is async, otherwise just call it
-        MarkdownRenderer.render(this.app, descriptionToRender, textSpan, task.path, this);
-
-        // 5. Render Alert Badge 
-        if (parsed.alert) {
-            const badge = contentWrapper.createSpan({ cls: 'cpwn-task-alert-badge' });
-
-
-            setIcon(badge, 'alarm-clock'); // Lucide icon
-            badge.createSpan({
-                text: parsed.alert.time,
-                cls: 'cpwn-alert-time-text'
-            });
-
-            badge.setAttribute('aria-label', `Alert: ${parsed.alert.date} at ${parsed.alert.time}`);
-        }
-
-        taskRow.addEventListener('click', () => {
-            this.app.workspace.openLinkText(task.path, '', false, { eState: { line: task.lineNumber } });
+                this.app.workspace.openLinkText(task.path, '', false, { eState: { line: task.lineNumber } });
+            }
         });
 
         return taskRow;
@@ -10859,15 +11057,14 @@ export class PeriodMonthView extends ItemView {
      * Toggles the completion state of a task by modifying the source Markdown file.
      * @param {object} task The task object to toggle.
      */
-    // In toggleTaskCompletion: write → await tasks-changed (authoritative) → return
     async toggleTaskCompletion(task) {
         const tasksApi = this.app.plugins.plugins['obsidian-tasks-plugin']?.apiV1;
         if (!tasksApi) { new Notice('Tasks API not found.'); return; }
 
         const file = this.app.vault.getAbstractFileByPath(task.path);
         if (!(file instanceof TFile)) return;
-
         this.isTogglingTask = true;
+
         try {
             const content = await this.app.vault.read(file);
             const lines = content.split('\n');
@@ -10878,8 +11075,65 @@ export class PeriodMonthView extends ItemView {
             lines.splice(task.lineNumber, 1, updatedLine);
             await this.app.vault.modify(file, lines.join('\n'));
 
-            // Prefer Tasks’ update if available; otherwise we already have metadata fallback
+            if (this.containerEl) {
+                const rowSelector =
+                    `.cpwn-tasks-tab-row[data-task-path="${task.path}"][data-line-number="${task.lineNumber}"]`;
+
+                const tasksTabRow = this.containerEl.querySelector(rowSelector);
+
+                if (tasksTabRow) {
+                    const checkbox = tasksTabRow.querySelector('input.task-list-item-checkbox');
+                    if (checkbox) {
+                        const willBeDone = !checkbox.checked;
+                        checkbox.checked = willBeDone;
+
+                        if (willBeDone) {
+                            checkbox.classList.add('is-checked');
+                            tasksTabRow.classList.add('is-checked');
+                            tasksTabRow.setAttribute('data-task', 'x');
+                        } else {
+                            checkbox.classList.remove('is-checked');
+                            tasksTabRow.classList.remove('is-checked');
+                            const symbol = task.status && task.status.symbol ? task.status.symbol : ' ';
+                            checkbox.dataset.task = symbol;
+                            tasksTabRow.setAttribute('data-task', symbol);
+                        }
+                    }
+                }
+            }
+
+            // --- NEW: UPDATE POPUP UI IMMEDIATELY ---
+            if (this.popupEl) {
+                // Find the task row in the popup using its file path and line number
+                // Note: Ensure your row renderer adds these data attributes!
+                const popupTaskRow = this.popupEl.querySelector(
+                    `.cpwn-other-notes-popup-item[data-task-path="${task.path}"][data-line-number="${task.lineNumber}"]`
+                );
+
+                if (popupTaskRow) {
+                    const checkbox = popupTaskRow.querySelector('input[type="checkbox"]');
+                    if (checkbox) {
+                        // Toggle the visual state
+                        const willBeDone = !checkbox.checked;
+                        checkbox.checked = willBeDone;
+
+                        // Sync Classes (important for theme styles discussed earlier)
+                        if (willBeDone) {
+                            checkbox.addClass('is-checked');
+                            popupTaskRow.addClass('is-checked');
+                            popupTaskRow.setAttribute('data-task', 'x');
+                        } else {
+                            checkbox.removeClass('is-checked');
+                            popupTaskRow.removeClass('is-checked');
+                            popupTaskRow.setAttribute('data-task', ' '); // Reset to empty
+                        }
+                    }
+                }
+            }
+
             await this.waitForTasksChangedOnce(500);
+
+
         } catch (err) {
             console.error('Error toggling task', err);
             new Notice('Failed to toggle task.');
@@ -10918,38 +11172,6 @@ export class PeriodMonthView extends ItemView {
         // Re-show the popup immediately with the fresh data.
         this.showFilePopup(targetEl, freshData, dateOrTitle, isMobile);
     }
-
-    // Specifically refreshes task items in the popup.
-    /*
-    async refreshPopupContent() {
-        if (!this.popupEl) return;
-
-        const contentWrapper = this.popupEl.querySelector('.cpwn-popup-content-wrapper');
-        if (!contentWrapper) return;
-
-        // Find all task items in the popup and update them
-        const taskItems = this.popupEl.querySelectorAll('.cpwn-other-notes-popup-item');
-        taskItems.forEach(itemEl => {
-            // Look up the task in allTasks (which has ALL tasks)
-            const freshTask = this.allTasks.find(t =>
-                t.path === itemEl.dataset.taskPath &&
-                t.lineNumber === parseInt(itemEl.dataset.lineNumber)
-            );
-
-            if (freshTask) {
-                const textSpan = itemEl.querySelector('.cpwn-task-text');
-                if (textSpan) {
-                    textSpan.classList.toggle('completed', freshTask.status.type === 'DONE');
-                }
-                // Also update the checkbox symbol
-                const checkbox = itemEl.querySelector('.cpwn-task-checkbox-symbol');
-                if (checkbox) {
-                    this.renderTaskSymbol(checkbox, freshTask);
-                }
-            }
-        });
-    }
-    */
 
     async refreshPopupContent() {
         if (!this.popupEl) return;

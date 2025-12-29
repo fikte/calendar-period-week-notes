@@ -1,5 +1,7 @@
 // src/utils/suggesters.js
 import { AbstractInputSuggest } from 'obsidian';
+import { PINNED_HIGHLIGHT_COLORS } from '../data/constants.js';
+
 
 /**
  * A custom input suggester for tags.
@@ -11,43 +13,86 @@ export class TagSuggest extends AbstractInputSuggest {
         this.view = view;
         this.allTags = new Set();
 
-        this.refreshAllTags(); 
+        this.refreshAllTags();
 
     }
 
     getSuggestions(query) {
-        //this.refreshAllTags();
+        const suggestions = [];
+        const isNotesTab = this.view.activeTab === 'notes';
+        const lowerQuery = query.toLowerCase();
 
-        // If the query is empty, show all tags, sorted alphabetically.
-        if (!query) {
-            return Array.from(this.allTags)
-                .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+        if (isNotesTab) {
+            // 1. Get the notes that are actually being shown in the current view mode
+            // We use a helper method (added below) to get the current list
+            const visibleNotes = this.view.getCurrentlyVisibleNotes();
+            const colorMap = this.view.plugin.settings.pinnedNoteColorsByPath || {};
+
+            // 2. Identify which colors are assigned to THOSE specific notes
+            const usedColorIds = new Set();
+            visibleNotes.forEach(file => {
+                if (colorMap[file.path]) {
+                    usedColorIds.add(colorMap[file.path]);
+                }
+            });
+
+            // 3. Filter PINNED_HIGHLIGHT_COLORS to only those IDs
+            const colorOptions = PINNED_HIGHLIGHT_COLORS.filter(color => 
+                usedColorIds.has(color.id)
+            );
+
+            colorOptions.forEach(color => {
+                if (!query || "color:".includes(lowerQuery) || color.id.includes(lowerQuery)) {
+                    suggestions.push({
+                        type: 'color',
+                        label: color.label,
+                        value: `c:${color.id}`,
+                        hex: color.rgba // Ensure this is the correct property for your CSS dot
+                    });
+                }
+            });
         }
 
-        // Only proceed if query starts with '#'
-        if (!query.startsWith('#')) {
-            return [];
+        // 2. ADD TAG OPTIONS
+        // Handle query with or without leading '#'
+        const tagSearch = query.startsWith('#') ? lowerQuery.substring(1) : lowerQuery;
+
+        Array.from(this.allTags)
+            .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+            .forEach(tag => {
+                if (!query || tag.toLowerCase().includes(tagSearch)) {
+                    suggestions.push({
+                        type: 'tag',
+                        label: `#${tag}`,
+                        value: `#${tag}`
+                    });
+                }
+            });
+
+        return suggestions;
+    }
+
+    renderSuggestion(suggestion, el) {
+        el.addClass('cpwn-suggestion-item');
+        const container = el.createDiv({ cls: 'cpwn-suggestion-content' });
+
+        if (suggestion.type === 'color') {
+            const dot = container.createDiv({ cls: 'cpwn-suggestion-color-dot' });
+            dot.style.backgroundColor = suggestion.hex;
+            container.createSpan({ text: suggestion.label });
+        } else {
+            container.createSpan({ text: suggestion.label });
         }
-
-        const searchTerm = query.substring(1).toLowerCase();
-        return Array.from(this.allTags)
-            .filter(tag => tag.toLowerCase().includes(searchTerm))
-            .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
     }
 
-    renderSuggestion(tag, el) {
-        el.setText(tag);
-    }
-
-    selectSuggestion(tag) {
-        const finalValue = tag.startsWith('#') ? tag : `#${tag}`;
-        this.setValue(finalValue);
+    selectSuggestion(suggestion) {
+        this.setValue(suggestion.value);
 
         if (this.view.activeTab === 'tasks') {
-            this.view.tasksSearchTerm = finalValue;
+            this.view.tasksSearchTerm = suggestion.value;
             this.view.populateTasks();
         } else if (this.view.activeTab === 'notes') {
-            this.view.notesSearchTerm = finalValue;
+            this.view.notesSearchTerm = suggestion.value;
             this.view.populateNotes();
         }
 

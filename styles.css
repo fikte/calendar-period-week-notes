@@ -30,8 +30,23 @@ body.theme-dark {
     --cpwn-current-label-highlight-color-themed: var(--cpwn-current-highlight-label-color-dark); 
 }
 
+body {
+    --cpwn-checkbox-gap: 8px;
+    --cpwn-content-indent: 24px;
+}
+
 body .tooltip {
     z-index: 20000 !important; 
+}
+
+/* Default indent (Checkbox + Priority + Gaps) */
+.cpwn-task-grid.has-priority {
+    --cpwn-content-indent: 24px; 
+}
+
+/* Smaller indent (Checkbox + Gap only) */
+.cpwn-task-grid.no-priority {
+    --cpwn-content-indent: 0px; /* Checkbox (~16) + Gap (~8) */
 }
 
 /* Style for the "Month" part (uses existing --cpwn-month-color-themed variable) */
@@ -713,7 +728,6 @@ padding: 15px;
     color: var(--text-muted);
 }
 
-
 #notes-list-view .cpwn-note-row:hover,
 #asset-list-view .cpwn-note-row:hover,
 #pinned-notes-list .cpwn-note-row:hover,
@@ -724,6 +738,99 @@ padding: 15px;
 .cpwn-tasks-container .cpwn-task-row:focus {
     background-color: var(--cpwn-notes-hover-color);
 }
+
+
+/* Note Row Color Styles */
+
+.cpwn-note-highlight-color-section {
+    margin-top: 400;                 /* remove extra gap above the title */
+    padding: 0 2px;
+}
+
+.cpwn-note-highlight-color-row {
+    display: flex;
+    gap: 6px;
+    padding: 0 2px 4px 2px;        /* align circles horizontally with text */
+    margin-left: 18px;              /* align circles vertically with text */
+    margin-bottom: 6px;
+    margin-top: 8px;
+}
+
+.cpwn-note-highlight-note-row.cpwn-note-highlight-color-row {
+    background-color: var(--cpwn-note-highlight-color);
+}
+
+.cpwn-note-highlight-note-row.cpwn-note-highlight-color-bar::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 4px;
+    bottom: 4px;
+    width: 5px;
+    border-radius: 999px;
+    background-color: var(--cpwn-note-highlight-color);
+}
+
+.cpwn-note-highlight-note-row.cpwn-note-highlight-color-border {
+    box-shadow: 0 0 0 2px var(--cpwn-note-highlight-color);
+}
+
+.cpwn-note-highlight-note-row {
+    position: relative;
+    border-radius: 8px;
+    transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+
+
+/* left bar */
+.cpwn-note-highlight-note-row.cpwn-note-highlight-color-bar::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 4px;
+    bottom: 4px;
+    width: 5px;
+    border-radius: 999px;
+    background-color: var(--cpwn-note-highlight-color);
+}
+
+/* border */
+.cpwn-note-highlight-note-row.cpwn-note-highlight-color-border {
+    box-shadow: 0 0 0 2px var(--cpwn-note-highlight-color);
+}
+
+.cpwn-note-highlight-color-swatch {
+    position: relative;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.35);
+    cursor: pointer;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.25);
+    transition: transform 80ms ease, box-shadow 80ms ease, background-color 80ms ease;
+}
+
+/* ring for selected */
+.cpwn-note-highlight-color-swatch.is-selected {
+    box-shadow: 0 0 0 2px var(--interactive-accent);
+}
+
+/* X overlay only when selected + hovered */
+.cpwn-note-highlight-color-swatch.is-selected:hover::after {
+    content: '×';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.6);
+    text-shadow: 0 0 4px rgba(0,0,0,0.7);
+}
+
+
+
 
 
 .cpwn-note-status-dot { 
@@ -1610,6 +1717,21 @@ body.theme-light .cpwn-search-input-clear-btn .svg-icon {
   cursor: pointer;
 }
 
+.cpwn-suggestion-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.cpwn-suggestion-color-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    border: 1px solid var(--background-modifier-border);
+}
+
+
 .cpwn-pinned-sort-indicator {
   font-size: 0.85em;
   color: var(--text-muted);
@@ -1771,7 +1893,26 @@ body.theme-light .cpwn-search-input-clear-btn .svg-icon {
 .cpwn-theme-preview-tabs button.is-active { background-color: var(--interactive-accent); color: var(--cpwn-text-on-accent); font-weight: 600; }
 
 /* Main preview pane layout */
-.cpwn-theme-preview-pane { padding: 15px; border-radius: 8px; border: 1px solid var(--background-modifier-border); }
+/*.cpwn-theme-preview-pane { padding: 15px; border-radius: 8px; border: 1px solid var(--background-modifier-border); }*/
+.cpwn-theme-preview-pane {
+    min-height: 250px;
+    transition: background-color 0.2s ease, color 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.cpwn-theme-preview-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.cpwn-theme-preview-tabs button.is-active {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+
 
 /* Inner wrappers for sections */
 .cpwn-preview-section-wrapper { padding: 10px; border-radius: 6px; margin-bottom: 20px; }
@@ -2142,7 +2283,7 @@ body.theme-light .cpwn-search-input-clear-btn .svg-icon {
     background-color: var(--background-secondary);
     border: 1px solid var(--background-modifier-border);
     border-radius: 8px;
-    padding: 12px;
+    padding: 10px;
     display: flex;
     flex-direction: column;
 }
@@ -2558,7 +2699,7 @@ body.theme-dark .cpwn-heatmap-cell.cpwn-heatmap-current-week-cell {
 }
 
 .cpwn-pm-setting-wrapper .setting-item {
-    padding: 8px 0;
+    padding: 8px 8px;
     border: none;
 }
 
@@ -2619,9 +2760,10 @@ body.theme-dark .cpwn-heatmap-cell.cpwn-heatmap-current-week-cell {
 }
 
 .cpwn-pm-widget-header .cpwn-heatmap-collapse-icon:hover,
+.cpwn-pm-widget-header .cpwn-widget-toggle-icon:hover,
 .cpwn-pm-widget-header h3:hover,
 .cpwn-pm-widget-header .cpwn-heatmap-total-count.is-clickable:hover {
-  color: var(--text-accent);
+  color: var(--text-accent) !important;
 }
 
 .cpwn-heatmap-collapse-icon {
@@ -2631,6 +2773,8 @@ body.theme-dark .cpwn-heatmap-cell.cpwn-heatmap-current-week-cell {
     display: flex;
     align-items: center;
     margin-top: -8px; 
+    margin-right: 3px;
+    margin-left: -3px;
 }
 
 .cpwn-pm-widget-container.cpwn-is-collapsed .cpwn-heatmap-collapse-icon {
@@ -2668,6 +2812,8 @@ body.theme-dark .cpwn-heatmap-cell.cpwn-heatmap-current-week-cell {
     width: 18px;
     height: 18px;
     margin-top: -8px;
+    margin-right: 3px;
+    margin-left: -3px;
 }
 
 .cpwn-is-mini .cpwn-pm-progress-legend {
@@ -2691,7 +2837,7 @@ body.theme-dark .cpwn-heatmap-cell.cpwn-heatmap-current-week-cell {
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 0px;
     width: 100%;
     justify-content: space-between; 
 }
@@ -2826,13 +2972,6 @@ body.theme-dark .cpwn-heatmap-cell.cpwn-heatmap-current-week-cell {
   font-size: var(--cpwn-task-text-font-size);
 }
 
-/* When truncation is enabled, apply nowrap */
-/*.cpwn-tasks-container.truncate-mode .cpwn-task-row .cpwn-task-text {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}*/
-
 .cpwn-task-row.cpwn-task-truncate .cpwn-task-text-markdown {
     white-space: nowrap;
     overflow: hidden;
@@ -2852,17 +2991,6 @@ body.theme-dark .cpwn-heatmap-cell.cpwn-heatmap-current-week-cell {
 /* When full text mode is enabled, ensure wrapping */
 .cpwn-tasks-container.show-full-text .cpwn-task-row .cpwn-task-text {
     white-space: normal;
-    word-break: break-word;
-}
-
-.cpwn-task-row .cpwn-task-text,
-.cpwn-other-notes-popup-item .cpwn-task-text {
-    flex: 1;             /* Modern shorthand for flex-grow, shrink, basis */
-    display: flex;       /* CRITICAL: Makes this a flex container */
-    align-items: center; /* Vertically aligns the text nicely */
-    min-width: 0;
-    line-height: 1.7;
-    white-space: normal;  
     word-break: break-word;
 }
 
@@ -3201,16 +3329,69 @@ body.is-mobile .cpwn-tabs-content-wrapper {
     font-weight: 600;
     letter-spacing: 0.05em;
     color: var(--text-muted);
+    padding-bottom: 16px;
+}
+
+/* 1. Reset the bottom padding on the title when collapsed so it doesn't push "up" */
+.cpwn-pm-widget-container.collapsed .cpwn-widget-title,
+.cpwn-pm-widget-container.cpwn-is-mini .cpwn-widget-title {
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
+}
+
+/* 2. Ensure the header itself has equal top/bottom padding */
+.cpwn-pm-widget-container.collapsed .cpwn-pm-widget-header,
+.cpwn-pm-widget-container.cpwn-is-mini .cpwn-pm-widget-header {
+    padding-top: 0px;    /* Adjust this value to increase/decrease total height */
+    padding-bottom: 0px; /* Must match padding-top for perfect centering */
+    margin-bottom: 0 !important; /* Remove external spacing */
+    min-height: unset !important; /* Allow it to shrink to fit content */
+    height: auto !important;
+}
+
+/* 3. Remove any fixed height on the container itself in these states */
+.cpwn-pm-widget-container.collapsed,
+.cpwn-pm-widget-container.cpwn-is-mini {
+    min-height: unset !important;
+    height: auto !important;
+    padding-bottom: 0px !important; 
+}
+
+.cpwn-pm-widget-container.cpwn-is-mini {
+    min-height: unset !important;
+    height: auto !important;
+    padding-bottom: 10px !important; 
 }
 
 /* -- Toggle/Collapse Icon -- */
 .cpwn-widget-toggle-icon {
     color: var(--text-muted);
     transition: transform 0.2s ease-in-out;
-    /* This ensures the SVG icon inside is perfectly centered. */
+    /* We also make the icon a flex container to center the SVG within it */
     display: flex;
     align-items: center;
     justify-content: center;
+    /* A fixed size helps maintain consistent spacing */
+    width: 18px;
+    height: 18px;
+    margin-top: -8px;
+    margin-right: 3px;
+    margin-left: -3px;
+
+}
+
+.cpwn-modal-button-container {
+    display: flex;
+    justify-content: space-between; /* Pushes left and right apart */
+    align-items: center;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+.cpwn-modal-button-group-right {
+    display: flex;
+    gap: 10px; /* Space between Cancel and Save */
 }
 
 
@@ -3515,6 +3696,7 @@ body.is-mobile .cpwn-tabs-content-wrapper {
     /*min-height: 150px;*/
     max-height: 175px;
 }
+
 
 .cpwn-pm-widget-large .cpwn-pm-widget-pie {
     max-height: 260px; /* Taller for large */
@@ -4163,7 +4345,6 @@ body.is-mobile .cpwn-tabs-content-wrapper {
 
 .cpwn-goal-progress {
     font-size: var(--font-ui-smaller);
-    /* cpwn-muted-text handles color, but we ensure size here */
 }
 
 /* Right Section (Points) */
@@ -4638,9 +4819,8 @@ body.is-mobile .cpwn-tabs-content-wrapper {
 
 /* The actual SVG Icon */
 .cpwn-priority-icon {
-    width: 16px;
-    height: 16px;
-    stroke-width: 2.5px; /* Make them a bit bolder/readable */
+    flex-shrink: 0;
+    /* margin-right: 4px; */
 }
 
 /* The Text Container (holds the Markdown) */
@@ -4658,19 +4838,14 @@ body.is-mobile .cpwn-tabs-content-wrapper {
 
 /* Alert Badge Styling */
 .cpwn-task-alert-badge {
-    display: inline-flex;
-    align-items: center;
     gap: 4px;
     margin-left: 6px;
-    
     margin-right: 5px;
     flex-shrink: 0;
     color: var(--text-accent);
     display: inline-flex;
-    align-items: center;
     align-self: flex-start;
     margin-top: 3px;
-    vertical-align: middle;
 }
 .cpwn-task-alert-badge svg {
     width: 14px;
@@ -4683,10 +4858,1100 @@ body.is-mobile .cpwn-tabs-content-wrapper {
     opacity: 0.9;
 }
 
+/* Ensure tags align with the title text */
+.cpwn-tags-container {
+    margin-left: 0; 
+    padding-left: 0;
+}
+
 /* Hide content for ALL minimized states */
 .cpwn-pm-widget-container.cpwn-is-mini .cpwn-widget-content,
 .cpwn-pm-widget-container.cpwn-is-collapsed .cpwn-widget-content,
 .cpwn-pm-widget-container.collapsed .cpwn-widget-content { 
     display: none !important;
     pointer-events: none !important;
+}
+
+.cpwn-pm-css-chart-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%; /* Ensure it fills the widget */
+}
+
+/* Ensure SVG shrinks to fit if legend is present */
+.cpwn-pm-line-chart {
+    flex: 1;
+    min-height: 0; /* Crucial for flex children to shrink */
+    width: 100%;
+}
+
+/* Prevent legend from shrinking */
+.cpwn-pm-chart-legend {
+    flex-shrink: 0;
+    margin-top: 8px; /* Add breathing room */
+}
+
+
+/* ============================================================
+   TASK LAYOUT SYSTEM (FINAL & CONSOLIDATED)
+   ============================================================ */
+/* --- Flexible Task Grid Architecture --- */
+
+/* 1. Main Grid Container */
+.cpwn-task-grid {
+    width: 100%;
+    box-sizing: border-box;
+    align-items: center; /* Vertically center items in their rows */
+    padding: 4px 0;
+}
+
+.cpwn-task-checkbox + .cpwn-task-content {
+    margin-left: var(--task-checkbox-gap, 8px);
+}
+
+/* 2. Generic Area Containers */
+/* Matches any div starting with cpwn-area- */
+div[class^="cpwn-area-"] {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0; /* CRITICAL: prevents flex items from overflowing parent */
+}
+
+/* 3. Alignment & Flow Helpers */
+.cpwn-align-right {
+    justify-content: flex-end;
+    text-align: right;
+    flex-wrap: wrap; /* Allows metadata to wrap on small screens */
+}
+
+.cpwn-align-center {
+    justify-content: center;
+}
+
+.cpwn-flow-column {
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+/* 4. Component Styles */
+/* Checkbox */
+.cpwn-task-checkbox {
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--checkbox-border-color, var(--text-muted));
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    margin-top: 2px; /* Optical alignment with text */
+    margin-right: 0 !important; 
+}
+
+.cpwn-task-checkbox.is-checked {
+    background-color: var(--interactive-accent);
+    border-color: var(--interactive-accent);
+}
+
+/* Title */
+.cpwn-task-title {
+    color: var(--text-normal);
+    word-break: break-word;
+}
+
+.cpwn-task-title.is-completed {
+    text-decoration: line-through;
+    color: var(--text-muted);
+}
+
+/* Priority */
+.cpwn-task-priority {
+    font-weight: bold;
+    margin-right: 2px;
+    color: var(--text-error); /* Default to red/alert color for high priority */
+}
+
+.cpwn-task-tag-pill {
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+    white-space: nowrap;
+    margin-bottom: 0;
+    padding: 2px 6px;
+    border-radius: 12px; /* Default radius */
+    font-size: var(--font-ui-smaller);
+}
+
+/* Due date meta */
+.cpwn-meta-item.cpwn-due-date {
+    color: var(--cpwn-task-due-text-color, var(--text-muted));
+}
+
+/* Alert time meta */
+.cpwn-meta-item.cpwn-alert,
+.cpwn-alert-time-text {
+    color: var(--cpwn-task-alert-text-color, var(--text-accent));
+}
+
+.cpwn-tag-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+/* Metadata Items (Dates, Alerts) */
+.cpwn-meta-item {
+    font-size: 0.7em;
+    color: var(--text-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.cpwn-meta-icon {
+    display: inline-flex;       /* Use inline-flex to shrink-wrap the icon */
+    align-items: center;        /* Vertically center the SVG inside the span */
+    justify-content: center;    /* Horizontally center if width > SVG width */
+    line-height: 0;             /* Kill line-height so it doesn't push text down */
+    vertical-align: middle;     /* Helps align with adjacent text */
+    margin: 0;                  /* Remove accidental margins */
+    padding: 0;                 /* Remove accidental padding */
+}
+
+.cpwn-meta-icon svg {
+    display: block;             /* Removes extra space below SVG */
+    width: 14px;                /* Force consistent size */
+    height: 14px;
+}
+
+/* Icons and Spacers */
+.cpwn-icon-item {
+    display: flex;
+    align-items: center;
+    color: var(--text-muted);
+}
+
+.cpwn-icon-item svg {
+    width: 12px;
+    height: 12px;
+}
+
+.cpwn-layout-spacer {
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+/* Text Styles */
+.cpwn-text-muted { color: var(--text-muted); }
+.cpwn-text-accent { color: var(--text-accent); }
+.cpwn-text-error { color: var(--text-error); }
+
+/* Grid Spacing Fixes */
+.cpwn-task-grid-container {
+    width: 100%;
+    padding: 8px 4px !important; /* Restore some padding */
+    margin: 0;
+}
+
+.cpwn-task-grid {
+    width: 100%;
+}
+
+/* Remove default Markdown paragraph margins inside title */
+.cpwn-task-title-wrapper p {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Ensure icons inherit text color from parent */
+.cpwn-text-muted,
+.cpwn-text-muted .svg-icon {
+    color: var(--text-muted) !important;
+}
+
+.cpwn-text-accent,
+.cpwn-text-accent .svg-icon {
+    color: var(--text-accent) !important;
+}
+
+.cpwn-text-error,
+.cpwn-text-error .svg-icon {
+    color: var(--text-error) !important;
+}
+
+/* Font Sizes */
+.cpwn-font-tiny { font-size: 10px !important; line-height: 1.2; } 
+.cpwn-font-small { font-size: var(--font-ui-smaller) !important; }
+.cpwn-font-medium { font-size: var(--font-ui-small) !important; }
+.cpwn-font-normal { font-size: var(--font-text) !important; }
+.cpwn-font-large { font-size: var(--font-ui-large) !important; }
+
+/* Fix Icon Sizes */
+.cpwn-alert-badge .svg-icon {
+    flex-shrink: 0;
+
+}
+
+.cpwn-nested-container {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* Gap between Checkbox and Content (the yellow box) */
+.cpwn-area-content {
+    margin-left: 8px; 
+}
+
+.cpwn-layout-tags-new-line .cpwn-area-content {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+}
+
+/* Control subgrid behavior */
+.cpwn-subgrid-container {
+    width: 100%;
+}
+
+/* Vertical gap for items stacked inside a subgrid area (title vs tags) */
+.cpwn-sub-area-title {
+    gap: 4px;
+}
+
+/* --- FIX: Tags & Meta Alignment --- */
+
+/* Force tags container to flow horizontally and wrap */
+.cpwn-tags-container {
+    display: inline-flex !important; /* Critical for same-line layout */
+    flex-wrap: wrap !important;
+    white-space: normal !important;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 1;
+    text-overflow: ellipsis;
+    max-width: 100% !important;
+}
+
+
+
+/* Ensure the Meta area inside the subgrid handles alignment correctly */
+.cpwn-sub-area-meta {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start; 
+    gap: 8px;
+    flex-wrap: wrap; 
+    width: 100%;
+}
+
+/* Ensure subgrid items align to the top */
+.cpwn-subgrid-container {
+    align-items: start;
+}
+
+/* Force the meta row in the subgrid to stay on one line */
+.cpwn-sub-area-meta {
+    flex-wrap: nowrap !important;
+    white-space: nowrap;
+    overflow: hidden; 
+}
+
+
+.cpwn-task-grid,
+.cpwn-subgrid-container {
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
+/* Ensure flex containers wrap when told to */
+[class*="cpwn-area-"],
+[class*="cpwn-sub-area-"] {
+    min-width: 0 !important;
+    max-width: 100% !important;
+}
+
+
+/* Ensure all containers inside the task content area align left */
+.cpwn-task-content .cpwn-nested-container {
+    justify-content: flex-start;
+}
+
+/* 1. The Truncation Class */
+.cpwn-truncate-text {
+    white-space: nowrap !important;   /* Force single line */
+    overflow: hidden !important;      /* Hide what doesn't fit */
+    text-overflow: ellipsis !important; /* ADD THE ... DOTS */
+    
+    display: block; /* Needed for ellipsis */
+    max-width: 100%; /* Must be constrained */
+}
+
+/* 2. Handle Markdown Paragraphs inside */
+/* Obsidian renders text in <p>, so we must apply styles there too */
+.cpwn-truncate-text p {
+    margin: 0 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+/* The direct parent (likely your task title wrapper or grid cell) 
+   needs this to stop it from expanding infinitely. */
+.cpwn-task-title-wrapper {
+    min-width: 0; /* Allows flex/grid item to shrink below content size */
+    overflow: hidden; /* Ensures child truncation works */
+}
+
+/* ==========================================
+   Custom Layout Builder Modal Styles
+   ========================================== */
+
+/* Main Modal Container */
+.cpwn-layout-builder .cpwn-builder-container {
+    display: flex;
+    gap: 20px;
+    min-height: 450px;
+}
+
+/* Left Sidebar (Item Palette) */
+.cpwn-layout-builder .cpwn-builder-sidebar {
+    width: 220px;
+    border-right: 1px solid var(--background-modifier-border);
+    padding-right: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cpwn-builder-sidebar h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: var(--text-muted);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Draggable Items in Sidebar */
+.cpwn-draggable-item {
+    padding: 10px;
+    background-color: var(--interactive-normal);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    cursor: grab;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    transition: background-color 0.1s, border-color 0.1s;
+}
+
+.cpwn-draggable-item:hover {
+    background-color: var(--interactive-hover);
+    border-color: var(--interactive-accent);
+}
+
+.cpwn-draggable-item:active {
+    cursor: grabbing;
+}
+
+.cpwn-item-icon {
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+}
+
+/* Right Side (Canvas) */
+.cpwn-builder-canvas {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    overflow-y: auto; 
+}
+
+/* Row Container Wrapper */
+.cpwn-row-container {
+    background-color: var(--background-primary-alt);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 15px;
+}
+
+/* Row Header & Controls Area */
+.cpwn-row-header-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 8px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.cpwn-row-label {
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+}
+
+/* Alignment Dropdown Container */
+.cpwn-align-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* Alignment Select Dropdowns */
+.cpwn-align-select {
+    background-color: var(--interactive-normal);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    color: var(--text-normal);
+    cursor: pointer;
+    height: 26px;
+    line-height: 1;
+    outline: none;
+}
+
+.cpwn-align-select:hover {
+    border-color: var(--interactive-accent);
+}
+
+.cpwn-align-select:focus {
+    border-color: var(--interactive-accent);
+    box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb), 0.2);
+}
+
+/* The Actual Drop Zone Box */
+.cpwn-drop-zone {
+    min-height: 52px;
+    align-content: center;
+    background-color: var(--background-primary);
+    border: 2px dashed var(--background-modifier-border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    transition: all 0.2s ease;
+}
+
+.cpwn-drop-zone .cpwn-placed-item.dragging {
+    opacity: 0.3;
+    border: 2px solid var(--interactive-accent);
+    background-color: transparent;
+    color: transparent;
+}
+
+.cpwn-drop-zone.cpwn-drag-over {
+    border-color: var(--interactive-accent);
+    background-color: var(--background-secondary);
+    border-style: solid; /* Changes from dashed to solid on hover for feedback */
+    transform: scale(1.01); /* Subtle "pop" effect */
+}
+
+.cpwn-item-separator {
+    min-width: 24px;
+    justify-content: center;
+    background-color: var(--background-secondary) !important;
+    border: 1px solid var(--background-modifier-border);
+    padding: 2px 8px !important;
+}
+
+/* Items Placed Inside Rows */
+.cpwn-placed-item {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    padding: 4px 12px;
+    border-radius: 14px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+    transition: opacity 0.1s;
+}
+
+.cpwn-placed-item:hover {
+    opacity: 0.85;
+}
+
+/* Special Styling for Spacer Item in Builder */
+.cpwn-placed-item.cpwn-item-spacer {
+    background-color: transparent;
+    color: var(--text-muted);
+    border: 1px dashed var(--text-muted);
+    font-style: italic;
+    flex-grow: 1; 
+    justify-content: center;
+    min-width: 60px;
+    box-shadow: none;
+}
+
+/* ==========================================
+   NEW STYLE POPOVER & TRANSPARENCY SLIDER
+   ========================================== */
+
+/* Main Popup Container */
+.cpwn-popup {
+    background-color: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4); /* Stronger shadow for floating feel */
+    padding: 12px;
+    width: 260px; 
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: var(--font-ui-small);
+    z-index: var(--layer-popover);
+    animation: popover-fade-in 0.1s ease-out;
+}
+
+@keyframes popover-fade-in {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+/* Section Headers */
+.cpwn-custom-layout-section-header {
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+}
+
+/* Button Groups (Segmented Controls) */
+.cpwn-btn-group {
+    display: flex;
+    background-color: var(--background-secondary);
+    padding: 3px;
+    border-radius: 6px;
+    gap: 2px;
+    border: 1px solid var(--background-modifier-border);
+}
+
+.cpwn-btn-group button {
+    flex: 1;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: var(--text-normal);
+    padding: 4px 8px;
+    font-size: 11px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.1s ease;
+}
+
+.cpwn-btn-group button:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+.cpwn-btn-group button.is-active {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    font-weight: 500;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* Color & Opacity Row */
+.cpwn-color-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--background-secondary);
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid var(--background-modifier-border);
+}
+
+/* Color Preview Circle */
+.cpwn-color-preview {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid var(--background-modifier-border);
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+
+.cpwn-color-preview:hover {
+    transform: scale(1.1);
+}
+
+/* Slider Container */
+.cpwn-slider-container {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+/* The Range Input (Slider) */
+.cpwn-slider {
+    /*-webkit-appearance: none;*/
+    width: 100%;
+    height: 4px;
+    background: linear-gradient(to right, var(--background-modifier-border), var(--text-normal));
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+    margin: 0;
+}
+
+.cpwn-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--interactive-accent);
+    border-radius: 50%;
+    border: 2px solid var(--background-primary);
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+/* Footer Buttons */
+.cpwn-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 4px;
+    border-top: 1px solid var(--background-modifier-border);
+    padding-top: 10px;
+}
+
+.cpwn-footer button {
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.cpwn-btn-danger {
+    background-color: transparent !important;
+    color: var(--text-error) !important;
+    border: 1px solid var(--text-error) !important;
+}
+
+.cpwn-btn-danger:hover {
+    background-color: var(--background-modifier-error) !important;
+    color: var(--text-on-accent) !important;
+}
+
+/* ==========================================
+   Task List Renderer Styles (SCOPED)
+   ========================================== */
+
+/* 1. Ensure the custom layout row allows stretching */
+.cpwn-nested-container {
+    display: flex;
+    width: 100%;
+    padding-left: 0; /* Reset padding */
+    margin-left: 0;
+    align-items: center; /* Ensure vertical center */
+}
+
+/* 2. Reset margins on the first item to prevent indentation */
+.cpwn-nested-container > :first-child {
+    margin-left: 0;
+}
+
+/* 3. Hide empty spans that might cause gaps */
+.cpwn-nested-container > span:empty {
+    display: none;
+}
+
+/* 4. FORCE Spacer to work, but only inside these specific rows */
+.cpwn-nested-container > .cpwn-layout-spacer {
+    flex-grow: 1 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    display: flex !important;
+}
+
+/* 5. Protect right-aligned items from shrinking */
+.cpwn-nested-container > .cpwn-alert-item,
+.cpwn-nested-container > .cpwn-due-date {
+    flex-shrink: 0;
+}
+
+/* Builder Preview Colors - Logic for Chip Display */
+
+/* Accent Color Override */
+.cpwn-placed-item.cpwn-item-color-accent {
+    background-color: var(--background-primary);
+    border: 1px solid var(--interactive-accent);
+    color: var(--text-accent) !important;
+}
+
+/* Muted Color Override */
+.cpwn-placed-item.cpwn-item-color-muted {
+    background-color: var(--background-primary);
+    border: 1px solid var(--text-muted);
+    color: var(--text-muted) !important;
+}
+
+/* Custom Hex Override */
+.cpwn-placed-item[style*="color:"] {
+    background-color: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+}
+
+.cpwn-draggable-item.is-used {
+    opacity: 0.6;
+    background-color: var(--background-modifier-form-field);
+}
+
+
+.cpwn-item-used-indicator {
+    margin-left: auto;
+    color: var(--text-success);
+    opacity: 0.8;
+}
+.cpwn-item-used-indicator svg {
+    width: 14px;
+    height: 14px;
+}
+
+.cpwn-date-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important; /* Force single line */
+    white-space: nowrap !important;
+    line-height: 1 !important;
+    gap: 4px;
+    flex-shrink: 0; /* Prevent squishing */
+}
+
+/* Icon Container */
+.cpwn-date-badge .cpwn-meta-icon {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center;
+    height: 0.85em; /* or 0.85em, adjust to taste */
+    width: 0.85em;
+    flex-shrink: 0; /* Icon must not shrink */
+}
+
+/* SVG Inside Icon */
+.cpwn-date-badge .cpwn-meta-icon svg {
+    width: 100%;
+    height: 100%;
+    stroke-width: 2px;
+    display: block; /* Removes weird baseline gaps */
+}
+
+/* Shared layout for all badge-like items */
+.cpwn-recurrence,
+.cpwn-depends-on,
+.cpwn-task-id,
+.cpwn-task-source {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    flex-wrap: nowrap !important;
+}
+
+/* Icon sizing for all these items */
+.cpwn-recurrence .cpwn-meta-icon,
+.cpwn-depends-on .cpwn-meta-icon,
+.cpwn-task-id .cpwn-meta-icon,
+.cpwn-task-source .cpwn-meta-icon {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center;
+    height: 1em;
+    width: 1em;
+}
+
+/* Specific override for Source icon size if you really need 1.15em */
+.cpwn-task-source .cpwn-meta-icon {
+    height: 1.15em;
+    width: 1.15em;
+}
+
+/* Link Styling */
+.cpwn-source-link {
+    cursor: pointer;
+}
+
+/* Base Spacer */
+.cpwn-layout-spacer {
+    /* Default legacy behavior (fixed width) */
+    display: inline-block !important;
+    flex-grow: 0 !important;
+}
+
+/* Flexible Spacer State */
+.cpwn-layout-spacer.is-flexible {
+    display: flex !important;
+    flex-grow: 1 !important;
+    width: auto !important;
+    min-width: 10px;
+}
+
+/* Style for priority-colored checkboxes */
+.cpwn-task-checkbox.is-colored-priority {
+    /* Force the browser to use our custom color for the "checked" background */
+    accent-color: var(--checkbox-color) !important;
+    
+    /* Override Obsidian's default border for the unchecked state */
+    border-color: var(--checkbox-color) !important;
+}
+
+/* Optional: Add a subtle background tint when unchecked (if desired) */
+.cpwn-task-checkbox.is-colored-priority:not(:checked) {
+    background-color: color-mix(in srgb, var(--checkbox-color), transparent 90%);
+}
+
+/* Optional: Ensure the checkmark remains visible/white if your colors are dark */
+.cpwn-task-checkbox.is-colored-priority:checked {
+    border-color: var(--checkbox-color) !important;
+}
+
+
+/* --- ISOLATED SWIPEABLE WIDGET STYLES --- */
+.cpwn-swipe-wrapper {
+    position: relative;
+    height: 220px;
+    width: 100%;       /* Match parent width */
+    display: block;    /* Ensure block layout */
+    overflow: hidden;
+    background-color: var(--background-secondary);
+    border-radius: var(--radius-m);
+}
+
+.cpwn-swipe-axis {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 10;
+    background-color: var(--background-secondary);
+}
+
+.cpwn-swipe-axis-left {
+    left: 0;
+    width: 35px;
+    border-right: 1px solid var(--background-modifier-border);
+}
+
+.cpwn-swipe-axis-right {
+    right: 0;
+    width: 40px;
+    border-left: 1px solid var(--background-modifier-border);
+}
+
+.cpwn-swipe-scroll-container {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 35px;  /* Match left axis */
+    right: 40px; /* Match right axis */
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    cursor: grab;
+    user-select: none;
+    -webkit-overflow-scrolling: touch;
+}
+
+.cpwn-swipe-chart-inner {
+    height: 100%;
+    display: inline-block;
+}
+
+/* Axis Labels */
+.cpwn-swipe-label {
+    position: absolute;
+    transform: translateY(-50%);
+    font-size: 9px;
+    line-height: 1;
+}
+
+.cpwn-swipe-axis-left .cpwn-swipe-label {
+    right: 4px;
+    color: var(--text-muted);
+}
+
+.cpwn-swipe-axis-right .cpwn-swipe-label {
+    left: 4px;
+    color: var(--text-accent);
+}
+
+/* Chart Styles */
+.cpwn-swipe-total-line {
+    stroke: var(--text-accent);
+    stroke-width: 2px;
+    stroke-dasharray: 4, 4;
+    fill: none;
+}
+
+.cpwn-swipe-daily-line {
+    stroke: var(--interactive-accent);
+    stroke-width: 2px;
+    fill: none;
+}
+
+.cpwn-swipe-date-label {
+    text-anchor: middle;
+    font-size: 10px;
+    fill: var(--text-muted);
+}
+
+/* --- Container & Wrapper --- */
+.cpwn-pm-widget-swipeable {
+    width: 100% !important;
+    display: block !important;
+    position: relative;
+    overflow: hidden;
+}
+
+/* --- The Month Pill --- */
+.cpwn-month-label {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 20;
+
+    /* Typography */
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    white-space: nowrap;
+    user-select: none;
+
+    /* Box Model */
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 12px;
+    padding: 4px 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+
+    /* Interaction */
+    pointer-events: auto;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+/* Hover state (Replaces the JS mouseenter/mouseleave events) */
+.cpwn-month-label:hover {
+    color: var(--text-accent);
+    border-color: var(--text-accent);
+}
+
+/* --- Tooltip --- */
+.cpwn-chart-tooltip {
+    position: absolute;
+    display: none;
+    z-index: 100;
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.cpwn-chart-tooltip-date {
+    font-weight: bold;
+    margin-bottom: 2px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* --- Axes --- */
+.cpwn-swipe-axis-left,
+.cpwn-swipe-axis-right {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 10;
+    /*background: var(--background-primary);*/
+    cursor: help;
+}
+
+.cpwn-swipe-axis-left {
+    left: 0;
+    border-right: 1px solid var(--background-modifier-border);
+}
+
+.cpwn-swipe-axis-right {
+    right: 0;
+    border-left: 1px solid var(--background-modifier-border);
+}
+
+/* Axis Ticks */
+.cpwn-axis-tick {
+    position: absolute;
+    width: 100%;
+    font-size: 10px;
+    color: var(--text-muted);
+    padding-left: 4px; 
+    padding-right: 4px;
+}
+
+/* --- Scroll Container --- */
+.cpwn-swipe-scroll-container {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    z-index: 1;
+    scroll-behavior: auto;
+}
+
+/* --- SVG Elements --- */
+.cpwn-swipe-hit-rect {
+    fill: transparent;
+    cursor: crosshair;
+}
+
+.cpwn-swipe-day-text {
+    font-size: 10px;
+    fill: var(--text-muted);
+    text-anchor: middle;
+}
+.cpwn-tooltip-detail {
+    font-size: 10px;
+    margin-top: 1px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.cpwn-tooltip-bonus {
+    color: var(--color-green, #4caf50);
+}
+
+.cpwn-tooltip-streak {
+    color: var(--color-orange, #ff9800);
+}
+
+.cpwn-vacation-banner {
+    text-align: center; /* Centers the text horizontally */
+    width: 100%;        /* Ensures the container spans full width */
+    display: block;     /* Ensures it takes up its own line */
+    margin: 2px 0;     /* Add some breathing room */
+    font-size: 0.8em;
+    color: var(--text-muted);
 }

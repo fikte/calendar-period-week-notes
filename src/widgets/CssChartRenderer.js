@@ -1,4 +1,6 @@
 // src/widgets/CssChartRenderer.js
+import { setIcon } from 'obsidian';
+
 export class CssChartRenderer {
     constructor(container) {
         this.container = container;
@@ -17,7 +19,6 @@ export class CssChartRenderer {
             this.tooltipEl.remove();
             this.tooltipEl = null;
         }
-
     }
 
     /**
@@ -480,11 +481,6 @@ export class CssChartRenderer {
                 titleTspan.textContent = fullLabel;
                 tooltipText.appendChild(titleTspan);
 
-                //const spacer = document.createElementNS(svgNs, 'tspan');
-                //Object.entries({ x: 0, dy: '0.8em' }).forEach(([k,v]) => spacer.setAttribute(k,v));
-                //spacer.textContent = ' ';
-                //tooltipText.appendChild(spacer);
-
                 datasets.forEach((ds, i) => {
                     const tspan = document.createElementNS(svgNs, 'tspan');
                     Object.entries({ x: 0, dy: '1.3em' }).forEach(([k, v]) => tspan.setAttribute(k, v));
@@ -533,7 +529,7 @@ export class CssChartRenderer {
 
         const isMedium = config.size === 'medium';
         const viewBoxHeight = isMedium ? 175 : 300; // Medium charts will be less tall
-        svg.setAttribute('viewBox', `0 0 500 ${viewBoxHeight}`);
+        svg.setAttribute('viewBox', `0 0 490 ${viewBoxHeight}`);
         svg.style.overflow = 'visible';
         chartContainer.appendChild(svg);
 
@@ -698,8 +694,6 @@ export class CssChartRenderer {
 
             const path = document.createElementNS(svgNs, 'path');
 
-
-
             // 1. Check if the current dataset is the projected line by comparing its label.
             const isProjection = config.projection?.show && ds.label === config.projection.label;
             if (isProjection) {
@@ -707,9 +701,6 @@ export class CssChartRenderer {
 
                 // 2. If it is, apply the special dotted line styling directly from the config.
                 path.style.stroke = config.projection.color || 'var(--text-accent)';
-                //path.setAttribute('stroke-dasharray', '5,5');
-                // path.setAttribute('stroke-width', 3.5); // <-- Add this line
-                //path.style.fill = 'none'; // Ensure the dotted line is never filled
             } else {
                 // 3. Otherwise, it's a regular line, so apply its standard styling.
                 path.setAttribute('class', 'line-path');
@@ -911,7 +902,7 @@ export class CssChartRenderer {
         const svgNs = "http://www.w3.org/2000/svg";
         const svg = document.createElementNS(svgNs, "svg");
 
-        svg.setAttribute('viewBox', '0 0 300 125');
+        svg.setAttribute('viewBox', '0 0 295 100');
         svg.setAttribute('preserveAspectRatio', 'none');
 
         svg.setAttribute('preserveAspectRatio', 'none');
@@ -934,7 +925,7 @@ export class CssChartRenderer {
 
         const padding = { top: 15, right: 10, bottom: 10, left: 10 };
         const width = 300 - padding.left - padding.right;
-        const height = 120 - padding.top - padding.bottom;
+        const height = 95 - padding.top - padding.bottom;
 
         // Map values to coordinates
         const points = rawData.map((val, i) => {
@@ -1097,13 +1088,524 @@ export class CssChartRenderer {
             text.classList.add(labelClass);
             text.setAttribute('text-anchor', 'middle');
             text.setAttribute('x', points[i].x);
-            text.setAttribute('y', 127);
+            text.setAttribute('y', 98);
             text.textContent = label; // Use textContent
             svg.appendChild(text);
         });
-
     }
 
+    /**
+     * Renders a swipeable momentum chart with dual axes.
+     * Left axis: Daily values
+     * Right axis: Cumulative total 
+     */
+    renderSwipeableMomentum(chartDataObj, options = {}) {
+        this.container.empty();
+        //this.container.className = 'cpwn-pm-widget-swipeable';
+        this.container.addClass('cpwn-pm-widget-swipeable');
+
+        const SWIPE_WIDGET_HEIGHT = 220;
+
+        // Wrapper
+        const wrapper = this.container.createDiv({ cls: 'cpwn-swipe-wrapper' });
+        wrapper.style.height = `${SWIPE_WIDGET_HEIGHT}px`;
+
+        // Month Label
+        const monthLabel = wrapper.createDiv({ cls: 'cpwn-month-label' });
+        monthLabel.setText("Loading...");
+
+        // Tooltip
+        const tooltip = this.container.createDiv({ cls: 'cpwn-chart-tooltip' });
+
+        // Initialize Scroll State
+        if (this.currentScrollIndex === undefined) this.currentScrollIndex = -1;
+        if (this.swipeObserver) this.swipeObserver.disconnect();
+
+        const draw = () => {
+
+            // ... (Width checks) ...
+            let containerWidth = wrapper.getBoundingClientRect().width;
+            if (containerWidth < 50 && this.container.parentElement) {
+                containerWidth = this.container.parentElement.clientWidth - 20;
+            }
+            if (!containerWidth || containerWidth <= 0) return;
+
+            wrapper.empty();
+            wrapper.appendChild(monthLabel);
+
+            // ... (Data processing) ...
+            if (!chartDataObj?.datasets?.[0]?.data) {
+                wrapper.createDiv({ text: "No data", cls: "cpwn-muted-text" });
+                return;
+            }
+            const labels = chartDataObj.labels || [];
+            const dailyData = chartDataObj.datasets[0].data || [];
+            // GRAB THE BREAKDOWNS
+            const breakdowns = chartDataObj.breakdowns || [];
+
+            let totalData = chartDataObj.datasets[1]?.data || [];
+            if (totalData.length === 0) {
+                let running = 0;
+                totalData = dailyData.map(d => { running += (Number(d) || 0); return running; });
+            }
+            const totalDays = labels.length;
+            if (totalDays === 0) return;
+
+            // ... (Layout constants) ...
+            const padding = { top: 25, right: 10, bottom: 20, left: 10 };
+            const axisWidthL = 25;
+            const axisWidthR = 35;
+            const chartH = SWIPE_WIDGET_HEIGHT - padding.top - padding.bottom;
+            const pxPerDay = 45;
+
+            // ... (Scales logic) ...
+            let minD = Math.min(...dailyData);
+            let maxD = Math.max(...dailyData);
+            if (minD === maxD) { minD -= 10; maxD += 10; }
+            const rangeD = maxD - minD || 1;
+
+            let maxT = Math.max(...totalData);
+            if (maxT === 0) maxT = 10;
+            maxT = maxT * 1.05;
+            const magnitude = Math.pow(10, Math.floor(Math.log10(maxT)));
+            maxT = Math.ceil(maxT / (magnitude / 2)) * (magnitude / 2);
+            const minT = 0;
+            const rangeT = maxT - minT || 1;
+
+            // ... (Axes rendering) ...
+            const leftAxis = wrapper.createDiv({ cls: 'cpwn-swipe-axis-left' });
+            leftAxis.style.width = `${axisWidthL}px`;
+
+            const rightAxis = wrapper.createDiv({ cls: 'cpwn-swipe-axis-right' });
+            rightAxis.style.width = `${axisWidthR}px`;
+
+            // ... (Scroll Container) ...
+            const scrollContainer = wrapper.createDiv({ cls: 'cpwn-swipe-scroll-container' });
+            scrollContainer.style.left = `${axisWidthL}px`;
+            scrollContainer.style.right = `${axisWidthR}px`;
+
+            scrollContainer.style.height = `${SWIPE_WIDGET_HEIGHT}px`;
+
+            // ... (Animation Logic) ...
+            let animationFrameId = null;
+            const stopAutoScroll = () => { if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; } };
+            scrollContainer.addEventListener('touchstart', stopAutoScroll, { passive: true });
+            scrollContainer.addEventListener('wheel', stopAutoScroll, { passive: true });
+            scrollContainer.addEventListener('mousedown', stopAutoScroll);
+
+            // ... (SVG Setup) ...
+            const visibleWidth = containerWidth - axisWidthL - axisWidthR;
+            const scrollWidth = Math.max(visibleWidth, totalDays * pxPerDay);
+            const svgNs = "http://www.w3.org/2000/svg";
+            const svg = document.createElementNS(svgNs, "svg");
+            svg.setAttribute('width', `${scrollWidth}px`);
+            svg.setAttribute('height', `${SWIPE_WIDGET_HEIGHT}px`);
+            svg.setAttribute('viewBox', `0 0 ${scrollWidth} ${SWIPE_WIDGET_HEIGHT}`);
+            svg.style.display = "block";
+            scrollContainer.appendChild(svg);
+
+            const renderTicks = (container, min, max, count, isRight) => {
+                const range = max - min;
+                for (let i = 0; i <= count; i++) {
+                    const val = Math.round(min + (range * (i / count)));
+                    const y = padding.top + chartH - (i / count) * chartH;
+                    const lbl = container.createDiv({ cls: 'cpwn-axis-tick', text: val.toLocaleString() });
+                    lbl.style.top = `${y - 6}px`;
+                    lbl.style.textAlign = isRight ? 'left' : 'right';
+                    lbl.style.paddingRight = isRight ? '0' : '4px';
+                    lbl.style.paddingLeft = isRight ? '4px' : '0';
+
+                    if (!isRight) {
+                        const gridLine = document.createElementNS(svgNs, 'line');
+                        gridLine.setAttribute('x1', 0);
+                        gridLine.setAttribute('x2', scrollWidth); // Full width of the scroll area
+                        gridLine.setAttribute('y1', y);
+                        gridLine.setAttribute('y2', y);
+                        gridLine.setAttribute('stroke', 'var(--background-modifier-border)');
+                        gridLine.setAttribute('stroke-width', '1');
+                        gridLine.setAttribute('stroke-opacity', '0.4'); // Keep it very faint
+                        // Prepend so it sits BEHIND the data paths
+                        svg.prepend(gridLine);
+                    }
+                }
+            };
+            renderTicks(leftAxis, minD, maxD, 4, false);
+            renderTicks(rightAxis, minT, maxT, 4, true);
+
+            monthLabel.onclick = (e) => {
+                e.stopPropagation();
+                const maxScroll = scrollContainer.scrollWidth - scrollContainer.clientWidth;
+                const isAtEnd = (maxScroll - scrollContainer.scrollLeft) < 5;
+                if (isAtEnd) {
+                    scrollContainer.scrollLeft = 0;
+                    const autoScroll = () => {
+                        scrollContainer.scrollLeft += 4;
+                        if (scrollContainer.scrollLeft < (scrollContainer.scrollWidth - scrollContainer.clientWidth)) {
+                            animationFrameId = requestAnimationFrame(autoScroll);
+                        } else { stopAutoScroll(); }
+                    };
+                    stopAutoScroll(); animationFrameId = requestAnimationFrame(autoScroll);
+                } else {
+                    stopAutoScroll(); scrollContainer.scrollTo({ left: maxScroll, behavior: 'smooth' });
+                }
+            };
+
+            // ... (SVG Setup) ...
+            const dailyGroup = document.createElementNS(svgNs, 'g');
+            const totalGroup = document.createElementNS(svgNs, 'g');
+            dailyGroup.style.transition = "opacity 0.2s";
+            totalGroup.style.transition = "opacity 0.2s";
+            svg.appendChild(dailyGroup); svg.appendChild(totalGroup);
+
+            // ... (Points/Path Calc) ...
+            const dPoints = dailyData.map((val, i) => ({ x: (i * pxPerDay) + (pxPerDay / 2), y: (padding.top + chartH) - ((val - minD) / rangeD) * chartH, val: val }));
+            const tPoints = totalData.map((val, i) => ({ x: (i * pxPerDay) + (pxPerDay / 2), y: (padding.top + chartH) - ((val - minT) / rangeT) * chartH, val: val }));
+
+            // ... (Gradients) ...
+            const defs = document.createElementNS(svgNs, 'defs');
+            const gradId = 'swGrad-' + Math.random().toString(36).substr(2, 5);
+            const grad = document.createElementNS(svgNs, 'linearGradient');
+            grad.setAttribute('id', gradId); grad.setAttribute('x1', '0'); grad.setAttribute('x2', '0'); grad.setAttribute('y1', '0'); grad.setAttribute('y2', '1');
+            const stop1 = document.createElementNS(svgNs, 'stop'); stop1.setAttribute('offset', '0%'); stop1.setAttribute('stop-color', 'var(--interactive-accent)'); stop1.setAttribute('stop-opacity', '0.3'); grad.appendChild(stop1);
+            const stop2 = document.createElementNS(svgNs, 'stop'); stop2.setAttribute('offset', '100%'); stop2.setAttribute('stop-color', 'var(--interactive-accent)'); stop2.setAttribute('stop-opacity', '0.0'); grad.appendChild(stop2);
+            defs.appendChild(grad); svg.appendChild(defs);
+
+            // Paths
+            const dLineStr = dPoints.map((p, i) => (i === 0 ? `M ${p.x},${p.y}` : `L ${p.x},${p.y}`)).join(' ');
+            const dAreaStr = `${dLineStr} L ${dPoints[dPoints.length - 1].x},${SWIPE_WIDGET_HEIGHT} L ${dPoints[0].x},${SWIPE_WIDGET_HEIGHT} Z`;
+            const tLineStr = tPoints.map((p, i) => (i === 0 ? `M ${p.x},${p.y}` : `L ${p.x},${p.y}`)).join(' ');
+
+            const areaPath = document.createElementNS(svgNs, 'path'); areaPath.setAttribute('d', dAreaStr); areaPath.setAttribute('fill', `url(#${gradId})`); dailyGroup.appendChild(areaPath);
+            const linePath = document.createElementNS(svgNs, 'path'); linePath.setAttribute('d', dLineStr); linePath.setAttribute('fill', 'none'); linePath.setAttribute('stroke', 'var(--interactive-accent)'); linePath.setAttribute('stroke-width', '2'); dailyGroup.appendChild(linePath);
+            const totalPath = document.createElementNS(svgNs, 'path'); totalPath.setAttribute('d', tLineStr); totalPath.setAttribute('fill', 'none'); totalPath.setAttribute('stroke', 'var(--text-accent)'); totalPath.setAttribute('stroke-width', '2'); totalPath.setAttribute('stroke-dasharray', '4,3'); totalGroup.appendChild(totalPath);
+
+            // --- Helper to follow the mouse ---
+            // direction: 'right' (default) places tooltip to the right of cursor
+            // direction: 'left' places tooltip to the left of cursor
+            const updateTooltipPosition = (e, direction = 'right') => {
+                const containerRect = this.container.getBoundingClientRect();
+                const relX = e.clientX - containerRect.left;
+                const relY = e.clientY - containerRect.top;
+
+                // Get approximate width if needed, or just use a safe large offset
+                // Using a CSS transform is cleaner for "left" alignment, but purely JS works too
+
+                if (direction === 'left') {
+                    // Position to the LEFT of the mouse
+                    // We subtract an estimated width (e.g. 180px) or measure it if possible
+                    // A cleaner way is to use style.transform to shift it back by 100%
+                    tooltip.style.left = (relX - 15) + 'px';
+                    tooltip.style.transform = 'translateX(-100%)';
+                } else {
+                    // Position to the RIGHT of the mouse (Default)
+                    tooltip.style.left = (relX + 15) + 'px';
+                    tooltip.style.transform = 'none'; // Reset transform
+                }
+
+                tooltip.style.top = (relY - 5) + 'px';
+            };
+
+            // --- Left Axis Events (Tooltip on Right) ---
+            leftAxis.addEventListener('mouseenter', (e) => {
+                totalGroup.style.opacity = "0";
+                dailyGroup.style.opacity = "1";
+                tooltip.empty();
+                tooltip.setText("Left Axis: Daily momentum");
+                tooltip.style.display = 'block';
+                updateTooltipPosition(e, 'right');
+            });
+
+            leftAxis.addEventListener('mousemove', (e) => {
+                updateTooltipPosition(e, 'right');
+            });
+
+            leftAxis.addEventListener('mouseleave', () => {
+                totalGroup.style.opacity = "1";
+                tooltip.style.display = 'none';
+            });
+
+            // --- Right Axis Events (Tooltip on Left) ---
+            rightAxis.addEventListener('mouseenter', (e) => {
+                dailyGroup.style.opacity = "0";
+                totalGroup.style.opacity = "1";
+                tooltip.empty();
+                tooltip.setText("Right Axis: Total momentum");
+                tooltip.style.display = 'block';
+                updateTooltipPosition(e, 'left');
+            });
+
+            rightAxis.addEventListener('mousemove', (e) => {
+                updateTooltipPosition(e, 'left');
+            });
+
+            rightAxis.addEventListener('mouseleave', () => {
+                dailyGroup.style.opacity = "1";
+                tooltip.style.display = 'none';
+            });
+
+            // Dots & Hit Areas
+            dPoints.forEach((p, i) => {
+                const txt = document.createElementNS(svgNs, 'text');
+                txt.setAttribute('class', 'cpwn-swipe-day-text');
+                txt.setAttribute('x', p.x); txt.setAttribute('y', SWIPE_WIDGET_HEIGHT - 5);
+                const d = moment(labels[i], 'YYYY-MM-DD'); txt.textContent = d.isValid() ? d.format('D') : (i + 1); svg.appendChild(txt);
+
+                const c1 = document.createElementNS(svgNs, 'circle'); c1.setAttribute('cx', p.x); c1.setAttribute('cy', p.y); c1.setAttribute('r', 3); c1.setAttribute('fill', 'var(--background-primary)'); c1.setAttribute('stroke', 'var(--interactive-accent)'); c1.setAttribute('stroke-width', '2'); dailyGroup.appendChild(c1);
+                const c2 = document.createElementNS(svgNs, 'circle'); c2.setAttribute('cx', tPoints[i].x); c2.setAttribute('cy', tPoints[i].y); c2.setAttribute('r', 3); c2.setAttribute('fill', 'var(--background-primary)'); c2.setAttribute('stroke', 'var(--text-accent)'); c2.setAttribute('stroke-width', '2'); totalGroup.appendChild(c2);
+
+                const hitRect = document.createElementNS(svgNs, 'rect');
+                hitRect.setAttribute('class', 'cpwn-swipe-hit-rect');
+                hitRect.setAttribute('x', p.x - (pxPerDay / 2)); hitRect.setAttribute('y', 0); hitRect.setAttribute('width', pxPerDay); hitRect.setAttribute('height', SWIPE_WIDGET_HEIGHT);
+
+                // --- MOUSE ENTER (Aligned & Extensible) ---
+                hitRect.addEventListener('mouseenter', (e) => {
+                    // Highlight Points
+                    c1.setAttribute('r', 5); c1.setAttribute('fill', 'var(--interactive-accent)');
+                    c2.setAttribute('r', 5); c2.setAttribute('fill', 'var(--text-accent)');
+
+                    tooltip.empty();
+
+                    // 1. DATE HEADER
+                    const dateDiv = tooltip.createDiv({ cls: 'cpwn-chart-tooltip-date' });
+                    dateDiv.setText(moment(labels[i]).format('ddd, MMM Do YYYY'));
+
+                    // 2. BREAKDOWN CONTENT
+                    if (dailyGroup.style.opacity !== '0') {
+                        const bd = (breakdowns && breakdowns[i]) ? breakdowns[i] : {};
+
+                        // GRID CONTAINER for perfect alignment
+                        // 3 columns: [Icon] [Label..........] [Points]
+                        const grid = tooltip.createDiv();
+                        grid.style.display = 'grid';
+                        grid.style.gridTemplateColumns = '16px 1fr auto';
+                        grid.style.gap = '4px 8px'; // row-gap col-gap
+                        grid.style.marginTop = '6px';
+                        grid.style.marginBottom = '6px';
+                        grid.style.paddingBottom = '6px';
+                        grid.style.borderBottom = '1px dashed var(--background-modifier-border)';
+                        grid.style.alignItems = 'center';
+
+                        // Helper to add grid row
+                        const addGridRow = (iconName, label, pts, colorVar) => {
+                            // Col 1: Icon
+                            const iconContainer = grid.createDiv();
+                            iconContainer.style.display = 'flex';
+                            iconContainer.style.alignItems = 'center';
+                            iconContainer.style.justifyContent = 'center';
+                            iconContainer.style.color = 'var(--text-muted)';
+
+                            // ICON SPAN
+                            const iconSpan = iconContainer.createSpan();
+                            // Force container size
+                            iconSpan.style.display = 'flex';
+                            iconSpan.style.width = '12px';
+                            iconSpan.style.height = '12px';
+
+                            // Render Icon
+                            setIcon(iconSpan, iconName);
+
+                            // FORCE SVG SIZE (Critical Step)
+                            // We need to ensure the injected <svg> fits the 12px box
+                            const svg = iconSpan.querySelector('svg');
+                            if (svg) {
+                                svg.style.width = '100%';
+                                svg.style.height = '100%';
+                                svg.style.strokeWidth = '2px'; // Adjust thickness if needed
+                            }
+
+                            // Col 2: Label
+                            const labelDiv = grid.createDiv();
+                            labelDiv.innerText = label;
+                            labelDiv.style.fontSize = '11px';
+                            labelDiv.style.color = 'var(--text-normal)';
+
+                            // Col 3: Points
+                            const ptsDiv = grid.createDiv();
+                            ptsDiv.innerText = `+${pts}`;
+                            ptsDiv.style.fontWeight = '600';
+                            ptsDiv.style.textAlign = 'right';
+                            if (colorVar) ptsDiv.style.color = `var(${colorVar})`;
+                        };
+
+                        // --- DYNAMIC RENDERING ---
+                        // Define known keys to handle order and styling explicitly
+                        const config = [
+                            { key: 'goals', icon: 'target', label: 'Goals', color: '--text-normal' },
+                            { key: 'allMet', icon: 'sparkles', label: 'Bonus', color: '--color-green' },
+                            { key: 'bonus', icon: 'sparkles', label: 'Bonus', color: '--color-green' }, // Legacy key support
+                            { key: 'streak', icon: 'flame', label: 'Streak', color: '--color-orange' },
+                            { key: 'multiplier', icon: 'zap', label: 'Multiplier', color: '--text-accent' }
+                        ];
+
+                        // 1. Render Known Keys First (in specific order)
+                        config.forEach(item => {
+                            if (bd[item.key] && bd[item.key] > 0) {
+                                addGridRow(item.icon, item.label, bd[item.key], item.color);
+                            }
+                        });
+
+                        // 2. Render Unknown Keys (Automatic Extensibility)
+                        // If you add a new bonus type "vacationBonus" to the backend later, it shows up here automatically.
+                        Object.keys(bd).forEach(key => {
+                            // Skip keys we already handled or explicitly ignore
+                            if (config.some(c => c.key === key)) return;
+                            if (['date', 'totalPoints'].includes(key)) return;
+                            if (bd[key] <= 0) return;
+
+                            // Default style for unknown items
+                            // Capitalize key for label: "superBonus" -> "SuperBonus"
+                            const label = key.charAt(0).toUpperCase() + key.slice(1);
+                            addGridRow('plus-circle', label, bd[key], '--text-muted');
+                        });
+
+                        // 3. DAILY TOTAL FOOTER
+                        const totalFooter = tooltip.createDiv();
+                        totalFooter.style.display = 'flex';
+                        totalFooter.style.justifyContent = 'space-between';
+                        totalFooter.style.fontWeight = 'bold';
+                        totalFooter.style.fontSize = '12px';
+                        totalFooter.style.marginTop = '2px';
+
+                        totalFooter.createSpan({ text: "Daily total:" });
+                        totalFooter.createSpan({ text: `${dPoints[i].val}`, style: 'color: var(--interactive-accent)' });
+                    }
+
+                    // LIFETIME FOOTER
+                    if (totalGroup.style.opacity !== '0') {
+                        const lifeDiv = tooltip.createDiv();
+                        lifeDiv.style.display = 'flex';
+                        lifeDiv.style.justifyContent = 'space-between';
+                        lifeDiv.style.fontSize = '13px';
+                        lifeDiv.style.fontWeight = 'bold';
+                        lifeDiv.style.marginTop = '2px';
+
+                        lifeDiv.createSpan({ text: "Total:" });
+                        lifeDiv.createSpan({ text: `${tPoints[i].val}` });
+                    }
+
+                    // POSITIONING
+                    tooltip.style.display = 'block';
+                    const rect = hitRect.getBoundingClientRect();
+                    const containerRect = this.container.getBoundingClientRect();
+
+                    /*let leftPos = (rect.right - containerRect.left + 10);
+                    if (leftPos + 180 > containerWidth) leftPos = (rect.left - containerRect.left - 190);
+                    */
+
+                    // 1. Define Tooltip Width (Approximate or measure it)
+                    const tooltipWidth = 180;
+
+                    // 2. Default Preference: Try positioning to the RIGHT
+                    let leftPos = (rect.right - containerRect.left + 10);
+                    let transformOrigin = 'left center'; // For animation if you have any
+
+                    // 3. Boundary Check: Does it fit on the Right?
+                    if (leftPos + tooltipWidth > containerWidth) {
+                        // No, it would get cut off on the right.
+                        // Try positioning to the LEFT of the data point.
+                        const tryLeftPos = (rect.left - containerRect.left - tooltipWidth - 10);
+
+                        // 4. Boundary Check: Does it fit on the Left?
+                        if (tryLeftPos < 0) {
+                            // It fits NEITHER side (rare, but possible on tiny mobile screens).
+                            // Fallback: Force it to stay on screen by clamping.
+                            // We position it at 0 (left edge) but pushed right slightly to not touch edge.
+                            leftPos = 5;
+
+                            // Alternatively, if it's REALLY tight, center it over the point
+                            // leftPos = (containerWidth / 2) - (tooltipWidth / 2);
+                        } else {
+                            // It fits on the left! Use that.
+                            leftPos = tryLeftPos;
+                            transformOrigin = 'right center';
+                        }
+                    }
+
+                    // 5. Apply the calculated position
+                    tooltip.style.left = leftPos + 'px';
+                    tooltip.style.transformOrigin = transformOrigin; // Optional polish
+
+                    // 6. Ensure top doesn't clip (Simple check)
+                    // If you ever find it clips the top, you can do similar logic for 'top'.
+                    // For now, let's keep your hardcoded top or use a simple clamp:
+                    tooltip.style.top = '25px';
+
+
+                    tooltip.style.left = leftPos + 'px';
+                    tooltip.style.top = '25px';
+                });
+
+                wrapper.addEventListener('click', () => {
+                    if (activeTooltipIndex !== -1) {
+                        tooltip.style.display = 'none';
+                        activeTooltipIndex = -1;
+                        // You might need to reset all circles here if you want perfect cleanup
+                        wrapper.querySelectorAll('circle').forEach(c => {
+                            if (c.getAttribute('r') == 5) {
+                                c.setAttribute('r', 3);
+                                c.setAttribute('fill', 'var(--background-primary)');
+                            }
+                        });
+                    }
+                });
+
+
+                hitRect.addEventListener('mouseleave', () => { c1.setAttribute('r', 3); c1.setAttribute('fill', 'var(--background-primary)'); c2.setAttribute('r', 3); c2.setAttribute('fill', 'var(--background-primary)'); tooltip.style.display = 'none'; });
+                svg.appendChild(hitRect);
+            });
+
+            // ... (Scroll Handlers) ...
+            const updateScrollState = () => {
+                const sl = scrollContainer.scrollLeft;
+                const sw = scrollContainer.scrollWidth;
+                const cw = scrollContainer.clientWidth;
+                if (sw > cw && cw > 0) { this.currentScrollIndex = Math.floor(sl / pxPerDay); }
+                const centerIndex = Math.min(Math.floor((sl + (visibleWidth / 3)) / pxPerDay), labels.length - 1);
+                if (centerIndex >= 0 && labels[centerIndex]) {
+                    const d = moment(labels[centerIndex], 'YYYY-MM-DD');
+                    if (d.isValid()) monthLabel.setText(d.format('MMMM YYYY'));
+                }
+            };
+            scrollContainer.addEventListener('scroll', updateScrollState);
+
+            window.requestAnimationFrame(() => {
+                const maxScroll = scrollContainer.scrollWidth - scrollContainer.clientWidth;
+                if (this.currentScrollIndex !== -1) { scrollContainer.scrollLeft = this.currentScrollIndex * pxPerDay; }
+                else { scrollContainer.scrollLeft = maxScroll; }
+                updateScrollState();
+            });
+
+            if (this.attachScrollHandlers) this.attachScrollHandlers(scrollContainer);
+        };
+
+        this.swipeObserver = new ResizeObserver(() => window.requestAnimationFrame(draw));
+        this.swipeObserver.observe(this.container);
+    }
+
+
+    // Helper for scroll handlers to keep render method clean
+    attachScrollHandlers(el) {
+        let isDown = false, startX, scrollLeft;
+        el.addEventListener('mousedown', (e) => {
+            isDown = true; el.style.cursor = 'grabbing';
+            startX = e.pageX - el.offsetLeft; scrollLeft = el.scrollLeft;
+        });
+        el.addEventListener('mouseleave', () => { isDown = false; el.style.cursor = 'grab'; });
+        el.addEventListener('mouseup', () => { isDown = false; el.style.cursor = 'grab'; });
+        el.addEventListener('mousemove', (e) => {
+            if (!isDown) return; e.preventDefault();
+            const x = e.pageX - el.offsetLeft;
+            const walk = (x - startX) * 2;
+            el.scrollLeft = scrollLeft - walk;
+        });
+    }
+
+
+    /**
+     * Displays a tooltip at the mouse position with the provided content.
+     * @param {MouseEvent} e - The mouse event for positioning.
+     * @param {string|HTMLElement} content - The content to display inside the tooltip.
+     */
     showTooltip(e, content) {
         // Create tooltip element if it doesn't exist
         if (!this.tooltipEl) {
@@ -1182,33 +1684,6 @@ export class CssChartRenderer {
         this.tooltipEl.style.top = `${top}px`;
     }
 
-    /*
-    moveTooltip(e) {
-        if (this.tooltipEl) {
-            const tooltipRect = this.tooltipEl.getBoundingClientRect();
-            const viewportWidth = window.innerWidth;
-            const offset = 15; // Base offset from cursor
-
-            let left = e.pageX + offset;
-            let top = e.pageY + offset;
-
-            // Check for right overflow
-            if (left + tooltipRect.width > viewportWidth - 20) { // 20px buffer
-                // Flip to left side of cursor
-                left = e.pageX - tooltipRect.width - offset;
-            }
-
-            // Optional: Check for bottom overflow (flip up)
-            const viewportHeight = window.innerHeight;
-            if (top + tooltipRect.height > viewportHeight - 20) {
-                top = e.pageY - tooltipRect.height - offset;
-            }
-
-            this.tooltipEl.style.left = `${left}px`;
-            this.tooltipEl.style.top = `${top}px`;
-        }
-    }
-    */
 
     /**
      * Hides the tooltip from view.

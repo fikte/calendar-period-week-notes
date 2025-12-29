@@ -44,7 +44,7 @@
   "dateCellHoverColorDark": "rgba(186, 85, 211, 1)",
   "assetDotColor": "rgba(50, 205, 50, 1.00)",
   "calendarEventDotColor": "rgba(255, 102, 0, 1)",
-  "todayHighlightStyle": "circle",
+  "todayHighlightStyle": "cell",
   "todayCircleColorLight": "rgba(231, 151, 4, 0.80)",
   "todayCircleColorDark": "rgba(191, 9, 236, 1.00)",
   "weeklyNoteDotColor": "rgba(186, 85, 211, 1)",

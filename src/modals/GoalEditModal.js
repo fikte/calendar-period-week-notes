@@ -44,8 +44,8 @@ export class GoalEditModal extends Modal {
             target: 1,
             points: 10,
             query: '',
-            folder: '', 
-            activeDays: [0, 1, 2, 3, 4, 5, 6], 
+            folder: '',
+            activeDays: [0, 1, 2, 3, 4, 5, 6],
             vacationMode: false
         };
 
@@ -58,7 +58,7 @@ export class GoalEditModal extends Modal {
         if (typeof this.tempGoal.vacationMode !== 'boolean') {
             this.tempGoal.vacationMode = false;
         }
-        
+
         this.onSave = onSave;
     }
 
@@ -91,7 +91,7 @@ export class GoalEditModal extends Modal {
                     .setValue(this.tempGoal.type)
                     .onChange(value => {
                         this.tempGoal.type = value;
-                        
+
                         // Set sensible defaults
                         if (value === 'note-created') {
                             this.tempGoal.target = 1;
@@ -101,19 +101,19 @@ export class GoalEditModal extends Modal {
                             this.tempGoal.target = 3;
                         }
 
-                        this.updatePointsPreview(); 
-                        this.display();  
+                        this.updatePointsPreview();
+                        this.display();
                     });
-               
-                    if (this.goal.isCore) {
-                        drop.setDisabled(true);
-                    }
-                });
-                
-            // Adds a tooltip or description explaining why it's disabled
-            if (this.goal.isCore) {
-                typeSetting.setDesc('Core goals cannot change their type.');
-            }
+
+                if (this.goal.isCore) {
+                    drop.setDisabled(true);
+                }
+            });
+
+        // Adds a tooltip or description explaining why it's disabled
+        if (this.goal.isCore) {
+            typeSetting.setDesc('Core goals cannot change their type.');
+        }
 
         // 3. Conditional Input: Tag Query
         if (this.tempGoal.type === 'task-count') {
@@ -137,7 +137,7 @@ export class GoalEditModal extends Modal {
                         .onChange(value => {
                             this.tempGoal.folder = value;
                         });
-                    
+
                     // --- ATTACH FOLDER SUGGESTER HERE ---
                     new FolderSuggest(this.app, text.inputEl);
                 });
@@ -145,41 +145,41 @@ export class GoalEditModal extends Modal {
 
         // 4a. Conditional Input: Filename Format
         if (this.tempGoal.type === 'word-count' || this.tempGoal.type === 'note-created') {
-        new Setting(contentEl)
-            .setName("Filename format")
-            .setDesc("Enter the date format used for the file name.")
-            .addText(text => {
-                text.setPlaceholder("Default (Daily Note)")
-                    .setValue(this.tempGoal.dateFormat || "")
-                    .onChange(value => {
-                        this.tempGoal.dateFormat = value;
-                    });
-            });
-            
-        // Get current date string
-        const now = moment();
+            new Setting(contentEl)
+                .setName("Filename format")
+                .setDesc("Enter the date format used for the file name.")
+                .addText(text => {
+                    text.setPlaceholder("Default (Daily Note)")
+                        .setValue(this.tempGoal.dateFormat || "")
+                        .onChange(value => {
+                            this.tempGoal.dateFormat = value;
+                        });
+                });
 
-        // Policy-Compliant Description
-        const exampleContainer = contentEl.createDiv({ cls: 'setting-item-description' });
-        exampleContainer.style.fontSize = '0.8em';
-        exampleContainer.style.marginBottom = '1em';
-        
-        exampleContainer.createSpan({ text: "Leave blank to use your system Daily Note settings." });
-        exampleContainer.createSpan({ text: "Examples:" });
-        exampleContainer.createEl("br");
-        
-        // Line 2: YYYY-MM-DD
-        exampleContainer.createEl("code", { text: "YYYY-MM-DD" });
-        exampleContainer.createSpan({ text: " matches " });
-        exampleContainer.createEl("strong", { text: now.format("YYYY-MM-DD") });
-        exampleContainer.createEl("br");
-        
-        // Line 3: Custom Format
-        exampleContainer.createEl("code", { text: "[Log] YYYY-MM-DD" });
-        exampleContainer.createSpan({ text: " matches " });
-        exampleContainer.createEl("strong", { text: `Log ${now.format("YYYY-MM-DD")}` });
-        
-    }
+            // Get current date string
+            const now = moment();
+
+            // Policy-Compliant Description
+            const exampleContainer = contentEl.createDiv({ cls: 'setting-item-description' });
+            exampleContainer.style.fontSize = '0.8em';
+            exampleContainer.style.marginBottom = '1em';
+
+            exampleContainer.createSpan({ text: "Leave blank to use your system Daily Note settings." });
+            exampleContainer.createSpan({ text: "Examples:" });
+            exampleContainer.createEl("br");
+
+            // Line 2: YYYY-MM-DD
+            exampleContainer.createEl("code", { text: "YYYY-MM-DD" });
+            exampleContainer.createSpan({ text: " matches " });
+            exampleContainer.createEl("strong", { text: now.format("YYYY-MM-DD") });
+            exampleContainer.createEl("br");
+
+            // Line 3: Custom Format
+            exampleContainer.createEl("code", { text: "[Log] YYYY-MM-DD" });
+            exampleContainer.createSpan({ text: " matches " });
+            exampleContainer.createEl("strong", { text: `Log ${now.format("YYYY-MM-DD")}` });
+
+        }
 
 
         // 5. Conditional Input: Target Value
@@ -191,7 +191,7 @@ export class GoalEditModal extends Modal {
                     .setValue(String(this.tempGoal.target))
                     .onChange((value) => {
                         this.tempGoal.target = Number(value) || 0;
-                        this.updatePointsPreview(); 
+                        this.updatePointsPreview();
                     }));
         }
 
@@ -254,7 +254,7 @@ export class GoalEditModal extends Modal {
         this.pointsInfoEl.style.fontSize = '0.9em';
         this.pointsInfoEl.style.color = 'var(--text-accent)';
 
-        this.updatePointsPreview(); 
+        this.updatePointsPreview();
 
         // 7. Save Button
         new Setting(contentEl)
@@ -276,7 +276,7 @@ export class GoalEditModal extends Modal {
         let explanation = "";
 
         if (this.tempGoal.type === 'note-created') {
-            points = 30; 
+            points = 30;
             explanation = "Reward: 30 pts\n(Penalty: -10 pts if missed)";
         } else if (this.tempGoal.type === 'task-count') {
             const count = this.tempGoal.target || 0;
@@ -287,10 +287,10 @@ export class GoalEditModal extends Modal {
             points = Math.floor((count / 250) * 30);
             explanation = `${count} words ≈ ${points} pts\n(30 pts per 250 words)\n(Penalty: -10 pts if target not met)`;
         }
-    
+
         if (this.pointsInfoEl) {
-             this.pointsInfoEl.innerText = explanation;
-             this.pointsInfoEl.style.whiteSpace = 'pre-line'; 
+            this.pointsInfoEl.innerText = explanation;
+            this.pointsInfoEl.style.whiteSpace = 'pre-line';
         }
 
         this.tempGoal.points = points;
