@@ -1,5 +1,34 @@
 # Version Change History 
 
+v1.7.0
+Major new feature: Task Style Layouts  
+- Choose one of 19 different task layout styles or create your own with a new drag drop user interface in the Task tab settings. Style and create your own task layout that applies across all task views, Task tab and popup windows
+- Added the ability to change the date format of the dates shown in the task layout, e.g. YYYY-MM-DD,  DD-MM-YYYY etc
+
+Note highlight colours: 
+- Added the ability to add a highlight colour to a note which is displayed as a bar to the left side of the note row. To add a colour from the notes / pinned notes tab right click a note and choose the colour to apply. The highlight will show in popup windows and in the notes / pinned notes tab area. To remove, right click the note row again to click on the colour again. 
+- In the note / pinned note tab, there's the ability to filter notes by highlight colour. Just click into the text box and a list of highlight colours which match notes will be displayed. Alternatively, type c:red for example to filter in the filter text box  
+
+New Core Widget - Goal momentum
+- A new core widget to show your goal progression over time. You can scroll the entire history for your progression or click the month title when it's showing the latest day on the chart to then automatically scroll the chart from the beginning to the current week. Enable this new widget and choose where to place it in the Dashboard tab settings screen. Note: it's recommended to click the "Rebuild full history" button in the Goals tab to ensure all days are calculated correctly - this to fix a previous bug where the dates were being over calculated.  
+
+Other: 
+- Added ability to add schedule vacation dates to pause goals
+
+Minor fixes: 
+- On an operating system date change when the app is open, it now automatically updates the dashboard view if visible
+- For the file creation heat map, now only shows the file notes, previously also included completed tasks for that day 
+- CSS fix to showing line chart legends being displayed over the widget bounding box
+- CSS improvements to the dashboard widget chevon and name positions  
+- Fix to the weekly momentum chart which in some scenarios would not show when the widget was in a collapsed state to a then being visible  
+
+
+v1.6.0
+- New set alert date and time on tasks which will then show an alert icon in the header of this plugin - it will be displayed after the Month Year title. Click to pause the shaking icon. Hover over the icon to see which tasks are currently alerting. 
+- Popup windows and Task tab now shows an icon on the right of the task description to indicate if a task has an time alert set.
+- Changed the emoji's for displaying task priorities to use the Lucide icons. 
+- See my Templater JavaScript template code which makes it super quick to create or edit a task with Tags, Alert date and Time, Created Date and Due Date. Configurable to work with Tasks emojis or the Dataview date formats 
+
 v1.5.0
 - Major new feature: Set your own goals for Tasks, Note creation, (e.g. Daily Note / Journal) and Words written. Track the goals daily with 15 achievement levels including seeing how you've progressed over the last 7 days. Pause goals when you're on vacation. For this new feature and for all task features, Calendar Period Week Notes plugin requires the Tasks plugin to be installed with every task having a creation, due and completion date. 
 
