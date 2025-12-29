@@ -11,6 +11,25 @@ export class GoalTracker {
         if (!this.settings.vacationHistory) {
             this.settings.vacationHistory = {};
         }
+
+        if (!this.settings.vacationRanges) {
+            this.settings.vacationRanges = [];
+        }
+    }
+
+    isGlobalVacationActive() {
+        // 1. Manual Check
+        if (this.settings.vacationModeGlobal) return true;
+
+        // 2. Date Range Check
+        if (this.settings.vacationRanges && this.settings.vacationRanges.length > 0) {
+            const today = moment();
+            return this.settings.vacationRanges.some(range => {
+                if (!range.start || !range.end) return false;
+                return today.isBetween(moment(range.start), moment(range.end), 'day', '[]');
+            });
+        }
+        return false;
     }
 
     /**
@@ -26,7 +45,7 @@ export class GoalTracker {
         switch (goal.type) {
             case 'note-created':
                 //result = await this.checkNoteCreated(date, goal.folder);
-                result = await this.checkNoteCreated(goal, date); 
+                result = await this.checkNoteCreated(goal, date);
                 break;
             case 'word-count':
                 //result = await this.checkWordCount(date, goal.folder, goal.target);
@@ -41,6 +60,24 @@ export class GoalTracker {
     }
 
     /**
+     * Helper to check vacation status for a specific date (not just today)
+     */
+    checkVacationStatusForDate(date) {
+        // 1. Manual Check (Always applies if ON)
+        if (this.settings.vacationModeGlobal) return true;
+
+        // 2. Date Range Check
+        if (this.settings.vacationRanges && this.settings.vacationRanges.length > 0) {
+            return this.settings.vacationRanges.some(range => {
+                if (!range.start || !range.end) return false;
+                // '[]' = inclusive of start and end
+                return date.isBetween(moment(range.start), moment(range.end), 'day', '[]');
+            });
+        }
+        return false;
+    }
+
+    /**
      * Calculates the total score for a day with bonuses, active-day rules,
      * vacation mode, and persistent caching.
      * @param {moment.Moment} date - The date to score.
@@ -48,16 +85,33 @@ export class GoalTracker {
      * @returns {Promise<{date: string, totalPoints: number, results: Array<object>, allMet: boolean, level: number, levelTitle: string, levelIcon: string}>}
      */
     async calculateDailyScore(date, allTasks = []) {
-        if (this.settings.vacationModeGlobal) {
+        // 1. GLOBAL VACATION CHECK
+        // We check the specific date passed in, so history remains accurate
+        const activeGoals = (this.settings.goals || []).filter(g => !!g.enabled);
+
+        
+        if (this.checkVacationStatusForDate(date)) {
+            const pausedResults = activeGoals.map(g => ({
+                id: g.id,
+                name: g.name,
+                isMet: false,
+                isActiveToday: false, // Inactive
+                isVacationToday: true, // Specific flag
+                points: 0,
+                target: g.target,
+                current: 0,
+                type: g.type
+            }));
+
             return {
                 date: date.format('YYYY-MM-DD'),
                 totalPoints: 0,
-                breakdown: { goals: 0, allMet: 0, multiplier: 0, streak: 0 }, // NEW
-                results: [],
+                breakdown: { goals: 0, allMet: 0, multiplier: 0, streak: 0 },
+                results: pausedResults, // <--- RETURN THE LIST (not empty)
                 allMet: false,
                 level: 0,
-                levelTitle: '',
-                levelIcon: ''
+                levelTitle: 'Vacation',
+                levelIcon: 'palmtree'
             };
         }
 
@@ -81,7 +135,7 @@ export class GoalTracker {
         const vacationForDay = this.settings.vacationHistory[isoKey] || {};
         let totalPoints = 0;
 
-        // NEW: Initialize breakdown tracker
+        // Initialize breakdown tracker
         let breakdown = {
             goals: 0,
             allMet: 0,
@@ -90,66 +144,72 @@ export class GoalTracker {
         };
 
         const results = [];
-        const goals = this.settings.goals || [];
         const weekdayIndex = date.isoWeekday() - 1;
         let activeGoalsCount = 0;
         let metGoalsCount = 0;
 
-        const activeGoals = (this.settings.goals || []).filter(g => !!g.enabled);
+        //const activeGoals = (this.settings.goals || []).filter(g => !!g.enabled);
 
         for (const goal of activeGoals) {
             const activeDays = Array.isArray(goal.activeDays) && goal.activeDays.length > 0
                 ? goal.activeDays
                 : [0, 1, 2, 3, 4, 5, 6];
 
-            const isActiveToday = activeDays.includes(weekdayIndex);
-            const isVacationToday = !!vacationForDay[goal.id] || !!goal.vacationMode === true;
+            const isScheduledDay = activeDays.includes(weekdayIndex);
+            
+            // Individual goal vacation (manual toggle on the goal itself)
+            const isIndividualVacation = !!vacationForDay[goal.id] || !!goal.vacationMode === true;
 
-            if (isActiveToday && goal.vacationMode) {
+            // Save individual vacation state to history if active today
+            if (isScheduledDay && goal.vacationMode) {
                 if (!this.settings.vacationHistory[isoKey]) {
                     this.settings.vacationHistory[isoKey] = {};
                 }
                 this.settings.vacationHistory[isoKey][goal.id] = true;
             }
 
+            // A goal is "Active" if it is scheduled for today AND not on individual vacation
+            // (We already handled global vacation at the top of the function)
+            const isActiveToday = isScheduledDay && !isIndividualVacation;
+
             let result = { isMet: false, current: 0 };
-
-            if (isActiveToday && !isVacationToday) {
-                result = await this.checkGoal(goal, date, allTasks);
-                activeGoalsCount++;
-            } else if (isActiveToday && isVacationToday) {
-                result = await this.checkGoal(goal, date, allTasks);
-                activeGoalsCount++;
-            }
-
             let goalPoints = 0;
 
-            if (isActiveToday && result.isMet && !isVacationToday) {
-                metGoalsCount++;
-                const baseValue = parseInt(goal.points || 0);
-                goalPoints = baseValue;
+            if (isActiveToday) {
+                // Only do the heavy checking if the goal is actually active
+                result = await this.checkGoal(goal, date, allTasks);
+                activeGoalsCount++;
 
-                if (goal.type === 'task-count') {
-                    const extra = Math.max(0, result.current - goal.target);
-                    if (extra > 0) {
-                        goalPoints += extra * 2;
+                if (result.isMet) {
+                    metGoalsCount++;
+                    const baseValue = parseInt(goal.points || 0);
+                    goalPoints = baseValue;
+
+                    // Task Count Bonus
+                    if (goal.type === 'task-count') {
+                        const extra = Math.max(0, result.current - goal.target);
+                        if (extra > 0) {
+                            goalPoints += extra * 2;
+                        }
                     }
+                } else {
+                    // Penalty for missed active goal
+                    goalPoints = -10;
                 }
-            } else if (isActiveToday && !result.isMet && !isVacationToday) {
-                goalPoints = -10;
             } else {
+                // Inactive goals (rest days or individual vacation)
                 goalPoints = 0;
             }
 
             totalPoints += goalPoints;
-            breakdown.goals += goalPoints; // Track goal points
+            breakdown.goals += goalPoints;
 
             results.push({
                 id: goal.id,
                 name: goal.name,
                 isMet: isActiveToday ? result.isMet : false,
                 isActiveToday,
-                isVacationToday,
+                isVacationToday: isIndividualVacation,
                 points: goalPoints,
                 target: goal.target,
                 current: result.current,
@@ -157,22 +217,23 @@ export class GoalTracker {
             });
         }
 
+        // Mercy Rule: Don't go below zero for the day
         if (metGoalsCount === 0 && totalPoints < 0) {
             totalPoints = 0;
-            breakdown.goals = 0; // Reset if mercy rule applies
+            breakdown.goals = 0; 
         }
 
         // 2. "All Goals Met" Daily Bonus
         const allGoalsMet = activeGoalsCount > 0 && metGoalsCount === activeGoalsCount;
         if (allGoalsMet) {
             totalPoints += 100;
-            breakdown.allMet = 100; // Track bonus
+            breakdown.allMet = 100;
 
             // 3. Small Goal Count Multiplier
             if (activeGoalsCount > 0 && activeGoalsCount < 3) {
                 const preMult = totalPoints;
                 totalPoints = Math.floor(totalPoints * 1.5);
-                breakdown.multiplier = totalPoints - preMult; // Track difference
+                breakdown.multiplier = totalPoints - preMult;
             }
 
             // 4. Streak Bonus
@@ -180,7 +241,7 @@ export class GoalTracker {
             const yesterdayResults = await this.calculateDailyScoreSimple(yesterday, allTasks);
             if (yesterdayResults.allMet) {
                 totalPoints += 50;
-                breakdown.streak = 50; // Track streak
+                breakdown.streak = 50;
             }
         }
 
@@ -189,7 +250,7 @@ export class GoalTracker {
         const resultObj = {
             date: isoKey,
             totalPoints,
-            breakdown, // Return the breakdown
+            breakdown,
             results,
             allMet: allGoalsMet,
             level: achievement.level,
@@ -210,6 +271,7 @@ export class GoalTracker {
         return resultObj;
     }
 
+
     // Simplified calculation for "Yesterday" to avoid infinite loops/deep recursion
     async calculateDailyScoreSimple(date, allTasks) {
         const activeGoals = (this.settings.goals || []).filter(g => !!g.enabled);
@@ -222,6 +284,20 @@ export class GoalTracker {
             if (res.isMet) met++;
         }
         return { allMet: met === activeGoals.length };
+    }
+
+    checkVacationStatusForDate(date) {
+        // 1. Manual Check (Always applies if ON)
+        if (this.settings.vacationModeGlobal) return true;
+
+        // 2. Date Range Check
+        if (this.settings.vacationRanges && this.settings.vacationRanges.length > 0) {
+            return this.settings.vacationRanges.some(range => {
+                if (!range.start || !range.end) return false;
+                return date.isBetween(moment(range.start), moment(range.end), 'day', '[]');
+            });
+        }
+        return false;
     }
 
     // --- HELPER TO GET DAILY NOTE PATH ---
@@ -259,117 +335,140 @@ export class GoalTracker {
     }
 
     /**
- * 1. New Helper: Get System Daily Note Settings
- */
-getDailyNoteSettings() {
-    try {
-        // Try Periodic Notes (Community)
-        const periodicNotes = this.app.plugins.getPlugin('periodic-notes');
-        if (periodicNotes && periodicNotes.settings?.daily?.enabled) {
-            return {
-                folder: periodicNotes.settings.daily.folder,
-                format: periodicNotes.settings.daily.format
-            };
-        }
+    * 1. New Helper: Get System Daily Note Settings
+    */
+    getDailyNoteSettings() {
+        try {
+            // Try Periodic Notes (Community)
+            const periodicNotes = this.app.plugins.getPlugin('periodic-notes');
+            if (periodicNotes && periodicNotes.settings?.daily?.enabled) {
+                return {
+                    folder: periodicNotes.settings.daily.folder,
+                    format: periodicNotes.settings.daily.format
+                };
+            }
 
-        // Try Daily Notes (Core)
-        const dailyNotes = this.app.internalPlugins.getPluginById('daily-notes');
-        if (dailyNotes && dailyNotes.instance && dailyNotes.instance.options) {
-            return {
-                folder: dailyNotes.instance.options.folder,
-                format: dailyNotes.instance.options.format
-            };
+            // Try Daily Notes (Core)
+            const dailyNotes = this.app.internalPlugins.getPluginById('daily-notes');
+            if (dailyNotes && dailyNotes.instance && dailyNotes.instance.options) {
+                return {
+                    folder: dailyNotes.instance.options.folder,
+                    format: dailyNotes.instance.options.format
+                };
+            }
+        } catch (err) {
+            console.warn("GoalTracker: Could not retrieve daily note settings", err);
         }
-    } catch (err) {
-        console.warn("GoalTracker: Could not retrieve daily note settings", err);
-    }
-    // Fallback
-    return { folder: '', format: 'YYYY-MM-DD' };
-}
-
-/**
- * 2. New Helper: Calculate Target File Path
- */
-getGoalTargetFile(goal, date) {
-    let folder = goal.folder;     // User setting
-    let format = goal.dateFormat; // User setting
-
-    // If format is blank, grab system defaults
-    if (!format) {
-        const defaults = this.getDailyNoteSettings();
-        format = defaults.format || 'YYYY-MM-DD';
-        
-        // Only use system folder if user didn't specify one
-        if (!folder) {
-            folder = defaults.folder || '';
-        }
+        // Fallback
+        return { folder: '', format: 'YYYY-MM-DD' };
     }
 
-    const filename = date.format(format);
-    const normalizedFolder = folder ? folder.replace(/\/$/, '') : '';
-    const path = normalizedFolder ? `${normalizedFolder}/${filename}.md` : `${filename}.md`;
+    /**
+     * 2. New Helper: Calculate Target File Path
+     */
+    getGoalTargetFile(goal, date) {
+        let folder = goal.folder;     // User setting
+        let format = goal.dateFormat; // User setting
 
-    return this.app.vault.getAbstractFileByPath(path);
-}
+        // If format is blank, grab system defaults
+        if (!format) {
+            const defaults = this.getDailyNoteSettings();
+            format = defaults.format || 'YYYY-MM-DD';
+
+            // Only use system folder if user didn't specify one
+            if (!folder) {
+                folder = defaults.folder || '';
+            }
+        }
+
+        const filename = date.format(format);
+        const normalizedFolder = folder ? folder.replace(/\/$/, '') : '';
+        const path = normalizedFolder ? `${normalizedFolder}/${filename}.md` : `${filename}.md`;
+
+        return this.app.vault.getAbstractFileByPath(path);
+    }
 
 
     /**
      * Checks if a daily note exists.
      */
     async checkNoteCreated(goal, date) {
-    // Use the new helper, passing the FULL goal object
-    const file = this.getGoalTargetFile(goal, date);
-    const exists = file instanceof TFile;
-    return { isMet: exists, current: exists ? 1 : 0 };
-}
-
-   /* async checkNoteCreated(date, folderPath) {
-        const path = this.getDailyNotePath(date, folderPath);
-        const file = this.app.vault.getAbstractFileByPath(path);
+        // Use the new helper, passing the FULL goal object
+        const file = this.getGoalTargetFile(goal, date);
         const exists = file instanceof TFile;
         return { isMet: exists, current: exists ? 1 : 0 };
     }
-*/
+
+
     /**
      * Checks word count in a daily note.
      */
-    /*
-    async checkWordCount(date, folderPath, target) {
-        const path = this.getDailyNotePath(date, folderPath);
-        const file = this.app.vault.getAbstractFileByPath(path);
+    async checkWordCount(goal, date) {
+        // Use the new helper
+        const file = this.getGoalTargetFile(goal, date);
 
         if (!file || !(file instanceof TFile)) {
             return { isMet: false, current: 0 };
         }
 
         const content = await this.app.vault.read(file);
-        const contentBody = content.replace(/^---[\s\S]+?---/, ''); // Strip frontmatter
+        const contentBody = content.replace(/^---[\s\S]+?---/, '');
         const words = contentBody.trim().split(/\s+/).filter(w => w.length > 0).length;
 
-        return { isMet: words >= target, current: words };
+        return { isMet: words >= goal.target, current: words };
     }
-    */
-
-    async checkWordCount(goal, date) {
-    // Use the new helper
-    const file = this.getGoalTargetFile(goal, date);
-
-    if (!file || !(file instanceof TFile)) {
-        return { isMet: false, current: 0 };
-    }
-
-    const content = await this.app.vault.read(file);
-    const contentBody = content.replace(/^---[\s\S]+?---/, ''); 
-    const words = contentBody.trim().split(/\s+/).filter(w => w.length > 0).length;
-
-    return { isMet: words >= goal.target, current: words };
-}
-
 
     /**
      * Checks completed task count.
      */
+        /**
+     * Checks completed task count.
+     */
     checkTaskCount(date, allTasks, tagQuery, target) {
+        if (!allTasks) return { isMet: false, current: 0 };
+
+        const targetDateStart = date.clone().startOf('day');
+        const targetDateEnd = date.clone().endOf('day');
+
+        const completed = allTasks.filter(t => {
+            // 1. Check Status
+            // Supports 'x' (Obsidian) or 'DONE' (Dataview)
+            const isDone = t.status === 'x' || t.status === 'X' || t.status?.type === 'DONE';
+            if (!isDone) return false;
+
+            // 2. Resolve Completion Date
+            // t.completion: standard from your SettingsTab fetcher (moment object)
+            // t.done?.moment: Dataview Tasks
+            // t.completionDate: String or Date object
+            let completionDate = t.completion; // <--- FIX: Check this first!
+            
+            if (!completionDate) {
+                if (t.done?.moment) completionDate = t.done.moment;
+                else if (t.completionDate) completionDate = moment(t.completionDate);
+            }
+            
+            if (!completionDate) return false;
+
+            // 3. Check Date Range
+            const isSameDay = completionDate.isBetween(targetDateStart, targetDateEnd, null, '[]');
+
+            // 4. Check Tags
+            const matchesTag = tagQuery
+                ? (t.tags && t.tags.some(tag => tag.includes(tagQuery.replace('#', ''))))
+                : true;
+            
+            // Also check text for inline tags if t.tags array is missing
+            const textMatchesTag = tagQuery && !matchesTag && t.text
+                 ? t.text.includes(tagQuery)
+                 : false;
+
+            return isSameDay && (matchesTag || textMatchesTag);
+        });
+
+        return { isMet: completed.length >= target, current: completed.length };
+    }
+
+    /*checkTaskCount(date, allTasks, tagQuery, target) {
         if (!allTasks) return { isMet: false, current: 0 };
 
         const targetDateStart = date.clone().startOf('day');
@@ -392,7 +491,7 @@ getGoalTargetFile(goal, date) {
         });
 
         return { isMet: completed.length >= target, current: completed.length };
-    }
+    }*/
 
     getAchievementLevel(points) {
         const LEVEL_BANDS = [

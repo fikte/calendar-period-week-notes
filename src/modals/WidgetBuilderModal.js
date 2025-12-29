@@ -29,7 +29,6 @@ export class WidgetBuilderModal extends Modal {
             { value: 'bell', name: 'Bell' },
             { value: 'check', name: 'Check' },
             { value: 'check-check', name: 'Check Check' },
-            { value: 'check-line', name: 'Check Line' },
             { value: 'circle-question-mark', name: 'Circle Question Mark' },
             { value: 'flag', name: 'Flag' },
             { value: 'flag-off', name: 'Flag Off' },

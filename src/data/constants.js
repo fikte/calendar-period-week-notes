@@ -3,17 +3,18 @@ export const VIEW_TYPE_PERIOD = "calendar-period-week";
 
 export const DASHBOARDWIDGETS = {
     tasks: {
-        weeklyGoalPoints: { name: 'Weekly points score (Full)' },
-        goalStatusList: { name: 'Daily goals (Full)' },
-        goalStatusListCondensed: { name: 'Daily goals (Half-width)' },
-        weeklyGoalPointsCondensed: { name: 'Weekly momentum (Half-width)' },
-        today: { name: 'Today' },
-        tomorrow: { name: 'Tomorrow' },
-        next7days: { name: 'Next 7 days' },
-        futureNoDue: { name: 'Future / No due' },
-        upcomingoverdue: { name: 'Upcoming & overdue tasks' },
-        taskstatusoverview: { name: 'Task status overview' },
-        taskcompletionheatmap: { name: 'Task completion activity' },
+        weeklyGoalPoints: { name: 'Week goal momentum', size: 'medium' },
+        goalStatusList: { name: 'Daily goals', size: 'medium' },
+        goalStatusListCondensed: { name: 'Daily goals', size: 'small' },
+        weeklyGoalPointsCondensed: { name: 'Week goal momentum', size: 'small' },
+        swipeableMomentum: { name: 'Goal momentum', size: 'large' },
+        today: { name: 'Today', size: 'small' },
+        tomorrow: { name: 'Tomorrow', size: 'small' },
+        next7days: { name: 'Next 7 days', size: 'small' },
+        futureNoDue: { name: 'Future / No due', size: 'small' },
+        upcomingoverdue: { name: 'Upcoming & overdue tasks', size: 'medium' },
+        taskstatusoverview: { name: 'Task status overview', size: 'large' },
+        taskcompletionheatmap: { name: 'Task completion activity', size: 'medium' },
     },
     creation: {
         allfilesheatmap: { name: 'All files' },
@@ -22,6 +23,23 @@ export const DASHBOARDWIDGETS = {
         assetsheatmap: { name: 'Assets' }
     }
 };
+
+export const PINNED_HIGHLIGHT_COLORS = 
+    [
+        { id: 'red',    label: 'Red',    rgba: 'rgba(255,0,0,0.35)' },
+        { id: 'orange', label: 'Orange', rgba: 'rgba(255,165,0,0.35)' },
+        { id: 'yellow', label: 'Yellow', rgba: 'rgba(255,235,59,0.35)' },
+        { id: 'green',  label: 'Green',  rgba: 'rgba(76,175,80,0.35)' },
+        { id: 'blue',   label: 'Blue',   rgba: 'rgba(33,150,243,0.35)' },
+        { id: 'teal',   label: 'Teal',   rgba: 'rgba(0,150,136,0.35)' },
+        { id: 'purple', label: 'Purple', rgba: 'rgba(156,39,176,0.35)' },
+        { id: 'pink',   label: 'Pink',   rgba: 'rgba(233,30,99,0.35)' },
+        { id: 'brown',  label: 'Brown',  rgba: 'rgba(121,85,72,0.35)' },
+        { id: 'black',  label: 'Black',  rgba: 'rgba(0,0,0,0.35)' },
+        { id: 'gray',   label: 'Gray',   rgba: 'rgba(158,158,158,0.35)' },
+        { id: 'white',  label: 'White',  rgba: 'rgba(255,255,255,0.35)' },
+    ];
+
 
 // Define the default settings for the plugin. This object is used as a fallback and for resetting configurations.
 export const DEFAULT_SETTINGS = {
@@ -101,6 +119,9 @@ export const DEFAULT_SETTINGS = {
     pinnedNotesSortOrder: 'a-z', // can be 'a-z' or 'custom'
     pinnedNotesCustomOrder: [],  // Stores an array of note paths for custom order
 
+    pinnedNoteColorMode: 'row',    // 'row' | 'bar' | 'border' - update 23-12-2025 - just bar atm
+    pinnedNoteColorsByPath: {},    // { [file.path]: colorId }
+    
     //Assets 
     hiddenAssetTypes: "base,canvas",
     showUnusedAssetsIndicator: true,
@@ -149,7 +170,10 @@ export const DEFAULT_SETTINGS = {
     showTaskDot: false,
     taskDotColor: "rgba(200, 100, 200, 1)",
     taskBarChartDefaultMode: 'count',
-
+    taskLayout: 'default', 
+    taskLayoutId: 'default', // Current selection
+    customTaskLayout: null,
+    useSystemNotifications: false,
 
     // Task Dashboard Colors
     taskStatusColorOverdue: 'rgba(244, 21, 1, 0.5)',
@@ -260,10 +284,11 @@ export const DEFAULT_SETTINGS = {
         assetsheatmap: true,
     },
 
-    tasksDashboardOrder: ['goalStatusList', 'weeklyGoalPoints', 'goalStatusListCondensed', 'weeklyGoalPointsCondensed', 'today', 'tomorrow', 'next7days', 'futureNoDue', 'upcomingoverdue', 'taskcompletionheatmap', 'taskstatusoverview'],
+    tasksDashboardOrder: ['goalStatusList', 'weeklyGoalPoints', 'swipeableMomentum', 'goalStatusListCondensed', 'weeklyGoalPointsCondensed', 'today', 'tomorrow', 'next7days', 'futureNoDue', 'upcomingoverdue', 'taskcompletionheatmap', 'taskstatusoverview'],
     tasksDashboardWidgets: {
         goalStatusList: false,
         weeklyGoalPoints: false,
+        swipeableMomentum: false,
         goalStatusListCondensed: false,
         weeklyGoalPointsCondensed: false,
         today: true,
@@ -310,28 +335,35 @@ export const DEFAULT_SETTINGS = {
         }
     ],
     goalScoreHistory: {},
+    vacationRanges: [],
     vacationHistory: {},
     tasksStatsWidgets: [
         {
             widgetKey: 'weeklyGoalPoints',
-            widgetName: 'Weekly Goal Points',
+            widgetName: 'Weekly goal momentum (Full)',
             type: 'goal-widget'
         },
         {
             widgetKey: 'goalStatusList',
-            widgetName: 'Goal Status',
+            widgetName: 'Goal status',
             type: 'goal-widget'
         },
         {
             widgetKey: 'weeklyGoalPointsCondensed',
-            widgetName: 'Weekly Goal Points (Condensed)',
+            widgetName: 'Weekly goal points (Condensed)',
             type: 'goal-widget'
         },
         {
             widgetKey: 'goalStatusListCondensed',
-            widgetName: 'Goal Status (Condensed)',
+            widgetName: 'Goal status (Condensed)',
+            type: 'goal-widget'
+        },
+        {
+            widgetKey: 'swipeableMomentum',
+            widgetName: 'All goal momentum (Full)',
             type: 'goal-widget'
         }
+
     ]
     
 };

@@ -31,7 +31,8 @@ export class TaskDataAggregator {
             switch (metric) {
                 case 'completed':
                     dateToTest = task.completionDate;
-                    statusMatch = task.status === 'x';
+                    //statusMatch = task.status === 'x';
+                    statusMatch = task.status === 'x' || task.status === '-'; 
                     break;
                 case 'created':
                     dateToTest = task.createdDate;
