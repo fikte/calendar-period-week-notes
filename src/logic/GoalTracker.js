@@ -106,7 +106,7 @@ export class GoalTracker {
             return {
                 date: date.format('YYYY-MM-DD'),
                 totalPoints: 0,
-                breakdown: { goals: 0, allMet: 0, multiplier: 0, streak: 0 },
+                breakdown: { goals: 0, allMet: 0, multiplier: 0, streak: 0, status: 'vacation' },
                 results: pausedResults, // <--- RETURN THE LIST (not empty)
                 allMet: false,
                 level: 0,
@@ -118,7 +118,8 @@ export class GoalTracker {
         const isoKey = date.format('YYYY-MM-DD');
         const todayStart = moment().startOf('day');
         const dateStart = date.clone().startOf('day');
-        const canUseCache = dateStart.isBefore(todayStart, 'day');
+        const threeDaysAgo = moment().startOf('day').subtract(3, 'days');
+        const canUseCache = dateStart.isBefore(threeDaysAgo, 'day');
 
         // Return cached snapshot if available
         if (canUseCache &&
@@ -140,13 +141,15 @@ export class GoalTracker {
             goals: 0,
             allMet: 0,
             multiplier: 0,
-            streak: 0
+            streak: 0,
+            status: 'active'
         };
 
         const results = [];
         const weekdayIndex = date.isoWeekday() - 1;
         let activeGoalsCount = 0;
         let metGoalsCount = 0;
+        let anyGoalOnVacation = false;
 
         //const activeGoals = (this.settings.goals || []).filter(g => !!g.enabled);
 
@@ -159,6 +162,8 @@ export class GoalTracker {
             
             // Individual goal vacation (manual toggle on the goal itself)
             const isIndividualVacation = !!vacationForDay[goal.id] || !!goal.vacationMode === true;
+
+            if (isIndividualVacation) anyGoalOnVacation = true;
 
             // Save individual vacation state to history if active today
             if (isScheduledDay && goal.vacationMode) {
@@ -217,10 +222,16 @@ export class GoalTracker {
             });
         }
 
-        // Mercy Rule: Don't go below zero for the day
+        if (activeGoalsCount === 0 && anyGoalOnVacation) {
+            breakdown.status = 'vacation';
+        } else if (activeGoalsCount === 0) {
+            breakdown.status = 'inactive';
+        }
+
+        // Mercy Rule: Only minus max of -10 points if no goals met for the day. 
         if (metGoalsCount === 0 && totalPoints < 0) {
-            totalPoints = 0;
-            breakdown.goals = 0; 
+            totalPoints = -10;
+            breakdown.goals = -10; 
         }
 
         // 2. "All Goals Met" Daily Bonus

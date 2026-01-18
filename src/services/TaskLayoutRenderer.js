@@ -61,38 +61,39 @@ export class TaskLayoutRenderer {
         grid.style.width = '100%';
 
         if (layout.items) {
+            // TaskLayoutRenderer.js - Main forEach loop
             layout.items.forEach(config => {
-                const area = grid.createDiv({ cls: `cpwn-area-${config.area}` });
-                area.style.gridArea = config.area;
+                const isFlow = !!config.isFlow;
+                const area = grid.createDiv({
+                    cls: `cpwn-area-${config.area} ${isFlow ? 'is-flow' : ''}`
+                });
 
+                area.style.gridArea = config.area;
+                // CRITICAL: Must be display: flex for gap and flexWrap to work
+                area.style.display = 'flex';
+                area.style.minWidth = '0';
+                area.style.width = '100%';
+
+                if (isFlow) {
+                    area.style.flexDirection = 'row';
+                    area.style.flexWrap = 'wrap';
+                    // Hands alignment control to the individual children (Title, Date, etc.)
+                    area.style.alignItems = 'initial';
+                    area.style.gap = '4px 8px';
+                } else {
+                    area.style.flexDirection = config.flow || 'row';
+                    area.style.alignItems = config.align || 'center';
+                    area.style.gap = '6px';
+                }
+
+                // Grid cell alignment (alignment of the area within the grid)
                 if (config.align) area.style.alignSelf = config.align;
                 if (config.justify) area.style.justifySelf = config.justify;
 
-                area.style.display = 'flex';
-                area.style.flexDirection = config.flow || 'row';
-                area.style.gap = '6px';
-
-                // Ensure areas can shrink
-                area.style.minWidth = '0';
-                area.style.maxWidth = '100%';
-
-                // Default internal alignment
-                const internalAlign = config.align || 'center';
-                area.style.alignItems = internalAlign;
-
-                // Apply area-level text styles so children inherit them (e.g. muted/small)
                 this.applyStyles(area, config);
 
                 if (config.items && Array.isArray(config.items)) {
-                    // CHANGED: Create a merged config that includes global options
-                    // 'options' is defined earlier in your render method (const options = layout.options || ...)
-                    const contextConfig = {
-                        ...config,
-                        ...options // This injects colorCheckboxByPriority
-                    };
-
-                    // Pass contextConfig instead of just config
-                    this.renderItems(area, config.items, data, contextConfig);
+                    this.renderItems(area, config.items, data, { ...config, ...options });
                 }
             });
         }
@@ -125,6 +126,9 @@ export class TaskLayoutRenderer {
         visibleItems.forEach((visibleEntry, index) => {
             const { item, type, itemConfig } = visibleEntry;
 
+            const isFlow = !!areaConfig.isFlow;
+            //const canBeInline = !['title', 'subgrid'].includes(type);
+
             const config = {
                 textStyle: itemConfig.textStyle || areaConfig.textStyle,
                 fontSize: itemConfig.fontSize || areaConfig.fontSize,
@@ -132,13 +136,27 @@ export class TaskLayoutRenderer {
                 ...itemConfig
             };
 
+            //if (isFlow) {
+            // DEFINITIVE FIX 4: Every single child item must be inline
+            //    config.style = (config.style || '') + '; display: inline !important; width: auto !important;';
+            //}
+
+            if (isFlow) {
+                if (type === 'title') {
+                    config.style = (config.style || '') + '; display: inline !important;';
+                } else {
+                    // REMOVE 'vertical-align: baseline' from here! 
+                    // Let applyStyles handle the alignment from the user's config.
+                    config.style = (config.style || '') + '; display: inline-flex !important;';
+                }
+            }
+
             if (areaConfig.colorCheckboxByPriority) {
                 config.colorCheckboxByPriority = true;
             }
 
             // --- SMART SEPARATOR HIDING ---
             if (type === 'separator') {
-                
                 if (itemConfig.forceDisplay) {
                     this.renderSeparator(container, config);
                     return;
@@ -151,15 +169,18 @@ export class TaskLayoutRenderer {
                 if (isBracket) {
                     if (['(', '[', '{', '<'].includes(txt)) {
                         const next = visibleItems[index + 1];
-                        if (!next || next.type === 'separator' || next.type === 'spacer') return;
+                        // Content is valid if it's NOT a separator/spacer
+                        const hasNextContent = next && !['separator', 'spacer'].includes(next.type);
+                        if (!hasNextContent) return;
                     }
                     if ([')', ']', '}', '>'].includes(txt)) {
                         const prev = visibleItems[index - 1];
-                        if (!prev || prev.type === 'separator' || prev.type === 'spacer') return;
+                        // Content is valid if it's NOT a separator/spacer
+                        const hasPrevContent = prev && !['separator', 'spacer'].includes(prev.type);
+                        if (!hasPrevContent) return;
                     }
                 }
-                // 2. NEW: Logic for General Separators (like the dash '-')
-                // These should only show if they have valid data on BOTH sides
+                // 2. Logic for General Separators (Preserved Exactly)
                 else {
                     const prev = visibleItems[index - 1];
                     const next = visibleItems[index + 1];
@@ -172,6 +193,8 @@ export class TaskLayoutRenderer {
                 }
             }
 
+
+
             switch (type) {
                 case 'checkbox': this.renderCheckbox(container, data, config); break;
                 case 'priority': this.renderPriority(container, data, config); break;
@@ -193,64 +216,31 @@ export class TaskLayoutRenderer {
             }
         });
     }
-
-    /*
-    renderItems(container, items, data, areaConfig = {}) {
-      
-        items.forEach(item => {
-            const type = typeof item === 'string' ? item : item.type;
-            const itemConfig = typeof item === 'object' ? item : {};
-
-            // Merge item config with area config, but item config takes precedence
-            const config = {
-                textStyle: itemConfig.textStyle || areaConfig.textStyle,
-                fontSize: itemConfig.fontSize || areaConfig.fontSize,
-                color: itemConfig.color || areaConfig.color,
-                ...itemConfig
-            };
-
-            if (areaConfig.colorCheckboxByPriority) {
-                config.colorCheckboxByPriority = true;
-            }
-
-            switch (type) {
-                case 'checkbox': this.renderCheckbox(container, data, config); break;
-                case 'priority': this.renderPriority(container, data, config); break;
-                case 'title': this.renderTitle(container, data, config); break;
-                case 'tags': this.renderTags(container, data, config); break;
-                case 'due_date': this.renderDueDate(container, data, config); break;
-                case 'start_date': this.renderStartDate(container, data, config); break;
-                case 'scheduled_date': this.renderScheduledDate(container, data, config); break;
-                case 'alert': this.renderAlert(container, data, config); break;
-                case 'container': this.renderContainer(container, config, data); break;
-                case 'subgrid': this.renderSubgrid(container, itemConfig, data, config); break;
-                case 'spacer': this.renderSpacer(container, config); break;
-                case 'completion_date': this.renderCompletionDate(container, data, config); break;
-                case 'recurrence': this.renderRecurrence(container, data, config); break;
-                case 'id': this.renderId(container, data, config); break;
-                case 'depends_on': this.renderDependsOn(container, data, config); break;
-                case 'source': this.renderSource(container, data, config); break;
-                case 'separator': this.renderSeparator(container, config); break;
-
-            }
-        });
-    }
-    */
 
     renderContainer(parent, config, data) {
-        const wrapper = parent.createDiv({ cls: 'cpwn-nested-container' });
+        const isFlow = !!config.isFlow;
 
-        wrapper.style.display = 'flex';
-        wrapper.style.flexDirection = config.flow || 'row';
-        wrapper.style.alignItems = config.align || 'center';
-        wrapper.style.justifyContent = config.justify || 'flex-start';
-        wrapper.style.gap = config.gap || '6px';
+        // CHANGE: Create a span for flow, and a div for standard flex rows
+        const wrapper = isFlow
+            ? parent.createSpan({ cls: 'cpwn-nested-container is-flow' })
+            : parent.createDiv({ cls: 'cpwn-nested-container' });
 
-        // CRITICAL: allow spacer to use the whole line
-        wrapper.style.width = '100%';
-        wrapper.style.minWidth = '0';
-        // wrapper.style.boxSizing = 'border-box';
-        wrapper.style.paddingRight = '4px';
+        if (isFlow) {
+            // In flow mode, we want the container to not force a line break
+            wrapper.style.display = 'inline';
+            wrapper.style.width = 'auto';
+        } else {
+            // Standard behavior: preserve your original flex logic
+            wrapper.style.display = 'flex';
+            wrapper.style.flexDirection = config.flow || 'row';
+            wrapper.style.alignItems = config.align || 'center';
+            wrapper.style.justifyContent = config.justify || 'flex-start';
+            wrapper.style.gap = config.gap || '6px';
+            wrapper.style.width = '100%';
+            wrapper.style.minWidth = '0';
+        }
+
+
 
         if (config.indent) {
             // Apply a padding-left that matches the standard offset
@@ -314,34 +304,46 @@ export class TaskLayoutRenderer {
         }
     }
 
-    // --- Render Components ---
     renderTitle(parent, data, config = {}) {
+        // 1. Identify context
+        const isFlow = parent.hasClass('is-flow') || parent.closest('.is-flow');
         const wrapper = parent.createDiv({ cls: 'cpwn-task-title-wrapper' });
 
+        // 2. Original Alignment Logic
         if (config.align) wrapper.style.alignSelf = config.align;
 
-        // Styles for completed tasks
+        // 3. Original DONE status logic
         if (data.status.type === 'DONE') {
             wrapper.addClass('cpwn-text-muted');
             wrapper.style.opacity = '0.7';
             wrapper.addClass('is-completed');
         }
 
-        // Apply custom builder styles (font size, color, opacity)
+        // 4. Original Custom Styles (Font, Color, etc.)
         this.applyStyles(wrapper, config);
 
-        // --- TRUNCATION LOGIC ---
-        // Apply truncation if enabled in global settings
-        if (this.view?.plugin?.settings?.taskTextTruncate) {
-            wrapper.addClass('cpwn-truncate-text');
-            wrapper.title = data.cleanText; // Tooltip to show full text on hover
+        if (isFlow) {
+            // DEFINITIVE FIX 2: Wrapper must be inline
+            wrapper.style.display = 'inline';
+            wrapper.style.width = 'auto';
+            wrapper.style.marginRight = '4px';
         }
 
         const component = this.view || this.plugin;
         if (component) {
-            MarkdownRenderer.render(this.app, data.cleanText, wrapper, data.path, component);
+            MarkdownRenderer.render(this.app, data.cleanText, wrapper, data.path, component).then(() => {
+                if (isFlow) {
+                    const p = wrapper.querySelector('p');
+                    if (p) {
+                        // DEFINITIVE FIX 3: Generated p-tag must be inline
+                        p.style.display = 'inline';
+                        p.style.margin = '0';
+                    }
+                }
+            });
         }
     }
+
 
     renderCheckbox(parent, data, config = {}) {
         const symbol = data.status.symbol || ' ';
@@ -388,13 +390,13 @@ export class TaskLayoutRenderer {
 
     renderPriority(parent, data, config = {}) {
         if (data.priority === 2) return;
-
+        const isFlow = parent.hasClass('is-flow') || !!parent.closest('.is-flow');
         const pEl = parent.createSpan({ cls: 'cpwn-priority-icon' });
-        this.applyStyles(pEl, config);
+        this.applyStyles(pEl, config, isFlow);
 
-        if (config.align) {
-            pEl.style.alignSelf = config.align;
-        }
+        //if (config.align) {
+        //    pEl.style.alignSelf = config.align;
+        //}
 
         const map = {
             0: { icon: 'chevrons-up', color: 'var(--text-error)' },
@@ -413,13 +415,17 @@ export class TaskLayoutRenderer {
 
     renderTags(parent, data, config = {}) {
         if (!data.tags || !data.tags.length) return;
+        const isFlow = parent.hasClass('is-flow') || !!parent.closest('.is-flow');
 
         // 1. Create Container
         const container = parent.createSpan({ cls: 'cpwn-tags-container' });
 
         // Apply container-level alignment config
-        if (config.align) container.style.alignSelf = config.align;
-        if (config.justify) container.style.justifyContent = config.justify;
+        //if (config.align) container.style.alignSelf = config.align;
+        //if (config.justify) container.style.justifyContent = config.justify;
+        this.applyStyles(container, config, isFlow);
+        container.style.display = 'inline-flex';
+        container.style.gap = '4px';
 
         // 3. Render Each Tag
         data.tags.forEach(tag => {
@@ -491,6 +497,7 @@ export class TaskLayoutRenderer {
      * @param {object} options - Overrides for specific styling (gap, iconSize).
      */
     renderDateBadge(parent, text, iconName, className, config, options = {}) {
+        // PRESERVED: Original options destructuring
         const {
             iconSize,
             gap,
@@ -499,30 +506,46 @@ export class TaskLayoutRenderer {
 
         const badge = parent.createSpan({ cls: `${className} cpwn-date-badge` });
 
-        // ONLY set dynamic things like 'gap' (if variable) or 'color' here.
-        badge.style.gap = gap;
+        // 1. Set the display type for the badge
+        badge.style.display = 'inline-flex';
 
-        if (gap) badge.style.gap = gap;
+        // PRESERVED: Original gap logic
+        badge.style.gap = gap || '2px';
 
-        // Apply alignment and user-defined colors/styles
+        // 2. NEW: Respect User's Alignment choice internally
+        if (config.align) {
+            const internalMap = {
+                'center': 'center',
+                'start': 'flex-start',
+                'end': 'flex-end',
+                'baseline': 'baseline'
+            };
+            badge.style.alignItems = internalMap[config.align] || 'center';
+        }
+
+        // 3. PRESERVED & FIXED: Apply alignment and user-defined colors/styles
+        // Passing true as the third argument to applyStyles (if you updated it) 
+        // or relying on its internal logic to handle the vertical-align mapping.
         if (config.align) badge.style.alignSelf = config.align;
         this.applyStyles(badge, config);
 
-        // Icon Container
+        // 4. PRESERVED: Icon Container logic
         const iconSpan = badge.createSpan({ cls: 'cpwn-meta-icon' });
         iconSpan.style.display = 'inline-flex';
-        iconSpan.style.fontSize = iconFontSize; // Reset font context
 
-        // Only set manual dimensions if passed in options
+        // PRESERVED: Reset font context for the icon
+        iconSpan.style.fontSize = iconFontSize;
+
+        // PRESERVED: Manual dimensions if passed in options
         if (iconSize) {
             iconSpan.style.height = iconSize;
             iconSpan.style.width = iconSize;
         }
 
+        // 5. PRESERVED: Final Icon and Text rendering
         setIcon(iconSpan, iconName);
         badge.createSpan({ text: text });
     }
-
 
     renderDueDate(parent, data, config = {}) {
         let dateMoment = null;
@@ -608,14 +631,42 @@ export class TaskLayoutRenderer {
         this.renderDateBadge(parent, displayText, 'bell', 'cpwn-alert-badge', config, { gap: '3px' });
     }
 
+
     renderRecurrence(parent, data, config = {}) {
         if (!data.recurrence) return;
-
+        const isFlow = parent.hasClass('is-flow') || parent.closest('.is-flow');
         const el = parent.createSpan({ cls: 'cpwn-recurrence' });
+
+        // 1. Set display and wrap behavior
+        el.style.display = 'inline-flex';
+        el.style.gap = '4px';
+        el.style.whiteSpace = 'nowrap';
+
+        // 2. Map User choice to INTERNAL alignment (Icon vs Text)
+        if (config.align) {
+            const internalMap = {
+                'center': 'center',
+                'start': 'flex-start',
+                'end': 'flex-end',
+                'baseline': 'baseline'
+            };
+            el.style.alignItems = internalMap[config.align] || 'center';
+        }
+
+        // 3. Map User choice to EXTERNAL alignment (Badge vs Task Row)
+        // applyStyles handles the vertical-align/align-self mapping automatically
         this.applyStyles(el, config);
-        setIcon(el.createSpan({ cls: 'cpwn-meta-icon' }), 'rotate-cw');
+
+        const iconSpan = el.createSpan({ cls: 'cpwn-meta-icon' });
+        iconSpan.style.display = 'inline-flex';
+        // REMOVED: hardcoded verticalAlign: 'middle'
+
+        setIcon(iconSpan, 'rotate-cw');
         el.createSpan({ text: data.recurrence });
     }
+
+
+
 
     renderDependsOn(parent, data, config = {}) {
         if (!data.dependsOn || data.dependsOn.length === 0) return;
@@ -632,12 +683,17 @@ export class TaskLayoutRenderer {
 
     renderId(parent, data, config = {}) {
         if (!data.id) return;
-
+        const isFlow = parent.hasClass('is-flow') || !!parent.closest('.is-flow');
         const el = parent.createSpan({ cls: 'cpwn-task-id' });
-        this.applyStyles(el, config);
+
+        el.style.display = 'inline-flex';
+        el.style.alignItems = 'center'; // Internal alignment
+
+        this.applyStyles(el, config, isFlow);
 
         // Icon: Fingerprint (or use 'hash')
         const iconSpan = el.createSpan({ cls: 'cpwn-meta-icon' });
+        iconSpan.style.display = 'inline-flex';
         setIcon(iconSpan, 'fingerprint'); // 'hash' is another good option
 
         // Text
@@ -688,58 +744,72 @@ export class TaskLayoutRenderer {
     }
 
     renderSeparator(parent, config = {}) {
+        const isFlow = parent.hasClass('is-flow') || parent.closest('.is-flow');
         const el = parent.createSpan({
             cls: 'cpwn-layout-separator',
             text: config.text || '-'
         });
 
         el.style.whiteSpace = 'pre-wrap';
-        el.style.flexShrink = '0';
+
+        if (isFlow) {
+            // Fix 1: True inline behavior
+            el.style.display = 'inline';
+            el.style.width = 'auto';
+            el.style.margin = '1px'; // DISABLE NEGATIVE MARGINS FOR FLOW
+        } else {
+            el.style.display = 'inline-flex';
+            el.style.flexShrink = '1px';
+        }
 
         this.applyStyles(el, config);
-
         if (config.align) el.style.alignSelf = config.align;
 
-        // --- NEW LOGIC: SMART TIGHTENING ---
-        // If the user hasn't manually set a style that overrides margins...
-        if (!config.style || !config.style.includes('margin')) {
-
-            // If it's an OPEN bracket, pull the NEXT item closer (margin-right)
-            // or effectively, pull itself to the right.
-            // Actually, in flex gap, negative margins work to "eat" the gap.
-
-            // Assume the parent row has a gap of ~6px or 8px.
-            // A negative margin of -4px or -5px usually closes the visual gap nicely.
-
-            const txt = (config.text || '');
-
-            if (['(', '[', '{', '<'].includes(txt.trim())) {
-                if (!txt.endsWith(' ')) {
-                    el.style.marginRight = '-5px';
+        // Fix 2: Wrap your tightening logic in an !isFlow check
+        if (!isFlow) {
+            if (!config.style || !config.style.includes('margin')) {
+                const txt = (config.text || '');
+                if (['(', '[', '{', '<'].includes(txt.trim())) {
+                    if (!txt.endsWith(' ')) el.style.marginRight = '-5px';
                 }
-            }
-
-            // Close Bracket: Tighten Left (margin-left) -> Only if NO leading space
-            if ([')', ']', '}', '>', ',', ';'].includes(txt.trim())) {
-                if (!txt.startsWith(' ')) {
-                    el.style.marginLeft = '-5px';
+                if ([')', ']', '}', '>', ',', ';'].includes(txt.trim())) {
+                    if (!txt.startsWith(' ')) el.style.marginLeft = '-5px';
                 }
-            }
-
-            if (['|', '-', '/'].includes(txt)) {
-                // Standard separators might want normal spacing, do nothing.
             }
         }
     }
 
 
+
     // --- Helper to Apply Styles ---
-    applyStyles(el, config) {
+    applyStyles(el, config, isFlowOverride = null) {
         if (!config.color && config.textStyle) {
             el.addClass(`cpwn-text-${config.textStyle}`);
         }
         if (config.fontSize) {
             el.addClass(`cpwn-font-${config.fontSize}`);
+        }
+
+        if (config.align) {
+            // Use the override if provided, otherwise fallback to DOM check
+            const isFlow = isFlowOverride !== null
+                ? isFlowOverride
+                : (el.hasClass('is-flow') || !!el.closest('.is-flow'));
+
+            if (isFlow) {
+                const alignMap = {
+                    'center': 'middle',
+                    'start': 'top',
+                    'end': 'bottom',
+                    'baseline': 'baseline'
+                };
+                el.style.verticalAlign = alignMap[config.align] || config.align;
+                // Ensure alignSelf doesn't interfere
+                el.style.alignSelf = 'auto';
+            } else {
+                el.style.alignSelf = config.align;
+                el.style.verticalAlign = 'normal';
+            }
         }
 
         if (config.color) {
@@ -754,6 +824,8 @@ export class TaskLayoutRenderer {
         if (config.opacity) {
             el.style.opacity = config.opacity;
         }
+
+
 
         if (config.style) {
             // We MUST append to existing styles to avoid breaking display:flex/grid

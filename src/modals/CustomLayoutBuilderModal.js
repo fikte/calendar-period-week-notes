@@ -61,6 +61,7 @@ export class CustomLayoutBuilderModal extends Modal {
                         this.rows[key].align = rowConfig.align || 'center';
                         this.rows[key].justify = rowConfig.justify || 'start';
                         this.rows[key].indent = rowConfig.indent || false;
+                        this.rows[key].isFlow = rowConfig.isFlow || false;
                     }
                 });
             }
@@ -69,10 +70,12 @@ export class CustomLayoutBuilderModal extends Modal {
 
     onOpen() {
         const { contentEl } = this;
+        this.modalEl.addClass('cpwn-custom-layout-modal');
+
         contentEl.empty();
         contentEl.addClass('cpwn-layout-builder');
 
-        contentEl.createEl('h2', { text: 'Custom Layout Builder' });
+        contentEl.createEl('h2', { text: 'Custom layout builder' });
         contentEl.createEl('p', {
             text: 'Drag items to rows. Click any item to edit style or remove it.',
             cls: 'setting-item-description'
@@ -110,14 +113,14 @@ export class CustomLayoutBuilderModal extends Modal {
     renderSidebar(parent) {
         const sidebar = parent.createDiv({ cls: 'cpwn-builder-sidebar' });
 
-        sidebar.createEl('h4', { text: 'Layout Options' });
+        sidebar.createEl('h4', { text: 'Layout options' });
 
         const optionsContainer = sidebar.createDiv({ cls: 'cpwn-sidebar-options' });
         optionsContainer.style.marginBottom = '20px'; // Spacing
 
         // Create Toggle
         new Setting(optionsContainer)
-            .setName('Color Checkbox by Priority')
+            .setName('Color checkbox by priority')
             .setDesc('Tint the checkbox border based on task priority')
             .addToggle(toggle => {
                 toggle
@@ -217,6 +220,31 @@ export class CustomLayoutBuilderModal extends Modal {
         });
         justifySelect.onchange = (e) => this.rows[rowKey].justify = e.target.value;
 
+        const flowLabel = controls.createEl('label', {
+            cls: 'cpwn-flow-label',
+            style: 'display:flex; align-items:center; font-size:11px; margin-right:8px; gap:4px; cursor:pointer;'
+        });
+
+        const flowCb = flowLabel.createEl('input', { type: 'checkbox' });
+        flowCb.checked = this.rows[rowKey].isFlow === true;
+        flowCb.onchange = (e) => {
+            this.rows[rowKey].isFlow = e.target.checked;
+
+            // 2. Re-render the visual items for this specific zone
+            this.renderZoneItems(zone, rowKey);
+
+            // 3. Trigger the preview update (if your system uses this.updatePreview)
+            // Make sure to add a safety check if tempLayout exists
+            if (this.tempLayout && this.tempLayout.items) {
+                const areaConfig = this.tempLayout.items.find(area => area.area === rowKey);
+                if (areaConfig) {
+                    areaConfig.isFlow = e.target.checked;
+                }
+            }
+        };
+
+        flowLabel.createSpan({ text: 'Flow' });
+
         // Vertical Align
         const alignSelect = controls.createEl('select', { cls: 'cpwn-align-select' });
         alignSelect.title = "Vertical Alignment";
@@ -224,7 +252,7 @@ export class CustomLayoutBuilderModal extends Modal {
             { v: 'center', l: 'Middle' },
             { v: 'start', l: 'Top' },
             { v: 'end', l: 'Bottom' },
-            { v: 'baseline', l: 'Text Base' }
+            { v: 'baseline', l: 'Text base' }
         ].forEach(o => {
             const opt = alignSelect.createEl('option', { text: o.l, value: o.v });
             if (this.rows[rowKey].align === o.v) opt.selected = true;
@@ -285,33 +313,6 @@ export class CustomLayoutBuilderModal extends Modal {
             // let newIndex;
             let newIndex = afterElement ? siblings.indexOf(afterElement) : this.rows[rowKey].items.length;
 
-            /* if (afterElement) {
-                 // The DOM elements in 'siblings' map 1:1 to the array BEFORE the move? 
-                 // Actually, since we are in the drop event, the DOM reflects the state BEFORE the drop.
-                 // But if we are moving within the SAME row, we just removed the item from the array above.
-                 // We need to be careful with indices.
- 
-                 // Simplest robust way: Get the index of the 'afterElement' in the CURRENT (stale) DOM
-                 const siblingIndex = siblings.indexOf(afterElement);
- 
-                 // If we moved from the SAME row and the original index was LESS than this sibling index,
-                 // the indices effectively shift down by 1 because we removed the item.
-                 // However, simple insertion usually works if we just rely on the visual target.
-                 newIndex = siblingIndex;
- 
-                 // Correction for same-row move:
-                 // If I drag item at index 0 to index 2, I removed 0. The item formerly at 1 is now at 0.
-                 // If I drop before item formerly at 2 (now 1), I insert at 1.
-                 // This logic holds up generally without complex math if we just trust the visual "insert before".
- 
-                 // IMPORTANT: If dragging from same row, and we are dropping "after" ourselves, 
-                 // the "afterElement" might be the item itself or we might have issues. 
-                 // But since we remove visually only after render, let's stick to basic insertion.
-             } else {
-                 // No element found after cursor -> append to end
-                 newIndex = this.rows[rowKey].items.length;
-             }*/
-
             // --- STEP 3: Insert & Render ---
             // Insert at specific index
             this.rows[rowKey].items.splice(newIndex, 0, itemToMove);
@@ -326,8 +327,6 @@ export class CustomLayoutBuilderModal extends Modal {
                 if (otherZone) this.renderZoneItems(otherZone, data.originalRow);
             }
         });
-
-
     }
 
     // 1. Helper to close existing popups (PREVENTS CRASHES)
@@ -452,8 +451,6 @@ export class CustomLayoutBuilderModal extends Modal {
             });
         });
     }
-
-
 
     openStylePopover(item, targetEl, onUpdate) {
         // 1. Close existing
@@ -806,7 +803,7 @@ export class CustomLayoutBuilderModal extends Modal {
     saveAndClose() {
         const newConfig = {
             id: 'custom',
-            name: 'Custom Layout',
+            name: 'Custom layout',
             // 1. Define the main 3-column grid
             gridTemplate: '"checkbox content meta"',
             // 2. Force content to take ALL available space
@@ -843,14 +840,18 @@ export class CustomLayoutBuilderModal extends Modal {
 
 
     buildRowConfig(rowState) {
+        const isFlow = !!rowState.isFlow;
+
         return {
             type: 'container',
             flow: 'row',
             align: rowState.align,
             justify: rowState.justify,
             indent: rowState.indent,
+            isFlow: isFlow,
             gap: '6px',
-            style: 'width: 100%;', // Keeps the container full width
+            style: isFlow ? '' : 'width: 100%;',
+            //style: 'width: 100%;', // Keeps the container full width
             items: rowState.items.map(item => {
                 if (item.type === 'spacer') {
                     // FORCE the style in the JSON.

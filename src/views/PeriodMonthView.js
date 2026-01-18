@@ -4,6 +4,7 @@ import {
     debounce,
     TFile,
     TFolder,
+    Menu,
     Notice,
     MarkdownRenderer,
     setIcon,
@@ -742,9 +743,32 @@ export class PeriodMonthView extends ItemView {
         if (showTitle) {
             titleEl.addEventListener('click', () => {
                 const todayCell = heatmapContainer.querySelector('.cpwn-heatmap-today-cell');
-                if (todayCell) {
+                /*if (todayCell) {
                     const scrollPos = todayCell.offsetLeft - (heatmapContainer.offsetWidth / 2) + (todayCell.offsetWidth / 2);
                     heatmapContainer.scrollLeft = scrollPos;
+                }*/
+                if (todayCell) {
+                    // Calculate max possible scroll (rightmost edge)
+                    const maxScrollLeft = heatmapContainer.scrollWidth - heatmapContainer.clientWidth;
+                    
+                    // Calculate where 'today' is physically located in the big grid
+                    const todayLeft = todayCell.offsetLeft;
+                    
+                    // We want 'today' to be, say, 100px from the right edge of the VISIBLE container
+                    // Formula: ScrollPos = (Today's Position) - (Container Width) + (Desired Padding from Right)
+                    // Let's say we want 2 weeks (~40px) padding from the right:
+                    let targetScroll = todayLeft - heatmapContainer.clientWidth + 45; 
+
+                    // Clamp it: Can't scroll past the actual end (maxScrollLeft)
+                    // But also ensure we don't underscroll if there's plenty of future space
+                    if (targetScroll > maxScrollLeft) targetScroll = maxScrollLeft;
+                    if (targetScroll < 0) targetScroll = 0;
+
+                    // CHANGE: Use scrollTo with smooth behavior
+                    heatmapContainer.scrollTo({
+                        left: targetScroll,
+                        behavior: 'smooth'
+                    });
                 }
             });
         }
@@ -977,13 +1001,36 @@ export class PeriodMonthView extends ItemView {
 
         window.setTimeout(() => {
             const todayCell = grid.querySelector('.cpwn-heatmap-today-cell');
+            
+            
+             if (todayCell) {
+                // Calculate max possible scroll (rightmost edge)
+                const maxScrollLeft = heatmapContainer.scrollWidth - heatmapContainer.clientWidth;
+                
+                // Calculate where 'today' is physically located in the big grid
+                const todayLeft = todayCell.offsetLeft;
+                
+                // We want 'today' to be, say, 100px from the right edge of the VISIBLE container
+                // Formula: ScrollPos = (Today's Position) - (Container Width) + (Desired Padding from Right)
+                // Let's say we want 2 weeks (~40px) padding from the right:
+                let targetScroll = todayLeft - heatmapContainer.clientWidth + 45; 
+
+                // Clamp it: Can't scroll past the actual end (maxScrollLeft)
+                // But also ensure we don't underscroll if there's plenty of future space
+                if (targetScroll > maxScrollLeft) targetScroll = maxScrollLeft;
+                if (targetScroll < 0) targetScroll = 0;
+
+                heatmapContainer.scrollLeft = targetScroll;
+            }
+            /*
             if (todayCell) {
                 const scrollPos = todayCell.offsetLeft - (heatmapContainer.offsetWidth / 2) + (todayCell.offsetWidth / 2);
                 heatmapContainer.scrollLeft = scrollPos;
             } else {
                 heatmapContainer.scrollLeft = heatmapContainer.scrollWidth;
-            }
-        }, 100);
+            }*/
+            
+        }, 150);
 
         // --- 3. INITIAL PAINT ---
         // We built the grid, now we apply the colors/counts using the helper.
@@ -1063,61 +1110,130 @@ export class PeriodMonthView extends ItemView {
 
         // 3. Execute Update (Partial vs Full)
         if (targetDates.length > 0) {
-            // --- SURGICAL UPDATE  ---
             targetDates.forEach(dateKey => {
                 const cell = widgetContainer.querySelector(`.cpwn-heatmap-cell[data-date="${dateKey}"]`);
                 if (cell) {
-                    this._updateSingleCellVisuals(cell, dateKey, mainMap, colorSource, options);
+                    // CHANGE: Pass widgetKey as the last argument
+                    this._updateSingleCellVisuals(cell, dateKey, mainMap, colorSource, options, widgetKey);
                 }
             });
         } else {
-            // --- FULL UPDATE (Fallback if no file provided or cold start) ---
+            // --- FULL UPDATE ---
             const cells = widgetContainer.querySelectorAll('.cpwn-heatmap-cell');
             cells.forEach(cell => {
                 const dateKey = cell.dataset.date;
                 if (dateKey) {
-                    this._updateSingleCellVisuals(cell, dateKey, mainMap, colorSource, options);
+                    // CHANGE: Pass widgetKey as the last argument
+                    this._updateSingleCellVisuals(cell, dateKey, mainMap, colorSource, options, widgetKey);
                 }
             });
         }
+        // --- SURGICAL UPDATE  ---
+        /*targetDates.forEach(dateKey => {
+            const cell = widgetContainer.querySelector(`.cpwn-heatmap-cell[data-date="${dateKey}"]`);
+            if (cell) {
+                this._updateSingleCellVisuals(cell, dateKey, mainMap, colorSource, options, widgetKey);
+            }
+        });
+    } else {
+        // --- FULL UPDATE (Fallback if no file provided or cold start) ---
+        const cells = widgetContainer.querySelectorAll('.cpwn-heatmap-cell');
+        cells.forEach(cell => {
+            const dateKey = cell.dataset.date;
+            if (dateKey) {
+                this._updateSingleCellVisuals(cell, dateKey, mainMap, colorSource, options, widgetKey);
+            }
+        });
+    }*/
     }
 
     /**
      * Helper to update the visuals of a single heatmap cell.
      */
-    _updateSingleCellVisuals(cell, dateKey, mainMap, colorSource, options) {
-        const filesOnDay = mainMap.get(dateKey);
-        const count = filesOnDay ? filesOnDay.length : 0;
-
+    _updateSingleCellVisuals(cell, dateKey, mainMap, colorSource, options, widgetKey) {
         let finalColor = '';
+        let countForColor = 0;
+        let colorGradient = colorSource;
+        let hasData = false;
 
-        if (count > 0) {
-            let countForColor = count;
-            let colorGradient = colorSource;
+        // ============================================================
+        // 1. DETERMINE COUNT & GRADIENT SOURCE
+        // ============================================================
 
-            // Special Logic for Upcoming/Overdue Widget
-            if (options && options.overdueMap && options.upcomingMap) {
-                const overdueTasksOnDay = options.overdueMap.get(dateKey);
-                if (overdueTasksOnDay && overdueTasksOnDay.length > 0) {
-                    countForColor = overdueTasksOnDay.length;
-                    colorGradient = options.overdueGradient;
-                } else {
-                    const upcomingTasksOnDay = options.upcomingMap.get(dateKey);
-                    countForColor = upcomingTasksOnDay ? upcomingTasksOnDay.length : 0;
+        // --- CASE A: NEW Combined Heatmap ---
+        if (widgetKey === 'combinedTaskHeatmap') {
+            const { completionMap, upcomingMap, overdueMap, completionGradient, upcomingGradient, overdueGradient } = options;
+
+            const cCount = completionMap?.get(dateKey)?.length || 0;
+            const oCount = overdueMap?.get(dateKey)?.length || 0;
+            const uCount = upcomingMap?.get(dateKey)?.length || 0;
+
+            if (oCount > 0) {
+                // Priority 1: Overdue Tasks
+                countForColor = oCount;
+                colorGradient = overdueGradient;
+                hasData = true;
+            } else if (uCount > 0) {
+                // Priority 2: Upcoming/Due Tasks
+                countForColor = uCount;
+                colorGradient = upcomingGradient;
+                hasData = true;
+            } else if (cCount > 0) {
+                // Priority 3: Completed Tasks
+                countForColor = cCount;
+                colorGradient = completionGradient;
+                hasData = true;
+            }
+        }
+        // --- CASE B: Existing Upcoming/Overdue Widget ---
+        else if (options && options.overdueMap && options.upcomingMap) {
+            const overdueTasksOnDay = options.overdueMap.get(dateKey);
+            if (overdueTasksOnDay && overdueTasksOnDay.length > 0) {
+                countForColor = overdueTasksOnDay.length;
+                colorGradient = options.overdueGradient;
+                hasData = true;
+            } else {
+                const upcomingTasksOnDay = options.upcomingMap.get(dateKey);
+                if (upcomingTasksOnDay && upcomingTasksOnDay.length > 0) {
+                    countForColor = upcomingTasksOnDay.length;
+                    // For this widget, 'colorSource' passed in is usually the upcoming/open gradient
+                    colorGradient = colorSource;
+                    hasData = true;
                 }
             }
+        }
+        // --- CASE C: Standard Heatmaps (Task Completion, Daily Notes, etc) ---
+        else {
+            let filesOnDay;
+            // Handle special completion map if present
+            if (widgetKey === 'taskcompletionheatmap' && options && options.completionMap) {
+                filesOnDay = options.completionMap.get(dateKey);
+            } else {
+                filesOnDay = mainMap.get(dateKey);
+            }
 
-            if (countForColor > 0) {
-                if (Array.isArray(colorGradient) && colorGradient.length > 0) {
-                    let level;
-                    if (countForColor >= 10) level = 4;
-                    else if (countForColor >= 6) level = 3;
-                    else if (countForColor >= 3) level = 2;
-                    else level = 1;
-                    finalColor = colorGradient[level - 1] || colorGradient[colorGradient.length - 1];
-                } else {
-                    finalColor = colorGradient;
-                }
+            if (filesOnDay && filesOnDay.length > 0) {
+                countForColor = filesOnDay.length;
+                colorGradient = colorSource;
+                hasData = true;
+            }
+        }
+
+        // ============================================================
+        // 2. CALCULATE COLOR LEVEL (Your Custom Bucket Logic)
+        // ============================================================
+
+        if (hasData && countForColor > 0) {
+            if (Array.isArray(colorGradient) && colorGradient.length > 0) {
+                let level;
+                if (countForColor >= 10) level = 4;
+                else if (countForColor >= 6) level = 3;
+                else if (countForColor >= 3) level = 2;
+                else level = 1;
+
+                finalColor = colorGradient[level - 1] || colorGradient[colorGradient.length - 1];
+            } else {
+                finalColor = colorGradient;
             }
 
             // Ensure interactive class is present
@@ -1127,64 +1243,16 @@ export class PeriodMonthView extends ItemView {
             cell.classList.remove('is-interactive');
         }
 
-        // Apply Color Changes
+        // ============================================================
+        // 3. APPLY STYLES
+        // ============================================================
+
         if (finalColor) {
             if (cell.style.backgroundColor !== finalColor) {
                 cell.style.setProperty('background-color', finalColor, 'important');
             }
         } else {
             // If previously colored, remove the style to revert to CSS default
-            if (cell.style.backgroundColor) {
-                cell.style.removeProperty('background-color');
-            }
-        }
-    }
-
-    // Helper method to keep code DRY
-    _updateSingleCellVisuals(cell, dateKey, mainMap, colorSource, options) {
-        const filesOnDay = mainMap.get(dateKey);
-        const count = filesOnDay ? filesOnDay.length : 0;
-
-        let finalColor = '';
-
-        if (count > 0) {
-            let countForColor = count;
-            let colorGradient = colorSource;
-
-            if (options && options.overdueMap && options.upcomingMap) {
-                // ... existing upcoming/overdue logic ...
-                const overdueTasksOnDay = options.overdueMap.get(dateKey);
-                if (overdueTasksOnDay && overdueTasksOnDay.length > 0) {
-                    countForColor = overdueTasksOnDay.length;
-                    colorGradient = options.overdueGradient;
-                } else {
-                    const upcomingTasksOnDay = options.upcomingMap.get(dateKey);
-                    countForColor = upcomingTasksOnDay ? upcomingTasksOnDay.length : 0;
-                }
-            }
-
-            if (countForColor > 0) {
-                if (Array.isArray(colorGradient) && colorGradient.length > 0) {
-                    let level;
-                    if (countForColor >= 10) level = 4;
-                    else if (countForColor >= 6) level = 3;
-                    else if (countForColor >= 3) level = 2;
-                    else level = 1;
-                    finalColor = colorGradient[level - 1] || colorGradient[colorGradient.length - 1];
-                } else {
-                    finalColor = colorGradient;
-                }
-            }
-            cell.classList.add('is-interactive');
-        } else {
-            cell.classList.remove('is-interactive');
-        }
-
-        if (finalColor) {
-            if (cell.style.backgroundColor !== finalColor) {
-                cell.style.setProperty('background-color', finalColor, 'important');
-            }
-        } else {
             if (cell.style.backgroundColor) {
                 cell.style.removeProperty('background-color');
             }
@@ -1629,6 +1697,25 @@ export class PeriodMonthView extends ItemView {
         return eventBody;
     }
 
+    //Helper to check if the date has changed while the app was backgrounded
+    async checkDateConsistency() {
+        const currentDate = new Date().toDateString();
+        if (this.lastKnownDate !== currentDate) {
+            console.log("Date changed while backgrounded. Refreshing...");
+            this.lastKnownDate = currentDate;
+
+            // Clear caches
+            this.lastTasksDashboardState = null;
+            this.lastCreationState = null;
+            this.fileToHeatmapCache.clear();
+
+            // Force refresh
+            if (this.activeTab === 'dashboard') {
+                await this.populateDashboard(true);
+            }
+        }
+    }
+
     /**
      * Schedules a refresh to occur at the next midnight.
      */
@@ -1650,6 +1737,13 @@ export class PeriodMonthView extends ItemView {
 
             // Re-render the calendar to update heatmaps, badges, and today's highlight
             this.renderCalendar();
+
+            // Invalidate the cache for BOTH dashboard views.
+            // This ensures that even if the user isn't looking at them right now,
+            // they will rebuild with the new date the next time they are opened.
+            this.lastTasksDashboardState = null;
+            this.lastCreationState = null;
+            this.fileToHeatmapCache.clear();
 
             // If the user is currently looking at the tasks tab, refresh its view
             if (this.activeTab === 'tasks') {
@@ -1942,8 +2036,13 @@ export class PeriodMonthView extends ItemView {
                     WKC: String(dateInfoForWeek.calendarWeek).padStart(2, '0')
                 };
                 const expectedFileName = settings.weeklyNoteFormat.replace(/YYYY|WKP|WKC|MM|PN|PW/g, match => replacements[match]);
+
+                //console.log("Checking weekly note existence for:", expectedFileName);
+
                 const expectedPath = `${settings.weeklyNoteFolder}/${expectedFileName}.md`;
                 weeklyNoteExists = this.existingWeeklyNotes.has(expectedPath);
+
+                //console.log(`Weekly note for ${expectedFileName} exists:`, weeklyNoteExists);
             }
 
             if (settings.showPWColumn) {
@@ -2105,14 +2204,11 @@ export class PeriodMonthView extends ItemView {
                     }
                 }
 
-
                 if (isOtherMonth) dayNumber.addClass("cpwn-day-number-other-month");
                 if (isSameDay(dayDate, today) && !isOtherMonth) cell.addClass("cpwn-today-cell");
 
-
                 const dotsContainer = contentDiv.createDiv({ cls: 'cpwn-dots-container' });
                 const layout = this.plugin.settings.calendarLayout || 'normal';
-
 
                 dotsContainer.classList.remove('layout-condensed', 'layout-normal', 'layout-spacious');
                 dotsContainer.classList.add(`layout-${layout}`);
@@ -2129,9 +2225,7 @@ export class PeriodMonthView extends ItemView {
                     dotsContainer.createDiv({ cls: 'cpwn-calendar-dot cpwn-ics-event-dot' });
                 }
 
-
                 const hasPopupContent = dailyNoteExists || (totalTaskCount > 0) || (createdFiles.length > 0) || (modifiedFiles.length > 0) || (assetsCreated.length > 0) || (calendarEventCount > 0);
-
 
                 let dataToShow = {};
                 if (hasPopupContent) {
@@ -2146,10 +2240,8 @@ export class PeriodMonthView extends ItemView {
                     };
                 }
 
-
                 let longPressOccurred = false;
                 let touchTimer = null;
-
 
                 // --- 1. TOUCH HANDLING (Long Press) ---
                 if (Platform.isMobile) {
@@ -2167,23 +2259,18 @@ export class PeriodMonthView extends ItemView {
                             }, 500);
                         }
                     });
-
-
                     const cancelLongPress = () => window.clearTimeout(touchTimer);
                     cell.addEventListener('touchend', cancelLongPress);
                     cell.addEventListener('touchmove', cancelLongPress);
                 }
 
-
                 // --- 2. MOUSE HOVER HANDLING (Desktop + iPad) ---
                 if (hasPopupContent) {
                     const cellDate = dayDate;
 
-
                     cell.addEventListener('mouseenter', () => {
                         // Safety: Don't run hover logic on phones if Platform.isMobile is true
                         if (Platform.isMobile) return;
-
 
                         if (this.activeHoverCell !== cell) {
                             window.clearTimeout(this.hideTimeout);
@@ -2192,13 +2279,10 @@ export class PeriodMonthView extends ItemView {
                             this.activeHoverCell = cell;
                         }
 
-
                         if (this.isPopupLocked || this.isMouseDown) return;
-
 
                         this.hoverTimeout = window.setTimeout(() => {
                             if (this.activeHoverCell !== cell) return;
-
 
                             const liveTasksForDay = this.allTasks.filter(task => {
                                 const isDone = task.status.type === 'DONE';
@@ -2240,7 +2324,6 @@ export class PeriodMonthView extends ItemView {
                         }
                     });
                 }
-
 
                 // --- 3. UNIFIED CLICK HANDLER ---
                 cell.addEventListener('click', (event) => {
@@ -2488,7 +2571,8 @@ export class PeriodMonthView extends ItemView {
                 text = textLabels.fileCreationDashboard;
             } else { // Assumes 'tasks' view
 
-                iconName = 'chart-bar-big';
+                //iconName = 'chart-bar-big';
+                iconName = 'layout-list';
                 text = textLabels.tasksDashboard;
             }
         }
@@ -2648,8 +2732,6 @@ export class PeriodMonthView extends ItemView {
             console.error("Obsidian tasks plugin not found or is not ready. Task-based widgets will be empty.");
             this.allTasks = [];
         }
-
-
     }
 
     getScratchpadParts(fullContent) {
@@ -2876,6 +2958,7 @@ export class PeriodMonthView extends ItemView {
         let pollAttempts = 0;
         const maxAttempts = 10; // 5 seconds total
         const pollInterval = 500; // ms
+        this.lastKnownDate = new Date().toDateString();
 
         const pollForTasks = async () => {
             const tasksPlugin = this.app.plugins.plugins["obsidian-tasks-plugin"];
@@ -3212,6 +3295,128 @@ export class PeriodMonthView extends ItemView {
             }
         }, true) // 'true' enables the capture phase, which is crucial for reliability.
 
+
+        this.registerDomEvent(window, "focus", async () => {
+            const now = new Date();
+            if (!isSameDay(now, this.lastKnownToday)) {
+                this.lastKnownToday = now;
+
+                // SYNC MISSING DAYS (Weekends/Sleep time)
+                const historyUpdated = await GoalDataAggregator.syncHistory(this.app, this.plugin.settings, this.allTasks);
+
+                if (historyUpdated) {
+                    await this.plugin.saveSettings();
+                }
+
+                this.renderCalendar();
+                if (this.activeTab === 'dashboard') {
+                    await this.populateDashboard(true); // Re-renders the chart with new data
+                }
+            }
+        });
+
+
+        this.registerDomEvent(this.containerEl, 'contextmenu', (event) => {
+            const taskRow = event.target.closest('.cpwn-tasks-tab-row') ||
+                event.target.closest('.cpwn-other-notes-popup-item');
+
+            if (!taskRow) return;
+
+            if (!taskRow.dataset.taskPath && !taskRow.getAttribute('data-task-path')) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+
+            // Use the imported classes directly
+            const menu = new Menu();
+            menu.addItem((item) => {
+                item.setTitle("Copy direct link to task")
+                    .setIcon("link")
+                    .onClick(async () => {
+                        const filePath = taskRow.dataset.taskPath || taskRow.getAttribute('data-task-path');
+                        const lineNumber = parseInt(taskRow.dataset.lineNumber || taskRow.getAttribute('data-line-number'), 10);
+
+                        if (!filePath || isNaN(lineNumber)) return;
+
+                        const file = this.app.vault.getAbstractFileByPath(filePath);
+                        if (!file) return;
+
+                        // A. GET CLEAN TITLE (From Memory or Regex)
+                        let cleanTaskText = "Task";
+
+                        // Try to find the task in your loaded cache first for accuracy
+                        const memoryTask = (this.allTasks || []).find(t => t.path === filePath && t.lineNumber === lineNumber);
+
+                        if (memoryTask) {
+                            cleanTaskText = memoryTask.description;
+                            // Strip metadata: Remove priority, recurrence, dates (everything after these emojis)
+                            // Splits string at the first occurrence of any of these chars and takes the first part
+                            cleanTaskText = cleanTaskText.split(/[⏰🔁📅✅🛫⏳🔺⏫🔽🔼]/)[0].trim();
+                        }
+
+                        // B. READ FILE & HANDLE BLOCK ID
+                        let content = await this.app.vault.read(file);
+                        let lines = content.split('\n');
+                        let taskLine = lines[lineNumber];
+                        if (!taskLine) return; // Safety check
+
+                        // Fallback: If memory lookup failed, regex the raw line
+                        if (!memoryTask) {
+                            const match = taskLine.match(/^\s*[-\*+]\s+\[.?\]\s+(.*?)(?:\s[⏰🔁📅✅🛫⏳🔺⏫🔽🔼]|$)/);
+                            cleanTaskText = match ? match[1].trim() : "Task";
+                        }
+
+                        // Truncate if still too long
+                        if (cleanTaskText.length > 60) {
+                            cleanTaskText = cleanTaskText.substring(0, 60) + "...";
+                        }
+
+                        // Check/Create Block ID
+                        const blockIdMatch = taskLine.match(/\s\^([a-zA-Z0-9-]+)$/);
+                        let blockId;
+
+                        if (blockIdMatch) {
+                            blockId = blockIdMatch[1];
+                        } else {
+                            blockId = Math.random().toString(36).substring(2, 8);
+                            lines[lineNumber] = `${taskLine.trimEnd()} ^${blockId}`;
+                            await this.app.vault.modify(file, lines.join('\n'));
+                        }
+
+                        // C. GENERATE LINK
+                        const baseLink = this.app.metadataCache.fileToLinktext(file, file.path);
+                        const noteTitle = file.basename;
+
+                        // Format: [[Path#^ID | Clean Task Text - Note Title]]
+                        const aliasedLink = `[[${baseLink}#^${blockId}|${cleanTaskText} - ${noteTitle}]]`;
+
+                        await navigator.clipboard.writeText(aliasedLink);
+                        new Notice(`Link copied: ${cleanTaskText}`);
+                    });
+            });
+
+            menu.addItem((item) => {
+                item.setTitle("Copy link to note")
+                    .setIcon("link")
+                    .onClick(async () => {
+                        const filePath = taskRow.dataset.taskPath || taskRow.getAttribute('data-task-path');
+                        if (!filePath) return;
+
+                        const file = this.app.vault.getAbstractFileByPath(filePath);
+                        if (file) {
+                            const link = this.app.metadataCache.fileToLinktext(file, file.path);
+                            await navigator.clipboard.writeText(`[[${link}]]`);
+
+                            // Use the imported Notice class directly
+                            new Notice("Note link copied!");
+                        }
+                    });
+            });
+
+            menu.showAtMouseEvent(event);
+        }, { capture: true });
+
+
         this.app.workspace.onLayoutReady(() => {
             const statusBar = document.querySelector('.status-bar');
             if (statusBar && !Platform.isMobile) {
@@ -3316,9 +3521,13 @@ export class PeriodMonthView extends ItemView {
                 for (const key of coreWidgets) await this.updateTaskWidget(key);
 
                 // 2. Heatmaps (Safe to call, they check if container exists)
+                await this.updateTaskWidget('combinedTaskHeatmap');
                 await this.updateTaskWidget('upcomingoverdue');
                 await this.updateTaskWidget('taskcompletionheatmap');
                 await this.updateTaskWidget('taskstatusoverview');
+                await this.updateTaskWidget('taskScorecard');
+                await this.updateTaskWidget('opentaskprogressbar');
+                await this.updateTaskWidget('opentaskprogressbarsegments');
                 await this.updateMomentumWidget();
 
                 // 3. Custom Widgets
@@ -3392,6 +3601,23 @@ export class PeriodMonthView extends ItemView {
                 const overviewMetrics = await this.getTaskMetrics();
                 // Pass null as parent because we are updating the existing 'container'
                 this.renderTaskStatusWidget(null, overviewMetrics, 'taskstatusoverview', container);
+                break;
+            }
+            case 'taskScorecard': {
+                const scorecardMetrics = await this.getTaskMetrics(); // Using your overview-style aggregator
+
+                // Render into the existing container found by querySelector
+                this.renderTaskScorecardWidget(null, scorecardMetrics, 'taskScorecard', container);
+                break;
+            }
+            case 'opentaskprogressbar': {
+                const prgressBarMetrics = await this.getTaskMetrics(); // Using your overview-style aggregator
+                this.renderOpenTaskProgressBarWidget(null, prgressBarMetrics, 'opentaskprogressbar', container);
+                break;
+            }
+            case 'opentaskprogressbarsegments': {
+                const prgressBarSegmentMetrics = await this.getTaskMetrics(); // Using your overview-style aggregator
+                this.renderOpenTaskProgressBarSegmentsWidget(null, prgressBarSegmentMetrics, 'opentaskprogressbarsegments', container);
                 break;
             }
 
@@ -3522,6 +3748,113 @@ export class PeriodMonthView extends ItemView {
                 );
                 break;
             }
+
+            // --- HEATMAP 3: Combined (Completion + Upcoming/Overdue) ---
+            case 'combinedTaskHeatmap': {
+                // 1. Calculate Data
+                const now = moment().startOf('day');
+                const completionMap = new Map();
+                const upcomingMap = new Map();
+                const overdueMap = new Map();
+                const totalDataMap = new Map();
+
+                this.allTasks.forEach(task => {
+                    // A. Check Completion (Past)
+                    const isDone = task.status === 'x' || task.status?.type === 'DONE';
+                    // Use done date or completion date
+                    const doneMoment = task.done?.moment || (task.completionDate ? moment(task.completionDate) : null);
+
+                    if (isDone && doneMoment) {
+                        const dateKey = doneMoment.format('YYYY-MM-DD');
+                        if (!completionMap.has(dateKey)) completionMap.set(dateKey, []);
+                        completionMap.get(dateKey).push(task);
+
+                        // Add to total map for the renderer count
+                        if (!totalDataMap.has(dateKey)) totalDataMap.set(dateKey, []);
+                        totalDataMap.get(dateKey).push(task);
+                    }
+
+                    // B. Check Upcoming/Overdue (Future/Current)
+                    // Only check if NOT done
+                    if (!isDone && task.due?.moment) {
+                        const dateKey = task.due.moment.format('YYYY-MM-DD');
+
+                        // Add to total map
+                        if (!totalDataMap.has(dateKey)) totalDataMap.set(dateKey, []);
+                        totalDataMap.get(dateKey).push(task);
+
+                        if (task.due.moment.isBefore(now, 'day')) {
+                            if (!overdueMap.has(dateKey)) overdueMap.set(dateKey, []);
+                            overdueMap.get(dateKey).push(task);
+                        } else {
+                            if (!upcomingMap.has(dateKey)) upcomingMap.set(dateKey, []);
+                            upcomingMap.get(dateKey).push(task);
+                        }
+                    }
+                });
+
+                // 2. Change Detection (Signature Check)
+                const sigParts = [];
+                const getTaskSig = (t) => `${t.path}|${t.line}|${t.status?.type}`;
+
+                // Sort all known dates
+                const allDates = Array.from(totalDataMap.keys()).sort();
+
+                for (const date of allDates) {
+                    const cTasks = completionMap.get(date) || [];
+                    const oTasks = overdueMap.get(date) || [];
+                    const uTasks = upcomingMap.get(date) || [];
+
+                    if (cTasks.length === 0 && oTasks.length === 0 && uTasks.length === 0) continue;
+
+                    // Composite signature
+                    sigParts.push(`D:${date}_C:${cTasks.length}_O:${oTasks.length}_U:${uTasks.length}_` +
+                        cTasks.map(getTaskSig).join('') +
+                        oTasks.map(getTaskSig).join('') +
+                        uTasks.map(getTaskSig).join('')
+                    );
+                }
+                const newSignature = sigParts.join('||');
+
+                if (this.widgetSignatures && this.widgetSignatures.get(widgetKey) === newSignature) {
+                    return;
+                }
+
+                if (!this.widgetSignatures) this.widgetSignatures = new Map();
+                this.widgetSignatures.set(widgetKey, newSignature);
+
+                // 3. Render
+                // Define Gradients
+                const completionGradient = this.createColorGradient(this.plugin.settings.taskStatusColorCompleted);
+                const upcomingGradient = this.createColorGradient(this.plugin.settings.taskStatusColorOpen);
+                const overdueGradient = this.createColorGradient(this.plugin.settings.taskStatusColorOverdue);
+
+                // Define Range: -11 months to +12 months
+                const startDate = moment().subtract(11, 'months').startOf('month');
+                const endDate = moment().add(12, 'months').endOf('month');
+
+                await this.populateSingleHeatmapWidget(
+                    container,
+                    "Combined Activity", // Or "Task Momentum", "Full Overview"
+                    totalDataMap, // Used for cell counts/popups logic
+                    completionGradient, // Default color source (past)
+                    {
+                        startDate: startDate,
+                        endDate: endDate,
+                        // Pass specific maps for your visual refresh logic to distinguish colors
+                        completionMap: completionMap,
+                        upcomingMap: upcomingMap,
+                        overdueMap: overdueMap,
+                        // Pass gradients
+                        completionGradient: completionGradient,
+                        upcomingGradient: upcomingGradient,
+                        overdueGradient: overdueGradient
+                    },
+                    'combinedTaskHeatmap'
+                );
+                break;
+            }
+
 
             // --- CUSTOM WIDGETS ---
             default: {
@@ -5052,37 +5385,34 @@ export class PeriodMonthView extends ItemView {
         this.verticalScrollerEl = container.createDiv("cpwn-vertical-calendar-scroller");
 
         const initialMonthId = `cpwn-month-${this.displayedMonth.getFullYear()}-${this.displayedMonth.getMonth()}`;
-        const numMonthsAfter = 12;
-        for (let i = -6; i <= numMonthsAfter; i++) {
+
+        const yearsPast = this.plugin.settings.verticalViewYearsPast || 1;
+        const yearsFuture = this.plugin.settings.verticalViewYearsFuture || 1;
+        const monthsBack = 0 - (yearsPast * 12);
+        const monthsForward = ((yearsFuture) * 12);
+
+        // OPTIMIZATION 1: Use DocumentFragment
+        // Instead of appending to 'this.verticalScrollerEl' 24+ times, we append to this fragment
+        // and then append the fragment ONCE at the end.
+        const fragment = document.createDocumentFragment();
+
+        for (let i = monthsBack; i <= monthsForward; i++) {
             const monthDate = new Date(this.displayedMonth.getFullYear(), this.displayedMonth.getMonth() + i, 1);
 
-            const monthWrapper = this.verticalScrollerEl.createDiv({ cls: "cpwn-vertical-month-wrapper" });
-
+            // Create wrapper div in the fragment
+            const monthWrapper = fragment.createDiv({ cls: "cpwn-vertical-month-wrapper" });
             monthWrapper.id = `cpwn-month-${monthDate.getFullYear()}-${monthDate.getMonth()}`;
 
-            // Create the month title heading for the vertical list.
-            const monthTitleEl = monthWrapper.createEl("h3", {
-                cls: "cpwn-vertical-month-title",
-                // Set the initial text using the simple formatter.
-                text: formatMonthTitle(monthDate, this.plugin.settings.monthTitleFormat)
-            });
+            // --- Title Logic (Preserved) ---
+            const monthTitleEl = monthWrapper.createEl("h3", { cls: "cpwn-vertical-month-title cpwn-vertical-title-hoverable" });
             monthTitleEl.classList.add('cpwn-clickable');
 
+            this.populateStyledTitle(monthTitleEl, monthDate);
 
-            let hoverTimeout;
-            monthTitleEl.addEventListener('mouseenter', () => {
-                // After 400ms, use our new helper to build the perfectly consistent, styled title.
-                hoverTimeout = window.setTimeout(() => {
-                    this.populateStyledTitle(monthTitleEl, monthDate);
-                }, 500);
-            });
-
-            monthTitleEl.addEventListener('mouseleave', () => {
-                window.clearTimeout(hoverTimeout);
-                // On leave, revert back to the simple text format.
-                monthTitleEl.empty();
-                monthTitleEl.setText(formatMonthTitle(monthDate, this.plugin.settings.monthTitleFormat));
-            });
+            const monthColor = this.plugin.settings.monthTitleColor || 'var(--text-normal)';
+            const yearColor = this.plugin.settings.yearTitleColor || 'var(--text-accent)';
+            monthTitleEl.style.setProperty('--hover-month-color', monthColor);
+            monthTitleEl.style.setProperty('--hover-year-color', yearColor);
 
             monthTitleEl.addEventListener('click', () => {
                 this.displayedMonth = monthDate;
@@ -5090,30 +5420,26 @@ export class PeriodMonthView extends ItemView {
                 this.render();
             });
 
+            // --- Table Logic ---
             const table = monthWrapper.createEl("table", { cls: "cpwn-period-calendar-table" });
             const thead = table.createEl("thead");
             const headerRow = thead.createEl("tr");
 
-            if (this.plugin.settings.showPWColumn) {
-                headerRow.createEl("th", { text: " " });
-            }
-            if (this.plugin.settings.showWeekNumbers) {
-                headerRow.createEl("th", { text: this.plugin.settings.weekNumberColumnLabel });
-            }
+            if (this.plugin.settings.showPWColumn) headerRow.createEl("th", { text: " " });
+            if (this.plugin.settings.showWeekNumbers) headerRow.createEl("th", { text: this.plugin.settings.weekNumberColumnLabel });
+
             const startDayOffset = this.plugin.settings.weekStartDay === 'monday' ? 1 : 0;
             for (let d = 0; d < 7; d++) {
                 const dayIndex = (d + startDayOffset) % 7;
                 headerRow.createEl("th", { text: moment().day(dayIndex).format("ddd").toUpperCase() });
             }
 
-            // Add today's header highlight
+            // Today highlight
             if (this.plugin.settings.highlightTodayDayHeader) {
                 const today = new Date();
                 if (monthDate.getFullYear() === today.getFullYear() && monthDate.getMonth() === today.getMonth()) {
                     const todayHeaderIndex = Array.from(headerRow.children).findIndex(th => th.textContent.toLowerCase() === moment(today).format("ddd").toLowerCase());
-                    if (todayHeaderIndex !== -1) {
-                        headerRow.children[todayHeaderIndex].addClass("cpwn-today-day-header");
-                    }
+                    if (todayHeaderIndex !== -1) headerRow.children[todayHeaderIndex].addClass("cpwn-today-day-header");
                 }
             }
 
@@ -5122,9 +5448,13 @@ export class PeriodMonthView extends ItemView {
             this.addColumnHighlighting(headerRow, tbody);
         }
 
-        // After the layout is ready, scroll the initial month into view.
-        this.app.workspace.onLayoutReady(() => {
-            // SET FLAG before scrolling
+        // OPTIMIZATION 1 APPLIED: Append everything at once
+        this.verticalScrollerEl.appendChild(fragment);
+
+        // OPTIMIZATION 2: Defer Scrolling
+        // Use requestAnimationFrame to let the browser paint the new nodes first.
+        // This prevents "Forced Reflow" violations caused by calling scrollIntoView immediately after append.
+        window.requestAnimationFrame(() => {
             this.isProgrammaticScroll = true;
 
             const initialEl = this.verticalScrollerEl.querySelector(`#${initialMonthId}`);
@@ -5132,43 +5462,55 @@ export class PeriodMonthView extends ItemView {
                 initialEl.scrollIntoView({ block: 'start' });
             }
 
-            // CLEAR FLAG after scroll completes
+            // Clear flag after animation settles
             window.setTimeout(() => {
                 this.isProgrammaticScroll = false;
             }, 300);
         });
 
-        // Use a scroll listener to update the main header title.
+        // Scroll Listener (Preserved)
         this.verticalScrollerEl.addEventListener('scroll', () => {
-            // if programmatic scroll is in progress, do nothing
             if (this.isProgrammaticScroll) return;
 
             window.clearTimeout(this.titleUpdateTimeout);
             this.titleUpdateTimeout = window.setTimeout(() => {
-                let topmostVisibleMonth = null;
-                let smallestTopValue = Infinity;
-                const scrollerTop = this.verticalScrollerEl.getBoundingClientRect().top;
-                const monthElements = this.verticalScrollerEl.querySelectorAll('.cpwn-vertical-month-wrapper');
+                // Throttle this calculation
+                window.requestAnimationFrame(() => {
+                    const scrollerRect = this.verticalScrollerEl.getBoundingClientRect();
+                    const scrollerTop = scrollerRect.top;
 
-                for (const monthEl of monthElements) {
-                    const monthTop = monthEl.getBoundingClientRect().top;
-                    if (monthTop < scrollerTop && monthTop > smallestTopValue) {
-                        smallestTopValue = monthTop;
-                        topmostVisibleMonth = monthEl;
-                    }
-                }
+                    // Optimization: Use elementFromPoint or simple offset checks if possible, 
+                    // but your loop logic is acceptable if throttled.
+                    // We keep your existing logic for correctness, just ensure it's inside the timeout/rAF.
+                    let topmostVisibleMonth = null;
+                    let smallestTopValue = Infinity;
 
-                if (topmostVisibleMonth) {
-                    const [, year, month] = topmostVisibleMonth.id.split('-').map(Number);
-                    if (this.displayedMonth.getFullYear() !== year || this.displayedMonth.getMonth() !== month) {
-                        this.displayedMonth = new Date(year, month, 1);
-                        this.updateMonthTitle();
-                        this.updateTodayBtnAriaLabel();
+                    const monthElements = this.verticalScrollerEl.querySelectorAll('.cpwn-vertical-month-wrapper');
+                    for (const monthEl of monthElements) {
+                        const rect = monthEl.getBoundingClientRect();
+                        const monthTop = rect.top;
+
+                        // Break early optimization: if we found a month way below, stop looking
+                        // (assuming elements are in order)
+                        if (monthTop > scrollerRect.bottom) break;
+
+                        if (monthTop < scrollerTop && monthTop > smallestTopValue) {
+                            smallestTopValue = monthTop;
+                            topmostVisibleMonth = monthEl;
+                        }
                     }
-                }
+
+                    if (topmostVisibleMonth) {
+                        const [, year, month] = topmostVisibleMonth.id.split('-').map(Number);
+                        if (this.displayedMonth.getFullYear() !== year || this.displayedMonth.getMonth() !== month) {
+                            this.displayedMonth = new Date(year, month, 1);
+                            this.updateMonthTitle();
+                            this.updateTodayBtnAriaLabel();
+                        }
+                    }
+                });
             }, 100);
         });
-
     }
 
     async onclose() {
@@ -5649,8 +5991,6 @@ export class PeriodMonthView extends ItemView {
     }
 
 
-
-
     /**
      * The main render function for the entire view. It builds the DOM from scratch.
      */
@@ -5696,17 +6036,26 @@ export class PeriodMonthView extends ItemView {
         setIcon(this.headerAlertIconEl, 'bell');
 
         this.monthNameEl.addEventListener('click', () => {
-            // SET THE FLAG before switching views
+            // 1. Update State (Fast & Synchronous)
+            // We update state immediately so any logic checking it sees the new value.
             this.isProgrammaticScroll = true;
-
             this.isVerticalView = !this.isVerticalView;
-            this.render();
 
-            // CLEAR THE FLAG after render and initial scroll complete
-            window.setTimeout(() => {
-                this.isProgrammaticScroll = false;
-            }, 800);  // Longer delay for initial view render on mobile
+            // 2. Defer Rendering (The "Heavy" Part)
+            // requestAnimationFrame ensures the browser paints the current frame first.
+            // setTimeout(..., 0) pushes the execution to the end of the event loop stack.
+            window.requestAnimationFrame(() => {
+                window.setTimeout(() => {
+                    this.render();
+
+                    // 3. Clear Flag (Keep your existing timeout logic, but nest it here)
+                    window.setTimeout(() => {
+                        this.isProgrammaticScroll = false;
+                    }, 800);
+                }, 0);
+            });
         });
+
 
         const navDiv = headerDiv.createDiv({ cls: "cpwn-month-header-nav" });
 
@@ -6229,6 +6578,13 @@ export class PeriodMonthView extends ItemView {
             // a) Filter tasks based on metric type
             let preFilteredTasks = [];
             switch (metricType) {
+                case 'cancelled':
+                    preFilteredTasks = allTasks.filter(t => {
+                        const isCancelled = t.status.symbol === '-' || t.status.type === 'CANCELLED';
+                        return isCancelled;
+                    });
+                    break;
+
                 case 'completed':
                     preFilteredTasks = allTasks.filter(t => t.isDone && t.created?.moment && t.done?.moment);
                     break;
@@ -6265,7 +6621,8 @@ export class PeriodMonthView extends ItemView {
                     preFilteredTasks = allTasks.filter(t => {
                         const hasDueDate = t.due && t.due.moment;
                         const isCompleted = t.status && (t.status.type === 'DONE' || t.status.symbol === 'x');
-                        return !hasDueDate && !isCompleted;
+                        const isCancelled = t.status.symbol === '-' || t.status.type === 'CANCELLED';
+                        return !hasDueDate && !isCompleted && !isCancelled;
                     });
                     break;
                 case 'by-tag':
@@ -7063,6 +7420,8 @@ export class PeriodMonthView extends ItemView {
 
     // Main function to populate the dashboard based on the selected view mode.
     async populateDashboard(forceRefresh = false) {
+        await this.checkDateConsistency();
+
         if (!this.dashboardContentEl) return;
 
         // 1. Always get the latest data first.
@@ -7110,12 +7469,121 @@ export class PeriodMonthView extends ItemView {
         }
     }
 
+    async countMatchesForHeatmap(file, config, widgetKey, index) {
+        // Resolve full config from settings
+        let fullConfig = config;
+        let idx = index;
+        if (widgetKey && widgetKey.startsWith("custom-")) {
+            const fromKey = parseInt(widgetKey.split("-")[1], 10);
+            if (!Number.isNaN(fromKey)) idx = fromKey;
+        }
+        if (typeof idx === "number") {
+            const stored = this.plugin.settings.customHeatmaps[idx];
+            if (stored) fullConfig = stored;
+        }
+
+        const filters = fullConfig.filters || [];
+        const logic = (fullConfig.logic || "OR").toUpperCase();
+
+        if (filters.length === 0) return 1;
+
+        // --- 1. Prepare Metadata Cache ---
+        const cache = this.app.metadataCache.getFileCache(file);
+        const fileTags = new Set();
+
+        if (cache) {
+            // Frontmatter tags
+            const fmTags = cache.frontmatter?.tags;
+            if (Array.isArray(fmTags)) {
+                fmTags.forEach(t => fileTags.add("#" + t.toString().replace(/^#/, "")));
+            } else if (typeof fmTags === "string") {
+                fmTags.split(",").forEach(t => fileTags.add("#" + t.trim().replace(/^#/, "")));
+            }
+            // Inline tags from cache
+            if (cache.tags) {
+                cache.tags.forEach(t => fileTags.add(t.tag));
+            }
+        }
+
+        // Helper to lazily read file content
+        let content = null;
+        const getContent = async () => {
+            if (content === null) content = await this.app.vault.read(file);
+            return content;
+        };
+
+        let totalMatches = 0;
+
+        // --- 2. Iterate Filters ---
+        for (const filter of filters) {
+            let filterCount = 0;
+
+            if (filter.type === "tag" && filter.value) {
+                const searchTag = filter.value.startsWith("#") ? filter.value : "#" + filter.value;
+
+                // A. Check Metadata (Properties)
+                // If present in cache, we know we have at least 1 match.
+                const cacheCount = fileTags.has(searchTag) ? 1 : 0;
+
+                // B. Check Regex (Inline Content)
+                // This catches multiple occurrences in the body (e.g. 3x #WXS-Restart)
+                let regexCount = 0;
+                const text = await getContent();
+                const escaped = searchTag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                const re = new RegExp(escaped + "(?![\\w-])", "g");
+                const matches = text.match(re);
+                if (matches) regexCount = matches.length;
+
+                // C. Take the HIGHEST count
+                // This ensures 3 inline tags count as 3, but 1 property tag still counts as 1.
+                filterCount = Math.max(cacheCount, regexCount);
+
+            } else if (filter.type === "regex" && filter.value) {
+                const text = await getContent();
+                const re = new RegExp(filter.value, filter.flags || "g");
+                const matches = text.match(re);
+                if (matches) filterCount = matches.length;
+            }
+
+            totalMatches += filterCount;
+        }
+
+        // --- 3. Handle AND Logic ---
+        if (logic === "AND") {
+            // For AND, ensure EVERY filter returned at least 1 match
+            // (We re-run checks briefly or track boolean success above, but iterating works reliably)
+            const allPresent = await Promise.all(filters.map(async (filter) => {
+                if (filter.type === "path" || filter.type === "folder") return true; // these passed already
+
+                if (filter.type === "tag" && filter.value) {
+                    const searchTag = filter.value.startsWith("#") ? filter.value : "#" + filter.value;
+                    if (fileTags.has(searchTag)) return true;
+
+                    const text = await getContent();
+                    const escaped = searchTag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                    const re = new RegExp(escaped + "(?![\\w-])", "g");
+                    return re.test(text);
+                }
+
+                if (filter.type === "regex" && filter.value) {
+                    const text = await getContent();
+                    const re = new RegExp(filter.value, filter.flags || "g");
+                    return re.test(text);
+                }
+                return true;
+            }));
+
+            if (!allPresent.every(Boolean)) return 0;
+        }
+
+        return totalMatches > 0 ? totalMatches : 1;
+    }
 
     /**
     * Renders a single custom heatmap.
     * UPDATED: Accepts modifiedFile and passes it to the widget.
     */
-    async renderSingleHeatmap(widgetGrid, heatmapConfig, index, modifiedFile = null) {
+    async renderSingleHeatmap(widgetGrid, heatmapConfig, index, widgetKey, modifiedFile = null) {
         // 1. Find or create container
         const widgetContainerId = `cpwn-creation-widget-custom-${index}`;
         let widgetContainer = widgetGrid.querySelector(`#${widgetContainerId}`);
@@ -7133,28 +7601,50 @@ export class PeriodMonthView extends ItemView {
 
         // 3. Build Data Map
         const customMap = new Map();
-        filteredFiles.forEach(file => {
-            let dateKey;
-            // Handle date source (creation time vs title)
-            if (heatmapConfig.dateSource === 'dateFromTitle') {
-                // Use user formats or defaults
-                const userDateFormats = this.plugin.settings.customDateFormats ? this.plugin.settings.customDateFormats.split(',').map(f => f.trim()) : ['YYYY-MM-DD', 'DD-MM-YYYY'];
-                const dateRegex = /(\d{4}-\d{2}-\d{2})|(\d{2}-\d{2}-\d{4})/;
+
+        for (const file of filteredFiles) {
+            let dateKey = null;
+
+            // Existing dateSource logic
+            if (heatmapConfig.dateSource === "dateFromTitle") {
+                const userDateFormats = this.plugin.settings.customDateFormats
+                    ? this.plugin.settings.customDateFormats.split(",").map(f => f.trim())
+                    : ["YYYY-MM-DD", "DD-MM-YYYY"];
+                const dateRegex = /(\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})/;
                 const match = file.basename.match(dateRegex);
-                if (match && match[0]) {
+                if (match) {
                     const dateMoment = moment(match[0], userDateFormats, false);
-                    if (dateMoment.isValid()) dateKey = dateMoment.format('YYYY-MM-DD');
+                    if (dateMoment.isValid()) {
+                        dateKey = dateMoment.format("YYYY-MM-DD");
+                    }
                 }
-            } else {
-                // Default to creation time
-                dateKey = moment(file.stat.ctime).format('YYYY-MM-DD');
             }
 
-            if (dateKey) {
-                if (!customMap.has(dateKey)) customMap.set(dateKey, []);
-                customMap.get(dateKey).push(file);
+            if (!dateKey) {
+                dateKey = moment(file.stat.ctime).format("YYYY-MM-DD");
             }
-        });
+            if (!dateKey) continue;
+
+            // NEW: count pattern/tag hits in this file
+            const matchCount = await this.countMatchesForHeatmap(
+                file,
+                heatmapConfig,
+                widgetKey,
+                index
+            );
+
+            /* Debugging output
+            if (heatmapConfig.name === "GOL WXS Restarts") {
+                console.log(`Heatmap Name: ${heatmapConfig.name} | File: ${file.path} | Matches: ${matchCount}`);
+            }
+            */
+
+            if (matchCount <= 0) continue;
+
+            if (!customMap.has(dateKey)) customMap.set(dateKey, []);
+            const arr = customMap.get(dateKey);
+            for (let i = 0; i < matchCount; i++) arr.push(file);
+        }
 
         // 4. Render Widget
         if (customMap.size > 0) {
@@ -7372,7 +7862,7 @@ export class PeriodMonthView extends ItemView {
                         }
 
                         // CHANGE: Pass 'modifiedFile' as the 4th argument
-                        await this.renderSingleHeatmap(widgetGrid, heatmapConfig, index, modifiedFile);
+                        await this.renderSingleHeatmap(widgetGrid, heatmapConfig, index, widgetKey, modifiedFile);
                     }
                     continue;
                 }
@@ -7695,7 +8185,6 @@ export class PeriodMonthView extends ItemView {
                 iconSpan.removeClass('is-completed');
             }
         }
-
         // C. Update Points (e.g. "+30" or "-10")
         const pointsSpan = widgetEl.querySelector('.cpwn-goal-points');
         let pointsChanged = false;
@@ -7724,46 +8213,68 @@ export class PeriodMonthView extends ItemView {
     }
 
     async getTaskMetrics() {
-
         const allTasks = this.allTasks;
         if (!allTasks || allTasks.length === 0) {
-            return { completed: 0, open: 0, inProgress: 0, overdue: 0, cancelled: 0, total: 0 };
+            return { completed: 0, open: 0, inProgress: 0, overdue: 0, cancelled: 0, total: 0, someday: 0 };
         }
 
         const now = moment();
-        const totalTasks = allTasks.length;
-        const completed = allTasks.filter(t => t.status.type === 'DONE').length;
-        const cancelled = allTasks.filter(t => t.status.type === 'CANCELLED').length;
-        const inProgress = allTasks.filter(t => t.status.type === 'IN_PROGRESS').length;
-        // FIXED: Include both TODO and IN_PROGRESS tasks in the "open" count
 
-        const open = allTasks.filter(t =>
+        // Arrays for popups
+        const completedTasks = allTasks.filter(t => t.status.type === 'DONE');
+        const cancelledTasks = allTasks.filter(t => t.status.type === 'CANCELLED');
+        const inProgressTasks = allTasks.filter(t => t.status.type === 'IN_PROGRESS');
+
+        const openTasks = allTasks.filter(t =>
             t.status.type === 'TODO' || t.status.type === 'IN_PROGRESS'
-        ).length;
+        );
 
-        // FIXED: Also check IN_PROGRESS tasks for overdue
-        const overdue = allTasks.filter(t =>
+        const overdueTasks = allTasks.filter(t =>
             (t.status.type === 'TODO' || t.status.type === 'IN_PROGRESS') &&
             t.due?.moment?.isBefore(now, 'day')
-        ).length;
+        );
 
-        const due = allTasks.filter(t =>
+        const dueTasks = allTasks.filter(t =>
             t.due?.moment && !t.due.moment.isBefore(now, 'day') &&
             t.status.type === 'TODO'
-        ).length;
+        );
 
-        const someday = allTasks.filter(t => {
+        const somedayTasks = allTasks.filter(t => {
             const hasDueDate = t.due && t.due.moment;
-            const isCompleted = t.status && (t.status.type === 'DONE' || t.status.symbol === 'x');
+            const isCompleted = t.status?.type === 'DONE' || t.status?.symbol === 'x';
             const isCancelled = t.status?.type === 'CANCELLED';
             return !hasDueDate && !isCompleted && !isCancelled;
-        }).length;
+        });
 
-        const completedWithCreatedDate = allTasks.filter(t => t.status.type === 'DONE' && t.createdDate).length;
+        const completedWithCreatedDateTasks = allTasks.filter(t =>
+            t.status.type === 'DONE' && t.createdDate
+        );
 
-        return { completed, open, inProgress, overdue, cancelled, total: totalTasks, due, completedWithCreatedDate, someday };
+        // Return object containing both the arrays (for Scorecard popups) and counts (for Overview)
+        return {
+            // Counts (legacy support)
+            completed: completedTasks.length,
+            open: openTasks.length,
+            inProgress: inProgressTasks.length,
+            overdue: overdueTasks.length,
+            cancelled: cancelledTasks.length,
+            total: allTasks.length,
+            due: dueTasks.length,
+            someday: somedayTasks.length,
+            completedWithCreatedDate: completedWithCreatedDateTasks.length,
 
+            // Task Arrays (for scorecard popup support)
+            allCompletedTasks: completedTasks,
+            cancelledTasks,
+            overdueTasks,
+            inProgressTasks,
+            dueTasks,
+            somedayTasks,
+            openTasks,
+            completedWithCreatedDateTasks
+        };
     }
+
 
     async getTaskSummaryMetrics() {
         const allTasks = this.allTasks || [];
@@ -8223,9 +8734,6 @@ export class PeriodMonthView extends ItemView {
 
                 // Check if this widget should be hidden (in a collapsed section)
                 const isInCollapsedSection = this.isWidgetInCollapsedSection(widgetKey, finalOrder, this.plugin.settings);
-                //if (isInCollapsedSection) {
-                //    continue; // Skip rendering this widget
-                //}
 
                 switch (widgetKey) {
                     case 'today':
@@ -8243,7 +8751,6 @@ export class PeriodMonthView extends ItemView {
                         this.renderTaskSummaryWidget(widgetGrid, 'Future / No due', combinedIncomplete, [], [], combinedInProgress, metrics.noDue.incomplete, 'futureNoDue');
                         break;
                     }
-
                     case 'upcomingoverdue': {
                         const upcomingMap = new Map();
                         const overdueMap = new Map();
@@ -8320,6 +8827,82 @@ export class PeriodMonthView extends ItemView {
                         break;
                     }
 
+                    case 'combinedTaskHeatmap': {
+                        const widgetContainer = widgetGrid.createDiv({ cls: 'cpwn-pm-widget-container cpwn-pm-widget-medium' });
+                        widgetContainer.id = 'cpwn-widget-combinedTaskHeatmap';
+
+                        // 1. Initialize Maps
+                        const completionMap = new Map();
+                        const upcomingMap = new Map();
+                        const overdueMap = new Map();
+                        const totalDataMap = new Map(); // Acts as the master map for rendering cells
+
+                        const today = moment().startOf('day');
+
+                        // 2. Sort Tasks into Buckets
+                        this.allTasks.forEach(task => {
+                            // --- A. Completed Tasks (Past) ---
+                            // Check strict completion status
+                            if (task.status.type === 'DONE' && task.done?.moment) {
+                                const dateKey = task.done.moment.format('YYYY-MM-DD');
+
+                                if (!completionMap.has(dateKey)) completionMap.set(dateKey, []);
+                                completionMap.get(dateKey).push(task);
+
+                                // Add to master map so the cell is created
+                                if (!totalDataMap.has(dateKey)) totalDataMap.set(dateKey, []);
+                                totalDataMap.get(dateKey).push(task);
+                            }
+                            // --- B. Incomplete Tasks (Future & Overdue) ---
+                            // Check if task is NOT done and has a valid due date
+                            else if (task.status.type !== 'DONE' && task.due?.moment) {
+                                const dateKey = task.due.moment.format('YYYY-MM-DD');
+                                const isOverdue = task.due.moment.isBefore(today, 'day');
+
+                                if (isOverdue) {
+                                    if (!overdueMap.has(dateKey)) overdueMap.set(dateKey, []);
+                                    overdueMap.get(dateKey).push(task);
+                                } else {
+                                    if (!upcomingMap.has(dateKey)) upcomingMap.set(dateKey, []);
+                                    upcomingMap.get(dateKey).push(task);
+                                }
+
+                                // Add to master map so the cell is created
+                                if (!totalDataMap.has(dateKey)) totalDataMap.set(dateKey, []);
+                                totalDataMap.get(dateKey).push(task);
+                            }
+                        });
+
+                        // 3. Define Gradients
+                        const completionGradient = this.createColorGradient(this.plugin.settings.taskStatusColorCompleted);
+                        const overdueGradient = this.createColorGradient(this.plugin.settings.taskStatusColorOverdue);
+                        const upcomingGradient = this.createColorGradient(this.plugin.settings.taskStatusColorOpen);
+
+                        // 4. Define Date Range (Critical for showing future empty cells if needed, or just limiting range)
+                        // This ensures the grid spans from 11 months ago to 12 months in the future.
+                        const startDate = moment().subtract(11, 'months').startOf('month');
+                        const endDate = moment().add(12, 'months').endOf('month');
+
+                        // 5. Render
+                        await this.populateSingleHeatmapWidget(
+                            widgetContainer,
+                            "Task status activity",
+                            totalDataMap,        // Pass the MASTER map here to ensure all cells are considered
+                            completionGradient,  // Fallback gradient (usually overridden by specific logic in _updateSingleCellVisuals)
+                            {
+                                startDate,
+                                endDate,
+                                completionMap,
+                                upcomingMap,
+                                overdueMap,
+                                completionGradient,
+                                upcomingGradient,
+                                overdueGradient
+                            },
+                            'combinedTaskHeatmap'
+                        );
+                        break;
+                    }
 
                     case 'goalStatusListCondensed': {
                         try {
@@ -9675,32 +10258,51 @@ export class PeriodMonthView extends ItemView {
                             contentWrapper.style.display = 'none';
                         }
 
-                        // 6. Toggle Logic
+                        // 6. Header Click Handler
                         header.addEventListener('click', async () => {
-                            // Toggle class
+                            // 1. Toggle State
                             const currentlyCollapsed = widgetContainer.classList.toggle('collapsed');
 
-                            // Update Settings
+                            // 2. Save Settings
                             this.plugin.settings.collapsedWidgets[widgetKey] = currentlyCollapsed;
                             await this.plugin.saveSettings();
 
-                            // Update Icon
+                            // 3. Update Icon
                             if (showChevron && toggleIcon) {
-                                setIcon(toggleIcon, 'chevron-down');
+                                setIcon(toggleIcon, currentlyCollapsed ? 'chevron-right' : 'chevron-down');
                             }
 
-                            // Explicitly Toggle Content Visibility
+                            // 4. Handle Content Visibility & Rendering
                             if (currentlyCollapsed) {
                                 contentWrapper.style.display = 'none';
                             } else {
                                 contentWrapper.style.display = 'block';
-                                // Only re-render if we are showing it and data might be stale
-                                await this.updateMomentumWidget();
+
+                                // CHECK: Is the chart empty? If so, we MUST render it now.
+                                // This happens if it was collapsed by default on load.
+                                if (!contentWrapper.hasChildNodes() || contentWrapper.innerHTML === '') {
+                                    // Fetch Data
+                                    const chartDataObj = await GoalDataAggregator.getAllHistory(this.app, this.plugin.settings, this.allTasks);
+                                    // Render
+                                    const renderer = new CssChartRenderer(contentWrapper);
+                                    renderer.renderSwipeableMomentum(chartDataObj);
+                                } else {
+                                    // If it already exists, just refresh/resize it in case it was hidden
+                                    // (Optional: call chart.resize() if you had a direct reference, but re-rendering is safer for CssChartRenderer)
+                                    const existingCanvas = contentWrapper.querySelector('canvas');
+                                    if (existingCanvas && existingCanvas.chart) {
+                                        existingCanvas.chart.resize();
+                                        existingCanvas.chart.update();
+                                    }
+                                }
                             }
                         });
 
+
                         // Fetch Data & Initial Render (only if visible)
                         if (!isCollapsed) {
+                            widgetContainer.dataset.widgetKey = 'swipeableMomentum';
+
                             const chartDataObj = await GoalDataAggregator.getAllHistory(this.app, this.plugin.settings, this.allTasks);
                             const renderer = new CssChartRenderer(contentWrapper);
                             renderer.renderSwipeableMomentum(chartDataObj);
@@ -9717,6 +10319,23 @@ export class PeriodMonthView extends ItemView {
                             metrics,
                             'taskstatusoverview'
                         );
+                        break;
+                    }
+
+                    case 'taskScorecard': {
+                        const metrics = await this.getTaskMetrics();
+                        this.renderTaskScorecardWidget(widgetGrid, metrics, 'taskScorecard');
+                        break;
+                    }
+
+                    case 'opentaskprogressbar': {
+                        const metrics = await this.getTaskMetrics();
+                        this.renderOpenTaskProgressBarWidget(widgetGrid, metrics, 'opentaskprogressbar');
+                        break;
+                    }
+                    case 'opentaskprogressbarsegments': {
+                        const metrics = await this.getTaskMetrics();
+                        this.renderOpenTaskProgressBarSegmentsWidget(widgetGrid, metrics, 'opentaskprogressbarsegments');
                         break;
                     }
 
@@ -9753,6 +10372,251 @@ export class PeriodMonthView extends ItemView {
             }
         }
     }
+
+    renderOpenTaskProgressBarSegmentsWidget(parentContainer, metrics, widgetKey, existingElement = null) {
+
+        let container;
+        if (existingElement) {
+            container = existingElement;
+            container.empty();
+        } else {
+            container = parentContainer.createDiv({
+                cls: 'cpwn-pm-widget-container cpwn-pm-widget-medium cpwn-progress-segmented-widget'
+            });
+        }
+        container.id = `cpwn-widget-${widgetKey}`;
+
+        const s = this.plugin.settings;
+
+        // 1. Data Aggregation
+        //const cancelled = metrics.cancelled || 0;
+        const completed = metrics.completed || 0;
+        const overdue = metrics.overdue || 0;
+        const inProgress = metrics.inProgress || 0;
+        const due = metrics.due || 0;
+        const someday = metrics.someday || 0;
+
+        const total = completed + overdue + inProgress + due + someday;
+        const percent = total > 0 ? Math.round((completed / total) * 100) : 100;
+
+        // 2. Main Bar Container
+        const wrapper = container.createDiv({ cls: 'cpwn-progress-segmented-bar-wrapper' });
+        const bar = wrapper.createDiv({ cls: 'cpwn-progress-segmented-bar' });
+
+        // 3. Helper to create segments
+        const addSegment = (count, color, label) => {
+            if (count === 0) return;
+            const segment = bar.createDiv({ cls: 'cpwn-progress-segmented-bar-segment' });
+            segment.style.width = `${(count / total) * 100}%`;
+            segment.style.backgroundColor = color;
+
+            // NATIVE OBSIDIAN TOOLTIP (Safe)
+            // Instead of addClass('tooltip'), use the native helper if available
+            // or just the aria-label which Obsidian handles automatically in many themes.
+            segment.setAttr('aria-label', `${label}: ${count}`);
+        };
+
+        // Render segments in visual order
+        //addSegment(cancelled, s.taskStatusColorCancelled, 'Cancelled');
+        addSegment(completed, s.taskStatusColorCompleted, 'Completed');
+        addSegment(overdue, s.taskStatusColorOverdue, 'Overdue');
+        addSegment(inProgress, s.taskStatusColorInProgress, 'In progress');
+        addSegment(due, s.taskStatusColorOpen, 'Due');
+        addSegment(someday, 'rgba(150, 150, 150, 0.3)', 'Someday');
+
+        // 4. Centered Text Overlay
+        const textOverlay = bar.createDiv({ cls: 'cpwn-progress-segmented-bar-text-overlay' });
+        textOverlay.createSpan({ text: `${percent}% `, cls: 'cpwn-label-bold' });
+        textOverlay.createSpan({ text: `(${total - completed} tasks remaining)`, cls: 'cpwn-label-dim' });
+
+        return container;
+    }
+
+
+
+    renderOpenTaskProgressBarWidget(parentContainer, metrics, widgetKey, existingElement = null) {
+        let container;
+        if (existingElement) {
+            container = existingElement;
+            container.empty();
+        } else {
+            container = parentContainer.createDiv({
+                cls: 'cpwn-pm-widget-container cpwn-pm-widget-medium cpwn-integrated-progress-widget'
+            });
+        }
+        container.id = `cpwn-widget-${widgetKey}`;
+
+        const s = this.plugin.settings;
+        const totalOpen = (metrics.overdue || 0) + (metrics.due || 0) + (metrics.inProgress || 0) + (metrics.someday || 0);
+        const completed = metrics.completed || 0;
+        const totalWorkload = completed + totalOpen;
+        const percent = totalWorkload > 0 ? Math.round((completed / totalWorkload) * 100) : 100;
+
+        const wrapper = container.createDiv({ cls: 'cpwn-progress-integrated-wrapper' });
+
+        // 1. The Bar Container
+        const bar = wrapper.createDiv({ cls: 'cpwn-integrated-bar' });
+
+        // 2. The Fill
+        const fill = bar.createDiv({ cls: 'cpwn-integrated-fill' });
+        fill.style.width = `${percent}%`;
+        fill.style.backgroundColor = s.taskStatusColorCompleted;
+
+        // 3. The Integrated Text (Absolute positioned over the bar)
+        const textLabel = bar.createDiv({ cls: 'cpwn-integrated-text' });
+        // textLabel.createSpan({ text: `Task Progress: `, cls: 'cpwn-label-dim' });
+        textLabel.createSpan({ text: `${percent}% `, cls: 'cpwn-label-bold' });
+        textLabel.createSpan({ text: `(${totalOpen} tasks remaining)`, cls: 'cpwn-label-dim' });
+
+        return container;
+    }
+
+
+    // Renders the Task Scorecard widget with KPIs, breakdown, and progress bar.
+    renderTaskScorecardWidget(parentContainer, metrics, widgetKey, existingElement = null) {
+
+        let container;
+        if (existingElement) {
+            container = existingElement;
+            container.empty();
+        } else {
+            container = parentContainer.createDiv({ cls: 'cpwn-pm-widget-container cpwn-pm-widget-large' });
+        }
+        container.id = `cpwn-widget-${widgetKey}`;
+
+        let showTitle;
+        if (typeof this.plugin.settings.overrideShowTitle === 'boolean') {
+            showTitle = this.plugin.settings.overrideShowTitle;
+
+        } else if (typeof this.plugin.settings.showTaskWidgetTitles === 'boolean') {
+            showTitle = this.plugin.settings.showTaskWidgetTitles;
+
+        } else {
+            showTitle = true; // default fallback
+        }
+
+        let showChevron;
+        if (typeof this.plugin.settings.overrideShowChevron === 'boolean') {
+            showChevron = config.overrideShowChevron;
+
+        } else if (typeof this.plugin.settings.showTaskWidgetChevrons === 'boolean') {
+            showChevron = this.plugin.settings.showTaskWidgetChevrons;
+        } else {
+            showChevron = true; // default fallback
+        }
+
+        // --- State Management ---
+        const isCollapsed = this.plugin.settings.collapsedWidgets[widgetKey] || false;
+        if (isCollapsed) {
+            container.addClass('cpwn-is-collapsed');
+        }
+
+        // --- UI Elements ---
+        const header = container.createDiv({ cls: 'cpwn-pm-widget-header' });
+        let toggleIcon = '';
+        if (showChevron) {
+            toggleIcon = header.createDiv({ cls: 'cpwn-heatmap-collapse-icon' });
+        }
+        if (showTitle) {
+            header.createEl('h3', { text: 'Task scorecard' });
+        }
+        const scoreCardWrapper = container.createDiv({ cls: 'cpwn-widget-content-wrapper' });
+
+        if (showTitle) {
+            // --- Click Handler ---
+            header.addEventListener('click', async () => {
+                const currentlyCollapsed = container.classList.toggle('cpwn-is-collapsed');
+                this.plugin.settings.collapsedWidgets[widgetKey] = currentlyCollapsed;
+                await this.plugin.saveSettings();
+            });
+        }
+
+        const s = this.plugin.settings;
+
+        // 1. KPI Cards Row
+        const kpiRow = scoreCardWrapper.createDiv({ cls: 'cpwn-scorecard-kpi-row' });
+        const renderKPI = (label, value, color, tooltip, tasks) => {
+            const card = kpiRow.createDiv({ cls: 'cpwn-scorecard-kpi' });
+            const valEl = card.createDiv({ text: value || 0, cls: 'cpwn-scorecard-kpi-value' });
+            valEl.style.color = color;
+            card.createDiv({ text: label, cls: 'cpwn-scorecard-kpi-label' });
+            this.attachScorecardPopup(card, tasks, tooltip);
+        };
+
+
+        const lifetimeCount = metrics.completed || 0; // Use nullish coalescing for safety
+
+        renderKPI('Open', metrics.open, s.taskStatusColorOpen, 'Open tasks across all statuses', metrics.openTasks);
+        renderKPI('Completed', metrics.completedWithCreatedDate, s.taskStatusColorCompleted, 'Completed tasks with due & completion dates', metrics.completedWithCreatedDateTasks);
+        renderKPI('Lifetime', lifetimeCount, 'var(--text-muted)', 'All completed tasks across entire history', metrics.allCompletedTasks);
+
+        // 2. Active Breakdown (Includes Someday)
+        const breakdown = scoreCardWrapper.createDiv({ cls: 'cpwn-scorecard-breakdown' });
+
+        this.renderScoreCardRow(breakdown, 'Cancelled', metrics.cancelled, s.taskStatusColorCancelled, metrics.cancelledTasks);
+        this.renderScoreCardRow(breakdown, 'Overdue', metrics.overdue, s.taskStatusColorOverdue, metrics.overdueTasks);
+        this.renderScoreCardRow(breakdown, 'In progress', metrics.inProgress, s.taskStatusColorInProgress, metrics.inProgressTasks);
+        this.renderScoreCardRow(breakdown, 'Due', metrics.due, s.taskStatusColorOpen, metrics.dueTasks);
+        this.renderScoreCardRow(breakdown, 'Someday', metrics.someday, 'var(--text-faint)', metrics.somedayTasks);
+        // 3. Progress Bar (Completion rate against Total Open workload)
+        // Formula: Completed / (Completed + Total Open)
+        const totalOpen = (metrics.overdue || 0) + (metrics.due || 0) + (metrics.inProgress || 0) + (metrics.someday || 0);
+        const completed = metrics.completed || 0;
+        const totalWorkload = completed + totalOpen;
+        const percent = totalWorkload > 0 ? Math.round((completed / totalWorkload) * 100) : 100;
+
+        const progressSection = scoreCardWrapper.createDiv({ cls: 'cpwn-scorecard-progress' });
+        progressSection.createDiv({
+            text: `Task completion progress: ${percent}% (${totalOpen} open tasks remaining)`,
+            cls: 'cpwn-scorecard-progress-text'
+        });
+        const bar = progressSection.createDiv({ cls: 'cpwn-scorecard-bar' });
+        const fill = bar.createDiv({ cls: 'cpwn-scorecard-fill' });
+        fill.style.width = `${percent}%`;
+        fill.style.backgroundColor = s.taskStatusColorCompleted;
+
+        // --- Set Initial Icon ---
+        if (showChevron) {
+            setIcon(toggleIcon, 'chevron-down');
+        }
+        return container;
+    }
+
+    // Helper to render a single row in the scorecard breakdown.
+    renderScoreCardRow(parentContainer, label, count, color, tasks) {
+        if (!count || count === 0) return;
+
+        const row = parentContainer.createDiv({ cls: 'cpwn-scorecard-item' });
+        row.createSpan({ text: label, cls: 'cpwn-scorecard-item-label' });
+        const pill = row.createSpan({ text: count, cls: 'cpwn-scorecard-item-pill' });
+        pill.style.backgroundColor = color;
+        this.attachScorecardPopup(row, tasks, label);
+    }
+
+    // --- Helper for Hover Popups ---
+    attachScorecardPopup = (element, tasks, title,) => {
+        if (!tasks || (Array.isArray(tasks) && tasks.length === 0)) return;
+
+        const s = this.plugin.settings;
+
+        element.addClass('is-interactive');
+
+        element.addEventListener('mouseenter', (e) => {
+            if (this.isPopupLocked) return;
+            window.clearTimeout(this.hideTimeout);
+
+            this.hoverTimeout = window.setTimeout(() => {
+                // Formatting data for showFilePopup
+                const dataByType = { tasks: Array.isArray(tasks) ? tasks : [tasks] };
+                this.showFilePopup(element, dataByType, title, this.app.isMobile);
+            }, s.otherNoteHoverDelay);
+        });
+
+        element.addEventListener('mouseleave', () => {
+            window.clearTimeout(this.hoverTimeout);
+            this.hideTimeout = window.setTimeout(() => this.hideFilePopup(), s.popupHideDelay);
+        });
+    };
 
     // Renders the Task Status Overview widget with multiple horizontal bar charts.
     renderTaskStatusWidget(parentContainer, metrics, widgetKey, existingElement = null) {
@@ -9929,6 +10793,106 @@ export class PeriodMonthView extends ItemView {
 
         this.activePopupArgs = { targetEl, dataByType, dateOrTitle, isMobile };
         this.popupEl = createDiv({ cls: 'cpwn-other-notes-popup' });
+
+        // Inside showFilePopup method:
+
+        this.popupEl.addEventListener('contextmenu', (event) => {
+            const taskRow = event.target.closest('.cpwn-other-notes-popup-item');
+
+            // Only proceed if it's a task row (has task path)
+            if (!taskRow || (!taskRow.dataset.taskPath && !taskRow.getAttribute('data-task-path'))) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+
+            const menu = new Menu();
+
+            // 1. Copy Direct Link (Block ID)
+            menu.addItem((item) => {
+                item.setTitle("Copy direct link to task")
+                    .setIcon("link")
+                    .onClick(async () => {
+                        const filePath = taskRow.dataset.taskPath || taskRow.getAttribute('data-task-path');
+                        const lineNumber = parseInt(taskRow.dataset.lineNumber || taskRow.getAttribute('data-line-number'), 10);
+
+                        if (!filePath || isNaN(lineNumber)) return;
+
+                        const file = this.app.vault.getAbstractFileByPath(filePath);
+                        if (!file) return;
+
+                        // A. GET CLEAN TITLE (From Memory or Regex)
+                        let cleanTaskText = "Task";
+
+                        // Try to find the task in your loaded cache first for accuracy
+                        const memoryTask = (this.allTasks || []).find(t => t.path === filePath && t.lineNumber === lineNumber);
+
+                        if (memoryTask) {
+                            cleanTaskText = memoryTask.description;
+                            // Strip metadata: Remove priority, recurrence, dates (everything after these emojis)
+                            // Splits string at the first occurrence of any of these chars and takes the first part
+                            cleanTaskText = cleanTaskText.split(/[⏰🔁📅✅🛫⏳🔺⏫🔽🔼]/)[0].trim();
+                        }
+
+                        // B. READ FILE & HANDLE BLOCK ID
+                        let content = await this.app.vault.read(file);
+                        let lines = content.split('\n');
+                        let taskLine = lines[lineNumber];
+                        if (!taskLine) return; // Safety check
+
+                        // Fallback: If memory lookup failed, regex the raw line
+                        if (!memoryTask) {
+                            const match = taskLine.match(/^\s*[-\*+]\s+\[.?\]\s+(.*?)(?:\s[⏰🔁📅✅🛫⏳🔺⏫🔽🔼]|$)/);
+                            cleanTaskText = match ? match[1].trim() : "Task";
+                        }
+
+                        // Truncate if still too long
+                        if (cleanTaskText.length > 60) {
+                            cleanTaskText = cleanTaskText.substring(0, 60) + "...";
+                        }
+
+                        // Check/Create Block ID
+                        const blockIdMatch = taskLine.match(/\s\^([a-zA-Z0-9-]+)$/);
+                        let blockId;
+
+                        if (blockIdMatch) {
+                            blockId = blockIdMatch[1];
+                        } else {
+                            blockId = Math.random().toString(36).substring(2, 8);
+                            lines[lineNumber] = `${taskLine.trimEnd()} ^${blockId}`;
+                            await this.app.vault.modify(file, lines.join('\n'));
+                        }
+
+                        // C. GENERATE LINK
+                        const baseLink = this.app.metadataCache.fileToLinktext(file, file.path);
+                        const noteTitle = file.basename;
+
+                        // Format: [[Path#^ID | Clean Task Text - Note Title]]
+                        const aliasedLink = `[[${baseLink}#^${blockId}|${cleanTaskText} - ${noteTitle}]]`;
+
+                        await navigator.clipboard.writeText(aliasedLink);
+                        new Notice(`Link copied: ${cleanTaskText}`);
+                    });
+            });
+
+            menu.addItem((item) => {
+                item.setTitle("Copy link to note")
+                    .setIcon("copy")
+                    .onClick(async () => {
+                        const filePath = taskRow.dataset.taskPath || taskRow.getAttribute('data-task-path');
+                        if (!filePath) return;
+
+                        const file = this.app.vault.getAbstractFileByPath(filePath);
+                        if (file) {
+                            const link = this.app.metadataCache.fileToLinktext(file, file.path);
+                            await navigator.clipboard.writeText(`[[${link}]]`);
+                            new Notice("Note link copied!");
+                        }
+                    });
+            });
+
+            menu.showAtMouseEvent(event);
+        });
+
         const { settings } = this.plugin;
 
         if (isMobile) {
@@ -10890,6 +11854,7 @@ export class PeriodMonthView extends ItemView {
     * Main entry point for rendering a task based on settings
     */
     renderTaskItem(task) {
+
         // Create the container
         const taskRow = createDiv({ cls: 'cpwn-task-row  cpwn-tasks-tab-row' });
 

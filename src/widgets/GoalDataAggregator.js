@@ -50,36 +50,38 @@ export class GoalDataAggregator {
      * Includes labels, daily points, running totals, and breakdown details.
      */
     static async getAllHistory(app, settings, allTasks) {
+        const wasUpdated = await this.syncHistory(app, settings, allTasks);
+        
         // 1. Get the raw history map from settings
         const historyMap = settings.goalScoreHistory || {};
-        
+
         // 2. Prepare arrays for the chart data
         const labels = [];
         const dailyData = [];
         const breakdowns = [];
         const totalData = [];
-        
+
         // 3. Sort dates chronologically to ensure the line chart flows correctly
         const sortedDates = Object.keys(historyMap).sort();
-        
+
         // 4. Calculate running total variable
         let currentRunningTotal = 0;
-        
+
         // 5. Iterate through every day in history
         for (const dateKey of sortedDates) {
             const dayData = historyMap[dateKey];
-            
+
             // A. Date Label (e.g., "2025-12-16")
             labels.push(dateKey);
-            
+
             // B. Daily Points (e.g., 268)
             const dailyPoints = dayData.totalPoints || 0;
             dailyData.push(dailyPoints);
-            
+
             // C. Running Total (Accumulated points over time)
             currentRunningTotal += dailyPoints;
             totalData.push(currentRunningTotal);
-            
+
             // D. Breakdowns (CRITICAL: Used for Tooltip details like Bonus/Streak)
             // We default to an empty object if missing to keep arrays aligned
             breakdowns.push(dayData.breakdown || { goals: 0, allMet: 0, streak: 0 });
@@ -107,13 +109,13 @@ export class GoalDataAggregator {
     }
 
 
-    
+
     static async rebuildFullHistory(app, settings, allTasks) {
         const tracker = new GoalTracker(app, settings);
-        
+
         // 1. DETERMINE SCAN START DATE
         let earliestDate = moment();
-        
+
         if (allTasks && allTasks.length > 0) {
             allTasks.forEach(t => {
                 if (t.created && t.created.isValid() && t.created.isBefore(earliestDate)) {
@@ -136,14 +138,14 @@ export class GoalDataAggregator {
         const today = moment();
         const rawHistory = {};
         let totalProcessed = 0;
-        
-        for (let m = earliestDate.clone(); m.isSameOrBefore(today, 'day'); m.add(1, 'day')) {
+
+        for (let m = earliestDate.clone(); m.isBefore(today, 'day'); m.add(1, 'day')) {
             try {
                 const dayScore = await tracker.calculateDailyScore(m, allTasks);
                 const dateKey = m.format('YYYY-MM-DD');
-                rawHistory[dateKey] = dayScore; 
+                rawHistory[dateKey] = dayScore;
                 totalProcessed++;
-                
+
                 // Prevent UI freeze on large vaults
                 if (totalProcessed % 30 === 0) await new Promise(r => setTimeout(r, 0));
             } catch (err) {
@@ -191,10 +193,49 @@ export class GoalDataAggregator {
         // We modify the 'settings' object passed by reference.
         // The CALLER of this function is responsible for saving it to disk.
         settings.goalScoreHistory = finalHistory;
-        settings.totalPoints = newLifetimeTotal; 
+        settings.totalPoints = newLifetimeTotal;
 
         console.log(`[GoalTracker] History rebuilt. Filtered days: ${Object.keys(finalHistory).length}. Total Points: ${newLifetimeTotal}`);
-        
+
         return Object.keys(finalHistory).length;
     }
+
+    // Fills in any gaps in the history up to today. 
+    static async syncHistory(app, settings, allTasks) {
+        const tracker = new GoalTracker(app, settings);
+
+        const history = settings.goalScoreHistory || {};
+        const dates = Object.keys(history).sort();
+
+         if (dates.length > 0) {
+            const lastEntry = moment(dates[dates.length - 1]);
+            const yesterday = moment().subtract(1, 'day');
+            if (lastEntry.isSameOrAfter(yesterday, 'day')) {
+                return false; // Already up to date
+            }
+        }
+
+        // Start from the day after the last entry
+        let currentDate = dates.length > 0 ? moment(dates[dates.length - 1]).add(1, 'day') : moment().subtract(30, 'days');
+
+        // STOP AT YESTERDAY (End of day)
+        const yesterday = moment().subtract(1, 'day').endOf('day');
+
+        let updated = false;
+        while (currentDate.isSameOrBefore(yesterday, 'day')) {
+            const dateKey = currentDate.format('YYYY-MM-DD');
+            const dailyScore = await tracker.calculateDailyScore(currentDate, allTasks);
+            history[dateKey] = dailyScore;
+            currentDate.add(1, 'day');
+            updated = true;
+        }
+
+        if (updated) {
+            settings.goalScoreHistory = history;
+            // Optionally update total points here too
+            settings.totalPoints = await GoalTracker.getLifetimePoints(app, settings, allTasks);
+        }
+        return updated;
+    }
+
 }

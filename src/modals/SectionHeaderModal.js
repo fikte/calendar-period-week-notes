@@ -72,14 +72,30 @@ export class SectionHeaderModal extends Modal {
                 dropdown
                     .addOption('', '— None —')
                     .addOptions({
-                        'folder': 'Folder',
-                        'layers': 'Layers',
-                        'package': 'Package',
+                        'alert-circle': 'Alert circle',
+                        'archive': 'Archive',
+                        'bookmark': 'Bookmark',
                         'box': 'Box',
+                        'calendar': 'Calendar',
+                        'calendar-days': 'Calendar days',
+                        'check-circle': 'Check circle',
+                        'circle': 'Circle',
+                        'clock': 'Clock',
+                        'flag': 'Flag',
+                        'folder': 'Folder',
+                        'folder-open': 'Folder open',
                         'grid': 'Grid',
-                        'list': 'List',
+                        'inbox': 'Inbox',
+                        'kanban-square': 'Kanban square',
+                        'layers': 'Layers',
                         'layout-dashboard': 'Dashboard',
-                        'folder-open': 'Folder open'
+                        'list': 'List',
+                        'list-todo': 'List todo',
+                        'package': 'Package',
+                        'pin': 'Pin',
+                        'sparkles': 'Sparkles',
+                        'tags': 'Tags',
+                        'user': 'User'
                     })
                     .setValue(this.config.icon)
                     .onChange(value => {
