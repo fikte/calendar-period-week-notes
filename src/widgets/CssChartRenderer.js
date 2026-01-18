@@ -5,8 +5,9 @@ export class CssChartRenderer {
     constructor(container) {
         this.container = container;
         this.cleanup();
+        this.lastSwipeWidth = null;
+        this.swipeOffsetFromRight = 0;
     }
-
     cleanup() {
         if (this.container) {
             this.container.empty();
@@ -426,11 +427,6 @@ export class CssChartRenderer {
         tooltipGroup.appendChild(tooltipRect);
         tooltipGroup.appendChild(tooltipText);
         svg.appendChild(tooltipGroup);
-
-
-
-
-
 
         const interactionRect = document.createElementNS(svgNs, 'rect');
         Object.entries({ x: 0, y: 0, width: 400, height: 400, fill: 'transparent' }).forEach(([k, v]) => interactionRect.setAttribute(k, v));
@@ -1101,8 +1097,10 @@ export class CssChartRenderer {
      */
     renderSwipeableMomentum(chartDataObj, options = {}) {
         this.container.empty();
-        //this.container.className = 'cpwn-pm-widget-swipeable';
         this.container.addClass('cpwn-pm-widget-swipeable');
+
+        // 1. Initialize State Variable
+        let activeTooltipIndex = -1;
 
         const SWIPE_WIDGET_HEIGHT = 220;
 
@@ -1121,79 +1119,116 @@ export class CssChartRenderer {
         if (this.currentScrollIndex === undefined) this.currentScrollIndex = -1;
         if (this.swipeObserver) this.swipeObserver.disconnect();
 
+        // Helper: Converts points to a smooth SVG path
+        const getSmoothPath = (points, isClosed = false, height = 0) => {
+            if (points.length < 2) return "";
+            const controlPoint = (current, previous, next, reverse) => {
+                const p = previous || current;
+                const n = next || current;
+                const smoothing = 0.2;
+                const o = { x: n.x - p.x, y: n.y - p.y };
+                const angle = Math.atan2(o.y, o.x) + (reverse ? Math.PI : 0);
+                const length = Math.sqrt(Math.pow(o.x, 2) + Math.pow(o.y, 2)) * smoothing;
+                return { x: current.x + Math.cos(angle) * length, y: current.y + Math.sin(angle) * length };
+            };
+            let d = `M ${points[0].x},${points[0].y}`;
+            for (let i = 0; i < points.length - 1; i++) {
+                const p0 = points[i - 1]; const p1 = points[i]; const p2 = points[i + 1]; const p3 = points[i + 2];
+                const cp1 = controlPoint(p1, p0, p2, false);
+                const cp2 = controlPoint(p2, p1, p3, true);
+                d += ` C ${cp1.x},${cp1.y} ${cp2.x},${cp2.y} ${p2.x},${p2.y}`;
+            }
+            if (isClosed) { d += ` L ${points[points.length - 1].x},${height}`; d += ` L ${points[0].x},${height} Z`; }
+            return d;
+        };
+
+        let resizeTimeout = null;
+        let isResizing = false;
+
         const draw = () => {
+    let containerWidth = wrapper.getBoundingClientRect().width;
+    if (containerWidth < 50 && this.container.parentElement) {
+        containerWidth = this.container.parentElement.clientWidth - 20;
+    }
+    if (!containerWidth || containerWidth <= 0) return;
 
-            // ... (Width checks) ...
-            let containerWidth = wrapper.getBoundingClientRect().width;
-            if (containerWidth < 50 && this.container.parentElement) {
-                containerWidth = this.container.parentElement.clientWidth - 20;
-            }
-            if (!containerWidth || containerWidth <= 0) return;
+    if (this.lastSwipeWidth !== null && Math.abs(this.lastSwipeWidth - containerWidth) < 2) {
+        return;
+    }
 
-            wrapper.empty();
-            wrapper.appendChild(monthLabel);
+    // **CAPTURE SCROLL STATE - Store distance from RIGHT edge**
+    const oldScrollContainer = wrapper.querySelector('.cpwn-swipe-scroll-container');
+    let preservedOffsetFromRight = 0;
+    let shouldPreserveScroll = false;
+    
+    if (oldScrollContainer && this.lastSwipeWidth !== null) {
+        const oldScrollLeft = oldScrollContainer.scrollLeft;
+        const oldScrollWidth = oldScrollContainer.scrollWidth;
+        const oldClientWidth = oldScrollContainer.clientWidth;
+        const oldMaxScroll = oldScrollWidth - oldClientWidth;
+        
+        // Calculate how far we are from the RIGHT edge
+        preservedOffsetFromRight = oldMaxScroll - oldScrollLeft;
+        shouldPreserveScroll = true;
+    }
+    
+    this.lastSwipeWidth = containerWidth;
 
-            // ... (Data processing) ...
-            if (!chartDataObj?.datasets?.[0]?.data) {
-                wrapper.createDiv({ text: "No data", cls: "cpwn-muted-text" });
-                return;
-            }
-            const labels = chartDataObj.labels || [];
-            const dailyData = chartDataObj.datasets[0].data || [];
-            // GRAB THE BREAKDOWNS
-            const breakdowns = chartDataObj.breakdowns || [];
+    wrapper.empty();
+    wrapper.appendChild(monthLabel);
 
-            let totalData = chartDataObj.datasets[1]?.data || [];
-            if (totalData.length === 0) {
-                let running = 0;
-                totalData = dailyData.map(d => { running += (Number(d) || 0); return running; });
-            }
-            const totalDays = labels.length;
-            if (totalDays === 0) return;
+    if (!chartDataObj?.datasets?.[0]?.data) {
+        wrapper.createDiv({ text: "No data", cls: "cpwn-muted-text" });
+        return;
+    }
+    
+    const labels = chartDataObj.labels || [];
+    const dailyData = chartDataObj.datasets[0].data || [];
+    const breakdowns = chartDataObj.breakdowns || [];
 
-            // ... (Layout constants) ...
-            const padding = { top: 25, right: 10, bottom: 20, left: 10 };
-            const axisWidthL = 25;
-            const axisWidthR = 35;
-            const chartH = SWIPE_WIDGET_HEIGHT - padding.top - padding.bottom;
-            const pxPerDay = 45;
+    let totalData = chartDataObj.datasets[1]?.data || [];
+    if (totalData.length === 0) {
+        let running = 0;
+        totalData = dailyData.map(d => { running += (Number(d) || 0); return running; });
+    }
+    const totalDays = labels.length;
+    if (totalDays === 0) return;
 
-            // ... (Scales logic) ...
-            let minD = Math.min(...dailyData);
-            let maxD = Math.max(...dailyData);
-            if (minD === maxD) { minD -= 10; maxD += 10; }
-            const rangeD = maxD - minD || 1;
+    const padding = { top: 25, right: 10, bottom: 20, left: 10 };
+    const axisWidthL = 25;
+    const axisWidthR = 35;
+    const chartH = SWIPE_WIDGET_HEIGHT - padding.top - padding.bottom;
+    const pxPerDay = 45;
 
-            let maxT = Math.max(...totalData);
-            if (maxT === 0) maxT = 10;
-            maxT = maxT * 1.05;
-            const magnitude = Math.pow(10, Math.floor(Math.log10(maxT)));
-            maxT = Math.ceil(maxT / (magnitude / 2)) * (magnitude / 2);
-            const minT = 0;
-            const rangeT = maxT - minT || 1;
+    let minD = Math.min(...dailyData);
+    let maxD = Math.max(...dailyData);
+    if (minD === maxD) { minD -= 10; maxD += 10; }
+    const rangeD = maxD - minD || 1;
 
-            // ... (Axes rendering) ...
-            const leftAxis = wrapper.createDiv({ cls: 'cpwn-swipe-axis-left' });
-            leftAxis.style.width = `${axisWidthL}px`;
+    let maxT = Math.max(...totalData);
+    if (maxT === 0) maxT = 10;
+    maxT = maxT * 1.05;
+    const magnitude = Math.pow(10, Math.floor(Math.log10(maxT)));
+    maxT = Math.ceil(maxT / (magnitude / 2)) * (magnitude / 2);
+    const minT = 0;
+    const rangeT = maxT - minT || 1;
 
-            const rightAxis = wrapper.createDiv({ cls: 'cpwn-swipe-axis-right' });
-            rightAxis.style.width = `${axisWidthR}px`;
+    const leftAxis = wrapper.createDiv({ cls: 'cpwn-swipe-axis-left' });
+    leftAxis.style.width = `${axisWidthL}px`;
+    const rightAxis = wrapper.createDiv({ cls: 'cpwn-swipe-axis-right' });
+    rightAxis.style.width = `${axisWidthR}px`;
 
-            // ... (Scroll Container) ...
-            const scrollContainer = wrapper.createDiv({ cls: 'cpwn-swipe-scroll-container' });
-            scrollContainer.style.left = `${axisWidthL}px`;
-            scrollContainer.style.right = `${axisWidthR}px`;
+    const scrollContainer = wrapper.createDiv({ cls: 'cpwn-swipe-scroll-container' });
+    scrollContainer.style.left = `${axisWidthL}px`;
+    scrollContainer.style.right = `${axisWidthR}px`;
+    scrollContainer.style.height = `${SWIPE_WIDGET_HEIGHT}px`;
 
-            scrollContainer.style.height = `${SWIPE_WIDGET_HEIGHT}px`;
-
-            // ... (Animation Logic) ...
             let animationFrameId = null;
             const stopAutoScroll = () => { if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; } };
             scrollContainer.addEventListener('touchstart', stopAutoScroll, { passive: true });
             scrollContainer.addEventListener('wheel', stopAutoScroll, { passive: true });
             scrollContainer.addEventListener('mousedown', stopAutoScroll);
 
-            // ... (SVG Setup) ...
             const visibleWidth = containerWidth - axisWidthL - axisWidthR;
             const scrollWidth = Math.max(visibleWidth, totalDays * pxPerDay);
             const svgNs = "http://www.w3.org/2000/svg";
@@ -1217,14 +1252,11 @@ export class CssChartRenderer {
 
                     if (!isRight) {
                         const gridLine = document.createElementNS(svgNs, 'line');
-                        gridLine.setAttribute('x1', 0);
-                        gridLine.setAttribute('x2', scrollWidth); // Full width of the scroll area
-                        gridLine.setAttribute('y1', y);
-                        gridLine.setAttribute('y2', y);
+                        gridLine.setAttribute('x1', 0); gridLine.setAttribute('x2', scrollWidth);
+                        gridLine.setAttribute('y1', y); gridLine.setAttribute('y2', y);
                         gridLine.setAttribute('stroke', 'var(--background-modifier-border)');
                         gridLine.setAttribute('stroke-width', '1');
-                        gridLine.setAttribute('stroke-opacity', '0.4'); // Keep it very faint
-                        // Prepend so it sits BEHIND the data paths
+                        gridLine.setAttribute('stroke-opacity', '0.4');
                         svg.prepend(gridLine);
                     }
                 }
@@ -1240,28 +1272,47 @@ export class CssChartRenderer {
                     scrollContainer.scrollLeft = 0;
                     const autoScroll = () => {
                         scrollContainer.scrollLeft += 4;
-                        if (scrollContainer.scrollLeft < (scrollContainer.scrollWidth - scrollContainer.clientWidth)) {
-                            animationFrameId = requestAnimationFrame(autoScroll);
-                        } else { stopAutoScroll(); }
+                        if (scrollContainer.scrollLeft < (scrollContainer.scrollWidth - scrollContainer.clientWidth)) { animationFrameId = requestAnimationFrame(autoScroll); } else { stopAutoScroll(); }
                     };
                     stopAutoScroll(); animationFrameId = requestAnimationFrame(autoScroll);
-                } else {
-                    stopAutoScroll(); scrollContainer.scrollTo({ left: maxScroll, behavior: 'smooth' });
-                }
+                } else { stopAutoScroll(); scrollContainer.scrollTo({ left: maxScroll, behavior: 'smooth' }); }
             };
 
-            // ... (SVG Setup) ...
+            const statusGroup = document.createElementNS(svgNs, 'g');
+            statusGroup.setAttribute('class', 'cpwn-chart-status-bands');
+            svg.prepend(statusGroup);
+            let currentBlock = null;
+            for (let i = 0; i < totalDays; i++) {
+                const status = (breakdowns && breakdowns[i]) ? (breakdowns[i].status || 'active') : 'active';
+                if (status === 'vacation' || status === 'inactive') {
+                    if (!currentBlock || currentBlock.status !== status) {
+                        currentBlock = { status: status, startIndex: i, endIndex: i };
+                    } else { currentBlock.endIndex = i; }
+                }
+                if ((status === 'active' || i === totalDays - 1) && currentBlock) {
+                    const xStart = currentBlock.startIndex * pxPerDay;
+                    const xEnd = (currentBlock.endIndex + 1) * pxPerDay;
+                    const width = xEnd - xStart;
+                    const band = document.createElementNS(svgNs, 'rect');
+                    band.setAttribute('x', xStart); band.setAttribute('y', 0);
+                    band.setAttribute('width', width); band.setAttribute('height', SWIPE_WIDGET_HEIGHT);
+                    if (currentBlock.status === 'vacation') { band.setAttribute('fill', 'var(--interactive-accent)'); band.style.opacity = '0.08'; }
+                    else if (currentBlock.status === 'inactive') { band.setAttribute('fill', 'var(--text-muted)'); band.style.opacity = '0.05'; }
+                    statusGroup.appendChild(band);
+                    currentBlock = null;
+                }
+            }
+
             const dailyGroup = document.createElementNS(svgNs, 'g');
             const totalGroup = document.createElementNS(svgNs, 'g');
             dailyGroup.style.transition = "opacity 0.2s";
             totalGroup.style.transition = "opacity 0.2s";
-            svg.appendChild(dailyGroup); svg.appendChild(totalGroup);
+            svg.appendChild(totalGroup);
+            svg.appendChild(dailyGroup);
 
-            // ... (Points/Path Calc) ...
             const dPoints = dailyData.map((val, i) => ({ x: (i * pxPerDay) + (pxPerDay / 2), y: (padding.top + chartH) - ((val - minD) / rangeD) * chartH, val: val }));
             const tPoints = totalData.map((val, i) => ({ x: (i * pxPerDay) + (pxPerDay / 2), y: (padding.top + chartH) - ((val - minT) / rangeT) * chartH, val: val }));
 
-            // ... (Gradients) ...
             const defs = document.createElementNS(svgNs, 'defs');
             const gradId = 'swGrad-' + Math.random().toString(36).substr(2, 5);
             const grad = document.createElementNS(svgNs, 'linearGradient');
@@ -1270,156 +1321,183 @@ export class CssChartRenderer {
             const stop2 = document.createElementNS(svgNs, 'stop'); stop2.setAttribute('offset', '100%'); stop2.setAttribute('stop-color', 'var(--interactive-accent)'); stop2.setAttribute('stop-opacity', '0.0'); grad.appendChild(stop2);
             defs.appendChild(grad); svg.appendChild(defs);
 
-            // Paths
-            const dLineStr = dPoints.map((p, i) => (i === 0 ? `M ${p.x},${p.y}` : `L ${p.x},${p.y}`)).join(' ');
-            const dAreaStr = `${dLineStr} L ${dPoints[dPoints.length - 1].x},${SWIPE_WIDGET_HEIGHT} L ${dPoints[0].x},${SWIPE_WIDGET_HEIGHT} Z`;
-            const tLineStr = tPoints.map((p, i) => (i === 0 ? `M ${p.x},${p.y}` : `L ${p.x},${p.y}`)).join(' ');
+            const dLineStr = getSmoothPath(dPoints);
+            const dAreaStr = getSmoothPath(dPoints, true, SWIPE_WIDGET_HEIGHT);
+            const tLineStr = getSmoothPath(tPoints);
 
             const areaPath = document.createElementNS(svgNs, 'path'); areaPath.setAttribute('d', dAreaStr); areaPath.setAttribute('fill', `url(#${gradId})`); dailyGroup.appendChild(areaPath);
             const linePath = document.createElementNS(svgNs, 'path'); linePath.setAttribute('d', dLineStr); linePath.setAttribute('fill', 'none'); linePath.setAttribute('stroke', 'var(--interactive-accent)'); linePath.setAttribute('stroke-width', '2'); dailyGroup.appendChild(linePath);
             const totalPath = document.createElementNS(svgNs, 'path'); totalPath.setAttribute('d', tLineStr); totalPath.setAttribute('fill', 'none'); totalPath.setAttribute('stroke', 'var(--text-accent)'); totalPath.setAttribute('stroke-width', '2'); totalPath.setAttribute('stroke-dasharray', '4,3'); totalGroup.appendChild(totalPath);
 
-            // --- Helper to follow the mouse ---
-            // direction: 'right' (default) places tooltip to the right of cursor
-            // direction: 'left' places tooltip to the left of cursor
             const updateTooltipPosition = (e, direction = 'right') => {
                 const containerRect = this.container.getBoundingClientRect();
                 const relX = e.clientX - containerRect.left;
                 const relY = e.clientY - containerRect.top;
-
-                // Get approximate width if needed, or just use a safe large offset
-                // Using a CSS transform is cleaner for "left" alignment, but purely JS works too
-
-                if (direction === 'left') {
-                    // Position to the LEFT of the mouse
-                    // We subtract an estimated width (e.g. 180px) or measure it if possible
-                    // A cleaner way is to use style.transform to shift it back by 100%
-                    tooltip.style.left = (relX - 15) + 'px';
-                    tooltip.style.transform = 'translateX(-100%)';
-                } else {
-                    // Position to the RIGHT of the mouse (Default)
-                    tooltip.style.left = (relX + 15) + 'px';
-                    tooltip.style.transform = 'none'; // Reset transform
-                }
-
+                if (direction === 'left') { tooltip.style.left = (relX - 15) + 'px'; tooltip.style.transform = 'translateX(-100%)'; }
+                else { tooltip.style.left = (relX + 15) + 'px'; tooltip.style.transform = 'none'; }
                 tooltip.style.top = (relY - 5) + 'px';
             };
 
-            // --- Left Axis Events (Tooltip on Right) ---
-            leftAxis.addEventListener('mouseenter', (e) => {
-                totalGroup.style.opacity = "0";
-                dailyGroup.style.opacity = "1";
-                tooltip.empty();
-                tooltip.setText("Left Axis: Daily momentum");
-                tooltip.style.display = 'block';
-                updateTooltipPosition(e, 'right');
-            });
+            leftAxis.addEventListener('mouseenter', (e) => { totalGroup.style.opacity = "0"; dailyGroup.style.opacity = "1"; tooltip.empty(); tooltip.setText("Left Axis: Daily momentum"); tooltip.style.display = 'block'; updateTooltipPosition(e, 'right'); });
+            leftAxis.addEventListener('mousemove', (e) => { updateTooltipPosition(e, 'right'); });
+            leftAxis.addEventListener('mouseleave', () => { totalGroup.style.opacity = "1"; tooltip.style.display = 'none'; });
 
-            leftAxis.addEventListener('mousemove', (e) => {
-                updateTooltipPosition(e, 'right');
-            });
+            rightAxis.addEventListener('mouseenter', (e) => { dailyGroup.style.opacity = "0"; totalGroup.style.opacity = "1"; tooltip.empty(); tooltip.setText("Right Axis: Total momentum"); tooltip.style.display = 'block'; updateTooltipPosition(e, 'left'); });
+            rightAxis.addEventListener('mousemove', (e) => { updateTooltipPosition(e, 'left'); });
+            rightAxis.addEventListener('mouseleave', () => { dailyGroup.style.opacity = "1"; tooltip.style.display = 'none'; });
 
-            leftAxis.addEventListener('mouseleave', () => {
-                totalGroup.style.opacity = "1";
-                tooltip.style.display = 'none';
-            });
-
-            // --- Right Axis Events (Tooltip on Left) ---
-            rightAxis.addEventListener('mouseenter', (e) => {
-                dailyGroup.style.opacity = "0";
-                totalGroup.style.opacity = "1";
-                tooltip.empty();
-                tooltip.setText("Right Axis: Total momentum");
-                tooltip.style.display = 'block';
-                updateTooltipPosition(e, 'left');
-            });
-
-            rightAxis.addEventListener('mousemove', (e) => {
-                updateTooltipPosition(e, 'left');
-            });
-
-            rightAxis.addEventListener('mouseleave', () => {
-                dailyGroup.style.opacity = "1";
-                tooltip.style.display = 'none';
-            });
-
-            // Dots & Hit Areas
             dPoints.forEach((p, i) => {
                 const txt = document.createElementNS(svgNs, 'text');
                 txt.setAttribute('class', 'cpwn-swipe-day-text');
                 txt.setAttribute('x', p.x); txt.setAttribute('y', SWIPE_WIDGET_HEIGHT - 5);
                 const d = moment(labels[i], 'YYYY-MM-DD'); txt.textContent = d.isValid() ? d.format('D') : (i + 1); svg.appendChild(txt);
 
-                const c1 = document.createElementNS(svgNs, 'circle'); c1.setAttribute('cx', p.x); c1.setAttribute('cy', p.y); c1.setAttribute('r', 3); c1.setAttribute('fill', 'var(--background-primary)'); c1.setAttribute('stroke', 'var(--interactive-accent)'); c1.setAttribute('stroke-width', '2'); dailyGroup.appendChild(c1);
-                const c2 = document.createElementNS(svgNs, 'circle'); c2.setAttribute('cx', tPoints[i].x); c2.setAttribute('cy', tPoints[i].y); c2.setAttribute('r', 3); c2.setAttribute('fill', 'var(--background-primary)'); c2.setAttribute('stroke', 'var(--text-accent)'); c2.setAttribute('stroke-width', '2'); totalGroup.appendChild(c2);
+                const c2 = document.createElementNS(svgNs, 'circle');
+                c2.setAttribute('cx', tPoints[i].x); c2.setAttribute('cy', tPoints[i].y);
+                c2.setAttribute('r', 3); c2.setAttribute('fill', 'var(--background-primary)');
+                c2.setAttribute('stroke', 'var(--text-accent)'); c2.setAttribute('stroke-width', '2');
+                totalGroup.appendChild(c2);
+
+                const dayData = (breakdowns && breakdowns[i]) ? breakdowns[i] : {};
+                const dayStatus = dayData.status || 'active';
+                const isNegative = dPoints[i].val < 0;
+                let c1 = null;
+
+                if (dayStatus === 'vacation') {
+                    c1 = document.createElementNS(svgNs, 'polygon');
+                    const size = 4;
+                    const points = `${p.x},${p.y - size} ${p.x + size},${p.y} ${p.x},${p.y + size} ${p.x - size},${p.y}`;
+                    c1.setAttribute('points', points); c1.setAttribute('fill', 'var(--background-primary)'); c1.setAttribute('stroke', 'var(--interactive-accent)');
+                } else if (dayStatus === 'inactive') {
+                    c1 = document.createElementNS(svgNs, 'rect');
+                    const size = 6;
+                    c1.setAttribute('x', p.x - (size / 2)); c1.setAttribute('y', p.y - (size / 2));
+                    c1.setAttribute('width', size); c1.setAttribute('height', size);
+                    c1.setAttribute('fill', 'var(--background-primary)'); c1.setAttribute('stroke', 'var(--interactive-accent)'); c1.setAttribute('stroke-width', '2');
+                } else {
+                    c1 = document.createElementNS(svgNs, 'circle');
+                    c1.setAttribute('cx', p.x); c1.setAttribute('cy', p.y); c1.setAttribute('r', 3);
+                    if (isNegative) { c1.setAttribute('fill', 'var(--background-primary)'); c1.setAttribute('stroke', 'var(--color-red)'); }
+                    else { c1.setAttribute('fill', 'var(--background-primary)'); c1.setAttribute('stroke', 'var(--interactive-accent)'); }
+                }
+                c1.setAttribute('stroke-width', '2');
+                dailyGroup.appendChild(c1);
 
                 const hitRect = document.createElementNS(svgNs, 'rect');
                 hitRect.setAttribute('class', 'cpwn-swipe-hit-rect');
                 hitRect.setAttribute('x', p.x - (pxPerDay / 2)); hitRect.setAttribute('y', 0); hitRect.setAttribute('width', pxPerDay); hitRect.setAttribute('height', SWIPE_WIDGET_HEIGHT);
 
-                // --- MOUSE ENTER (Aligned & Extensible) ---
                 hitRect.addEventListener('mouseenter', (e) => {
-                    // Highlight Points
-                    c1.setAttribute('r', 5); c1.setAttribute('fill', 'var(--interactive-accent)');
-                    c2.setAttribute('r', 5); c2.setAttribute('fill', 'var(--text-accent)');
+                    // 1. Highlight Dots
+                    c2.setAttribute('r', 5);
+                    c2.setAttribute('fill', 'var(--text-accent)');
+                    if (isNegative) {
+                        c1.setAttribute('r', 5);
+                        c1.setAttribute('fill', 'var(--color-red)');
+                    } else {
+                        c1.setAttribute('r', 5);
+                        c1.setAttribute('fill', 'var(--interactive-accent)');
+                    }
 
-                    tooltip.empty();
+                    // 2. Track Active Index
+                    activeTooltipIndex = i;
 
-                    // 1. DATE HEADER
-                    const dateDiv = tooltip.createDiv({ cls: 'cpwn-chart-tooltip-date' });
+                    // 3. Create Content Container (Detached)
+                    const content = document.createElement('div');
+                    content.className = 'cpwn-chart-tooltip-content'; // Optional helper class
+
+                    // --- Header Date ---
+                    const dateDiv = content.createDiv({ cls: 'cpwn-chart-tooltip-date' });
                     dateDiv.setText(moment(labels[i]).format('ddd, MMM Do YYYY'));
 
-                    // 2. BREAKDOWN CONTENT
+                    // --- Status Check (Vacation/Inactive) ---
+                    if (dayStatus === 'vacation') {
+                        const statusRow = content.createDiv();
+                        statusRow.style.display = 'flex';
+                        statusRow.style.alignItems = 'center';
+                        statusRow.style.gap = '6px';
+                        statusRow.style.marginTop = '6px';
+                        statusRow.style.color = 'var(--text-accent)';
+                        statusRow.style.fontWeight = 'bold';
+
+                        const iconSpan = statusRow.createSpan();
+                        iconSpan.style.display = 'flex';
+                        setIcon(iconSpan, 'palmtree');
+                        const svg = iconSpan.querySelector('svg');
+                        if (svg) { svg.style.width = '14px'; svg.style.height = '14px'; }
+
+                        statusRow.createSpan({ text: 'Vacation (Goals Paused)' });
+                    } else if (dayStatus === 'inactive') {
+                        const statusRow = content.createDiv();
+                        statusRow.style.display = 'flex';
+                        statusRow.style.alignItems = 'center';
+                        statusRow.style.gap = '6px';
+                        statusRow.style.marginTop = '6px';
+                        statusRow.style.color = 'var(--text-muted)';
+
+                        const iconSpan = statusRow.createSpan();
+                        iconSpan.style.display = 'flex';
+                        setIcon(iconSpan, 'coffee');
+                        const svg = iconSpan.querySelector('svg');
+                        if (svg) { svg.style.width = '14px'; svg.style.height = '14px'; }
+
+                        statusRow.createSpan({ text: 'Rest Day (Inactive)' });
+                    }
+
+                    // --- Penalty Row ---
+                    if (dPoints[i].val < 0) {
+                        const penaltyRow = content.createDiv();
+                        penaltyRow.style.marginTop = '10px';
+                        penaltyRow.style.display = 'flex';
+                        penaltyRow.style.alignItems = 'center';
+                        penaltyRow.style.justifyContent = 'center';
+                        penaltyRow.style.gap = '6px';
+                        penaltyRow.style.color = 'var(--color-red)';
+                        penaltyRow.style.fontWeight = '500';
+
+                        const iconSpan = penaltyRow.createSpan();
+                        iconSpan.style.display = 'flex';
+                        setIcon(iconSpan, 'alert-triangle');
+                        const svg = iconSpan.querySelector('svg');
+                        if (svg) { svg.style.width = '14px'; svg.style.height = '14px'; svg.style.strokeWidth = '2.5px'; }
+
+                        penaltyRow.createSpan({ text: 'Penalty: -10 (no goals met)', cls: 'cpwn-penalty-text' });
+                    }
+
+                    // --- Active Data Grid ---
                     if (dailyGroup.style.opacity !== '0') {
                         const bd = (breakdowns && breakdowns[i]) ? breakdowns[i] : {};
 
-                        // GRID CONTAINER for perfect alignment
-                        // 3 columns: [Icon] [Label..........] [Points]
-                        const grid = tooltip.createDiv();
+                        const grid = content.createDiv();
                         grid.style.display = 'grid';
                         grid.style.gridTemplateColumns = '16px 1fr auto';
-                        grid.style.gap = '4px 8px'; // row-gap col-gap
+                        grid.style.gap = '4px 8px';
                         grid.style.marginTop = '6px';
                         grid.style.marginBottom = '6px';
                         grid.style.paddingBottom = '6px';
                         grid.style.borderBottom = '1px dashed var(--background-modifier-border)';
                         grid.style.alignItems = 'center';
 
-                        // Helper to add grid row
                         const addGridRow = (iconName, label, pts, colorVar) => {
-                            // Col 1: Icon
                             const iconContainer = grid.createDiv();
                             iconContainer.style.display = 'flex';
                             iconContainer.style.alignItems = 'center';
                             iconContainer.style.justifyContent = 'center';
                             iconContainer.style.color = 'var(--text-muted)';
 
-                            // ICON SPAN
                             const iconSpan = iconContainer.createSpan();
-                            // Force container size
                             iconSpan.style.display = 'flex';
                             iconSpan.style.width = '12px';
                             iconSpan.style.height = '12px';
-
-                            // Render Icon
                             setIcon(iconSpan, iconName);
-
-                            // FORCE SVG SIZE (Critical Step)
-                            // We need to ensure the injected <svg> fits the 12px box
                             const svg = iconSpan.querySelector('svg');
-                            if (svg) {
-                                svg.style.width = '100%';
-                                svg.style.height = '100%';
-                                svg.style.strokeWidth = '2px'; // Adjust thickness if needed
-                            }
+                            if (svg) { svg.style.width = '100%'; svg.style.height = '100%'; svg.style.strokeWidth = '2px'; }
 
-                            // Col 2: Label
                             const labelDiv = grid.createDiv();
                             labelDiv.innerText = label;
                             labelDiv.style.fontSize = '11px';
                             labelDiv.style.color = 'var(--text-normal)';
 
-                            // Col 3: Points
                             const ptsDiv = grid.createDiv();
                             ptsDiv.innerText = `+${pts}`;
                             ptsDiv.style.fontWeight = '600';
@@ -1427,39 +1505,31 @@ export class CssChartRenderer {
                             if (colorVar) ptsDiv.style.color = `var(${colorVar})`;
                         };
 
-                        // --- DYNAMIC RENDERING ---
-                        // Define known keys to handle order and styling explicitly
                         const config = [
                             { key: 'goals', icon: 'target', label: 'Goals', color: '--text-normal' },
-                            { key: 'allMet', icon: 'sparkles', label: 'Bonus', color: '--color-green' },
-                            { key: 'bonus', icon: 'sparkles', label: 'Bonus', color: '--color-green' }, // Legacy key support
+                            { key: 'allMet', icon: 'star', label: 'Bonus', color: '--color-green' },
+                            { key: 'bonus', icon: 'star', label: 'Bonus', color: '--color-green' },
                             { key: 'streak', icon: 'flame', label: 'Streak', color: '--color-orange' },
                             { key: 'multiplier', icon: 'zap', label: 'Multiplier', color: '--text-accent' }
                         ];
 
-                        // 1. Render Known Keys First (in specific order)
                         config.forEach(item => {
                             if (bd[item.key] && bd[item.key] > 0) {
                                 addGridRow(item.icon, item.label, bd[item.key], item.color);
                             }
                         });
 
-                        // 2. Render Unknown Keys (Automatic Extensibility)
-                        // If you add a new bonus type "vacationBonus" to the backend later, it shows up here automatically.
+                        // Catch-all for others
                         Object.keys(bd).forEach(key => {
-                            // Skip keys we already handled or explicitly ignore
                             if (config.some(c => c.key === key)) return;
                             if (['date', 'totalPoints'].includes(key)) return;
                             if (bd[key] <= 0) return;
-
-                            // Default style for unknown items
-                            // Capitalize key for label: "superBonus" -> "SuperBonus"
                             const label = key.charAt(0).toUpperCase() + key.slice(1);
                             addGridRow('plus-circle', label, bd[key], '--text-muted');
                         });
 
-                        // 3. DAILY TOTAL FOOTER
-                        const totalFooter = tooltip.createDiv();
+                        // Daily Total Footer
+                        const totalFooter = content.createDiv();
                         totalFooter.style.display = 'flex';
                         totalFooter.style.justifyContent = 'space-between';
                         totalFooter.style.fontWeight = 'bold';
@@ -1470,118 +1540,135 @@ export class CssChartRenderer {
                         totalFooter.createSpan({ text: `${dPoints[i].val}`, style: 'color: var(--interactive-accent)' });
                     }
 
-                    // LIFETIME FOOTER
-                    if (totalGroup.style.opacity !== '0') {
-                        const lifeDiv = tooltip.createDiv();
-                        lifeDiv.style.display = 'flex';
-                        lifeDiv.style.justifyContent = 'space-between';
-                        lifeDiv.style.fontSize = '13px';
-                        lifeDiv.style.fontWeight = 'bold';
-                        lifeDiv.style.marginTop = '2px';
+                    // --- Lifetime Total ---
+                    const lifeDiv = content.createDiv({ cls: 'cpwn-chart-tooltip-total' });
+                    lifeDiv.style.marginTop = '8px';
+                    lifeDiv.style.borderTop = '1px solid var(--background-modifier-border)';
+                    lifeDiv.style.paddingTop = '4px';
+                    lifeDiv.style.display = 'flex';
+                    lifeDiv.style.justifyContent = 'space-between';
+                    lifeDiv.style.fontSize = '11px';
+                    lifeDiv.style.color = 'var(--text-muted)';
 
-                        lifeDiv.createSpan({ text: "Total:" });
-                        lifeDiv.createSpan({ text: `${tPoints[i].val}` });
-                    }
+                    lifeDiv.createSpan({ text: "Total:" });
+                    lifeDiv.createSpan({ text: `${tPoints[i].val}` });
 
-                    // POSITIONING
-                    tooltip.style.display = 'block';
-                    const rect = hitRect.getBoundingClientRect();
-                    const containerRect = this.container.getBoundingClientRect();
-
-                    /*let leftPos = (rect.right - containerRect.left + 10);
-                    if (leftPos + 180 > containerWidth) leftPos = (rect.left - containerRect.left - 190);
-                    */
-
-                    // 1. Define Tooltip Width (Approximate or measure it)
-                    const tooltipWidth = 180;
-
-                    // 2. Default Preference: Try positioning to the RIGHT
-                    let leftPos = (rect.right - containerRect.left + 10);
-                    let transformOrigin = 'left center'; // For animation if you have any
-
-                    // 3. Boundary Check: Does it fit on the Right?
-                    if (leftPos + tooltipWidth > containerWidth) {
-                        // No, it would get cut off on the right.
-                        // Try positioning to the LEFT of the data point.
-                        const tryLeftPos = (rect.left - containerRect.left - tooltipWidth - 10);
-
-                        // 4. Boundary Check: Does it fit on the Left?
-                        if (tryLeftPos < 0) {
-                            // It fits NEITHER side (rare, but possible on tiny mobile screens).
-                            // Fallback: Force it to stay on screen by clamping.
-                            // We position it at 0 (left edge) but pushed right slightly to not touch edge.
-                            leftPos = 5;
-
-                            // Alternatively, if it's REALLY tight, center it over the point
-                            // leftPos = (containerWidth / 2) - (tooltipWidth / 2);
-                        } else {
-                            // It fits on the left! Use that.
-                            leftPos = tryLeftPos;
-                            transformOrigin = 'right center';
-                        }
-                    }
-
-                    // 5. Apply the calculated position
-                    tooltip.style.left = leftPos + 'px';
-                    tooltip.style.transformOrigin = transformOrigin; // Optional polish
-
-                    // 6. Ensure top doesn't clip (Simple check)
-                    // If you ever find it clips the top, you can do similar logic for 'top'.
-                    // For now, let's keep your hardcoded top or use a simple clamp:
-                    tooltip.style.top = '25px';
-
-
-                    tooltip.style.left = leftPos + 'px';
-                    tooltip.style.top = '25px';
+                    // 4. SHOW GLOBAL TOOLTIP
+                    this.showTooltip(e, content);
                 });
 
-                wrapper.addEventListener('click', () => {
-                    if (activeTooltipIndex !== -1) {
-                        tooltip.style.display = 'none';
-                        activeTooltipIndex = -1;
-                        // You might need to reset all circles here if you want perfect cleanup
-                        wrapper.querySelectorAll('circle').forEach(c => {
-                            if (c.getAttribute('r') == 5) {
-                                c.setAttribute('r', 3);
-                                c.setAttribute('fill', 'var(--background-primary)');
-                            }
-                        });
-                    }
+                // 5. UPDATE MOUSE MOVE HANDLER
+                hitRect.addEventListener('mousemove', (e) => {
+                    this.moveTooltip(e);
+                });
+
+                // 6. UPDATE MOUSE LEAVE HANDLER
+                hitRect.addEventListener('mouseleave', () => {
+                    c1.setAttribute('r', 3);
+                    c1.setAttribute('fill', 'var(--background-primary)');
+                    c2.setAttribute('r', 3);
+                    c2.setAttribute('fill', 'var(--background-primary)');
+                    this.hideTooltip(); // Use global hide
                 });
 
 
-                hitRect.addEventListener('mouseleave', () => { c1.setAttribute('r', 3); c1.setAttribute('fill', 'var(--background-primary)'); c2.setAttribute('r', 3); c2.setAttribute('fill', 'var(--background-primary)'); tooltip.style.display = 'none'; });
+                hitRect.addEventListener('mouseleave', () => {
+                    c1.setAttribute('r', 3); c1.setAttribute('fill', 'var(--background-primary)');
+                    c2.setAttribute('r', 3); c2.setAttribute('fill', 'var(--background-primary)');
+                    tooltip.style.display = 'none';
+
+                    // --- 3. Clear Active Index ---
+                    activeTooltipIndex = -1;
+                });
                 svg.appendChild(hitRect);
             });
 
-            // ... (Scroll Handlers) ...
             const updateScrollState = () => {
-                const sl = scrollContainer.scrollLeft;
-                const sw = scrollContainer.scrollWidth;
-                const cw = scrollContainer.clientWidth;
-                if (sw > cw && cw > 0) { this.currentScrollIndex = Math.floor(sl / pxPerDay); }
-                const centerIndex = Math.min(Math.floor((sl + (visibleWidth / 3)) / pxPerDay), labels.length - 1);
-                if (centerIndex >= 0 && labels[centerIndex]) {
-                    const d = moment(labels[centerIndex], 'YYYY-MM-DD');
-                    if (d.isValid()) monthLabel.setText(d.format('MMMM YYYY'));
+        if (isResizing) return;
+        
+        const sl = scrollContainer.scrollLeft; 
+        const sw = scrollContainer.scrollWidth; 
+        const cw = scrollContainer.clientWidth;
+        
+        const centerIndex = Math.min(Math.floor((sl + (cw / 3)) / pxPerDay), labels.length - 1);
+        if (centerIndex >= 0 && labels[centerIndex]) {
+            const d = moment(labels[centerIndex], 'YYYY-MM-DD'); 
+            if (d.isValid()) monthLabel.setText(d.format('MMMM YYYY'));
+        }
+    };
+    
+    scrollContainer.addEventListener('scroll', updateScrollState, { passive: true });
+
+    const hideTooltipOnScroll = () => {
+        if (activeTooltipIndex !== -1) {
+            this.hideTooltip();
+            activeTooltipIndex = -1;
+            const highlighted = wrapper.querySelectorAll('[r="5"], [width="6"]');
+            highlighted.forEach(el => {
+                if (el.tagName === 'circle') {
+                    el.setAttribute('r', 3);
+                    el.setAttribute('fill', 'var(--background-primary)');
+                } else if (el.tagName === 'rect') {
+                    el.setAttribute('width', 4);
+                    el.setAttribute('height', 4);
                 }
-            };
-            scrollContainer.addEventListener('scroll', updateScrollState);
-
-            window.requestAnimationFrame(() => {
-                const maxScroll = scrollContainer.scrollWidth - scrollContainer.clientWidth;
-                if (this.currentScrollIndex !== -1) { scrollContainer.scrollLeft = this.currentScrollIndex * pxPerDay; }
-                else { scrollContainer.scrollLeft = maxScroll; }
-                updateScrollState();
             });
+        }
+    };
 
-            if (this.attachScrollHandlers) this.attachScrollHandlers(scrollContainer);
-        };
+    scrollContainer.addEventListener('scroll', hideTooltipOnScroll, { passive: true });
+    scrollContainer.addEventListener('touchmove', hideTooltipOnScroll, { passive: true });
 
-        this.swipeObserver = new ResizeObserver(() => window.requestAnimationFrame(draw));
-        this.swipeObserver.observe(this.container);
+    // **NEW SCROLL RESTORATION - PRESERVE RIGHT EDGE**
+    if (shouldPreserveScroll) {
+        // This is a resize/redraw - keep the right edge position
+        const newMaxScroll = scrollContainer.scrollWidth - scrollContainer.clientWidth;
+        
+        // Scroll to maintain the same distance from the right edge
+        const newScrollLeft = Math.max(0, newMaxScroll - preservedOffsetFromRight);
+        scrollContainer.scrollLeft = newScrollLeft;
+        
+        updateScrollState();
+    } else {
+        // First render - scroll to end
+        window.requestAnimationFrame(() => {
+            const maxScroll = scrollContainer.scrollWidth - scrollContainer.clientWidth;
+            scrollContainer.scrollLeft = maxScroll;
+            updateScrollState();
+        });
     }
 
+    this.container.addEventListener('click', (e) => {
+        if (!e.target.classList.contains('cpwn-swipe-hit-rect')) { hideTooltipOnScroll(); }
+    });
+
+    if (this.attachScrollHandlers) this.attachScrollHandlers(scrollContainer);
+};
+
+        // **DEBOUNCED RESIZE OBSERVER**
+        this.swipeObserver = new ResizeObserver(() => {
+            isResizing = true;
+
+            if (resizeTimeout) {
+                clearTimeout(resizeTimeout);
+            }
+
+            // Call draw immediately for responsive feel
+            window.requestAnimationFrame(draw);
+
+            // Set flag back after resize settles
+            resizeTimeout = setTimeout(() => {
+                isResizing = false;
+                const scrollContainer = wrapper.querySelector('.cpwn-swipe-scroll-container');
+                if (scrollContainer) {
+                    // Trigger one final scroll update after resize completes
+                    scrollContainer.dispatchEvent(new Event('scroll'));
+                }
+            }, 150);
+        });
+
+        this.swipeObserver.observe(this.container);
+    }
 
     // Helper for scroll handlers to keep render method clean
     attachScrollHandlers(el) {

@@ -356,9 +356,8 @@ body .cpwn-period-month-container.today-style-cell .cpwn-today-cell .cpwn-dots-c
     
 }
 
-/* The weekly dot now just sets the color and re-uses .cpwn-calendar-dot for its size */
 .cpwn-weekly-note-dot {
-    background-color: var(--cpwn-weekly-note-dot-color);
+    background-color: var(--cpwn-weekly-note-dot-color, var(--weekly-note-color, var(--text-muted)));
 }
 
 /* -- Calendar Day Content & Dots -- */
@@ -1109,7 +1108,21 @@ body:has(.cpwn-task-text:hover) .tooltip {
 .cpwn-theme-dark .cpwn-vertical-month-title {
     color: var(--cpwn-month-color-themed);
     background-color: var(--background-secondary);
-   /* color: var(--cpwn-text-normal);  Ensure text is readable */
+}
+
+/* DEFAULT: Force White/Inherit structure */
+.cpwn-vertical-title-hoverable .cpwn-month-title-month,
+.cpwn-vertical-title-hoverable .cpwn-month-title-year {
+    color: inherit !important; 
+}
+
+/* HOVER: Use the injected variables */
+.cpwn-vertical-title-hoverable:hover .cpwn-month-title-month {
+    color: var(--cpwn-month-color-themed) !important;
+}
+
+.cpwn-vertical-title-hoverable:hover .cpwn-month-title-year {
+    color: var(--cpwn-year-color-themed) !important;
 }
 
 .cpwn-period-month-container.cpwn-vertical-view-active .cpwn-tabs-content-wrapper { display: none; }
@@ -2631,7 +2644,7 @@ body.theme-dark .cpwn-heatmap-cell.cpwn-heatmap-current-week-cell {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
+    color: var(--text-normal);
     font-weight: 600;
     font-size: 0.9em;
     transition: width 0.3s ease-in-out;
@@ -4110,14 +4123,11 @@ body.is-mobile .cpwn-tabs-content-wrapper {
     background-color: var(--daily-note-color);
 }
 
-.cpwn-weekly-note-dot {
-    background-color: var(--weekly-note-color);
-}
 
 /* Section Headers */
 .cpwn-section-header {
     display: flex;
-    align-items: baseline;
+    align-items: middle;
     gap: 6px;
     justify-content: flex-start;
 }
@@ -5826,7 +5836,7 @@ div[class^="cpwn-area-"] {
 /* --- The Month Pill --- */
 .cpwn-month-label {
     position: absolute;
-    top: 10px;
+    top: 0px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 20;
@@ -5839,7 +5849,10 @@ div[class^="cpwn-area-"] {
     user-select: none;
 
     /* Box Model */
-    background: var(--background-primary);
+    /*background: var(--background-primary);*/
+    background-color: rgba(var(--background-primary), 0.05); 
+    backdrop-filter: blur(2px);
+
     border: 1px solid var(--background-modifier-border);
     border-radius: 12px;
     padding: 4px 12px;
@@ -5955,3 +5968,289 @@ div[class^="cpwn-area-"] {
     font-size: 0.8em;
     color: var(--text-muted);
 }
+
+.cpwn-chart-status-bands rect {
+    pointer-events: none; /* Ensure the mouse still hits the hitRects */
+}
+
+/* Vacation Band */
+.cpwn-chart-status-bands [status="vacation"] {
+    fill: var(--interactive-accent);
+    opacity: 0.1;
+}
+
+/* Inactive Band */
+.cpwn-chart-status-bands [status="inactive"] {
+    fill: var(--text-muted);
+    opacity: 0.05;
+}
+
+.modal.cpwn-custom-layout-modal {
+    width: 32vw; /* Or use 80vw for responsive width */
+    max-width: 90vw;
+}
+
+/* Ensure the nested container doesn't force a block break */
+.cpwn-nested-container.is-flow {
+    display: inline !important;
+}
+
+
+/* 1. Ensure the flow area can wrap and break long text correctly */
+.is-flow {
+    flex-wrap: wrap !important;
+    word-break: break-word;
+}
+
+/* 2. Allow badges to follow text flow while keeping internal icon/text aligned */
+.is-flow .cpwn-recurrence,
+.is-flow .cpwn-date-badge,
+.is-flow .cpwn-layout-separator {
+    display: inline-flex !important; /* NOT display: inline */
+    white-space: nowrap;           /* Keep 'every week...' from breaking internally */
+}
+
+.is-flow .cpwn-date-badge, 
+.is-flow .cpwn-recurrence {
+    display: inline-flex !important;
+    vertical-align: middle; /* Or baseline, overridden by JS */
+}
+
+/* 3. Ensure icons sit correctly on the text baseline */
+.is-flow .cpwn-meta-icon {
+    display: inline-flex !important;
+    vertical-align: middle;
+    margin-right: 4px;
+    flex-shrink: 0;
+}
+
+/* 4. Ensure the task title wrapper plays nice with others in the flex row */
+.is-flow .cpwn-task-title-wrapper {
+    display: inline !important;
+    flex: 0 1 auto;
+    width: auto !important;
+    margin-right: 4px;
+}
+
+
+
+/* --- TASK SCORECARD WIDGET --- */
+
+
+/* Main Container - Ensures it follows your bounding box rules */
+.cpwn-task-scorecard-widget {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100% !important;
+}
+
+/* KPI Card Grid (Top Row) */
+.cpwn-scorecard-kpi-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.cpwn-scorecard-kpi {
+    border: 1px solid var(--background-modifier-border);
+    padding: 10px 6px;
+    border-radius: 8px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    transition: transform 0.2s ease;
+}
+
+.cpwn-scorecard-kpi:hover {
+    background: var(--background-modifier-hover);
+    border-color: var(--interactive-accent);
+}
+
+.cpwn-scorecard-kpi-value {
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 6px;
+    font-variant-numeric: tabular-nums;
+}
+
+.cpwn-scorecard-kpi-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+}
+
+/* Active Breakdown (Middle List) */
+.cpwn-scorecard-breakdown {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cpwn-scorecard-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 8px;
+    background: var(--background-primary);
+    border-radius: 6px;
+    border: 1px solid transparent;
+}
+
+.cpwn-scorecard-item:hover {
+    border-color: var(--background-modifier-border);
+}
+
+.cpwn-scorecard-item-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-normal);
+}
+
+.cpwn-scorecard-item-pill {
+    padding: 2px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #ffffff; /* Contrast for colored pills */
+    min-width: 32px;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Progress Section (Bottom Bar) */
+.cpwn-scorecard-progress {
+    margin-top: 20px;
+}
+
+.cpwn-scorecard-progress-text {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    text-align: left;
+}
+
+.cpwn-scorecard-bar {
+    height: 18px;
+    background: var(--background-modifier-border);
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+}
+
+.cpwn-scorecard-fill {
+    height: 100%;
+    border-radius: 6px;
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    background: var(--interactive-accent);
+    box-shadow: 0 0 10px var(--interactive-accent-hover);
+}
+
+
+/* styles.css */
+.cpwn-integrated-bar {
+    position: relative;
+    height: 28px; /* Thicker for text */
+    background-color: var(--background-modifier-border);
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.cpwn-integrated-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    /* Subtle glow on the leading edge */
+    box-shadow: 2px 0 8px rgba(0,0,0,0.2); 
+}
+
+.cpwn-integrated-text {
+    position: relative;
+    z-index: 2;
+    font-size: var(--font-adaptive-small);
+    /* Uses the standard UI font weight */
+    font-weight: var(--font-medium);
+    /* Standard text color that adapts to light/dark mode */
+    color: var(--text-normal);
+    /* This ensures the text "pops" against the green bar regardless of theme */
+    text-shadow: 0 1px 1px var(--background-primary);
+    pointer-events: none;
+    display: flex;
+    gap: 4px;
+}
+
+.cpwn-label-bold { 
+    /* Use Obsidian's bold weight variable */
+    font-weight: var(--font-bold); 
+    /* High contrast text variable intended for colored backgrounds */
+    color: var(--text-normal); 
+}
+
+.cpwn-label-dim { 
+    color: var(--text-normal); 
+}
+
+/* --- Segmented Progress Bar Widget --- */
+.cpwn-progress-segmented-bar {
+    position: relative;
+    width: 100%;
+    height: 28px; /* Standard Obsidian widget height */
+    background-color: var(--background-modifier-border);
+    border-radius: 6px;
+    display: flex;
+    overflow: hidden; /* Fixes the "vertical beam" glitch */
+    border: 1px solid var(--background-modifier-border);
+    box-sizing: border-box;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Glossy highlight effect (Makes it look premium) */
+.cpwn-progress-segmented-bar::after {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 50%;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%);
+    pointer-events: none;
+    z-index: 6;
+}
+
+.cpwn-progress-segmented-bar-segment {
+    height: 100% !important;
+    min-height: unset !important;
+    max-height: 28px !important; /* Safety constraint */
+    flex-shrink: 0;
+    transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Text Overlay Styling */
+.cpwn-progress-segmented-bar-text-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    pointer-events: none;
+    font-size: var(--font-adaptive-small);
+    font-weight: 500;
+    color: var(--text-normal);
+    gap: 4px;
+    /* Essential for readability over multi-colored segments */
+    text-shadow: 0 1px 2px var(--background-primary);
+}
+
+

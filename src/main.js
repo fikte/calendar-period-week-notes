@@ -92,8 +92,8 @@ export default class PeriodMonthPlugin extends Plugin {
                 // When tasks change anywhere, trigger a full data refresh of your view.
                 this.refreshData();
             })
-        );
-
+        );        
+        
         this.app.workspace.onLayoutReady(() => {
             this.activateView();
         });
@@ -133,10 +133,7 @@ export default class PeriodMonthPlugin extends Plugin {
                 this.showSystemNotification(title, body);
             } catch (e) {
                 console.error("System notification failed", e);
-               //new Notice(title + ": " + body);
             }
-        //} else {
-            //new Notice(title + ": " + body);
         }
     }
 
@@ -215,7 +212,6 @@ export default class PeriodMonthPlugin extends Plugin {
             '--cpwn-task-color-open': this.settings.taskStatusColorOpen,
             '--cpwn-task-color-completed': this.settings.taskStatusColorCompleted,
             '--cpwn-task-color-cancelled': this.settings.taskStatusColorCancelled,
-
         };
 
         for (const key in styleProps) {

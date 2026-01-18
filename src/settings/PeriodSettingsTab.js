@@ -158,6 +158,222 @@ export class PeriodSettingsTab extends PluginSettingTab {
     /**
      * Creates a widget element with all its settings and drag handlers
      */
+    // Change the 2nd argument from 'name' to 'widgetObj' to be clear it's an object
+createWidgetElement(key, widgetObj, visibilitySettings, visibilityKey, index, containerEl, activeTabName) {
+    
+    // 1. EXTRACT THE NAME STRING
+    // Handle both cases: if it's the full object (new way) or just a string (old way safety)
+    const displayName = typeof widgetObj === 'object' ? (widgetObj.name || 'Unknown Widget') : widgetObj;
+
+    // 2. Determine Widget Config (for custom widgets)
+    const widgetConfig = this.plugin.settings.tasksStatsWidgets?.find(w => w.widgetKey === key);
+    const isSectionHeader = widgetConfig?.type === 'section-header';
+
+    // Check for Custom Heatmaps
+    const isCustomHeatmap = visibilityKey === 'creationDashboardWidgets' && key.startsWith('custom-');
+    const customHeatmapIndex = isCustomHeatmap ? parseInt(key.split('-')[1]) : -1;
+    const customHeatmapConfig = isCustomHeatmap ? this.plugin.settings.customHeatmaps[customHeatmapIndex] : null;
+
+    // Indentation Logic
+    let isInSection = false;
+    if (!isSectionHeader && this.plugin.settings.tasksStatsWidgets && visibilityKey === 'tasksDashboardWidgets') {
+        const allKeys = this.getMemoizedFinalOrder(
+            { ...DASHBOARDWIDGETS.tasks },
+            'tasksDashboardOrder'
+        );
+        for (let i = index - 1; i >= 0; i--) {
+            const prevConfig = this.plugin.settings.tasksStatsWidgets.find(w => w.widgetKey === allKeys[i]);
+            if (prevConfig?.type === 'section-header') {
+                isInSection = true;
+                break;
+            }
+        }
+    }
+
+    const widgetEl = createDiv({
+        cls: `cpwn-pm-draggable-widget-item ${isSectionHeader ? 'cpwn-pm-section-header-item' : ''} ${isInSection && !isSectionHeader ? 'cpwn-pm-indented-item' : ''}`,
+        attr: { 'data-widget-key': key }
+    });
+
+    // Drag handle
+    const dragHandle = widgetEl.createDiv({ cls: 'cpwn-pm-drag-handle' });
+    setIcon(dragHandle, 'grip-vertical');
+
+    // Setting wrapper
+    const settingWrapper = widgetEl.createDiv({ cls: 'cpwn-pm-setting-wrapper' });
+    const setting = new Setting(settingWrapper);
+
+    if (isSectionHeader) {
+        setting.setName(widgetConfig.name);
+        const visibilityStatus = widgetConfig.isVisible !== false ? 'Visible' : 'Not visible';
+        setting.setDesc(`Type: Section header | ${visibilityStatus}`);
+
+        if (widgetConfig.icon) {
+            const iconPreview = setting.nameEl.createSpan({ cls: 'cpwn-pm-section-icon-preview' });
+            setIcon(iconPreview, widgetConfig.icon);
+            iconPreview.style.color = widgetConfig.iconColor;
+            iconPreview.style.marginRight = '8px';
+            setting.nameEl.prepend(iconPreview);
+            setting.nameEl.style.color = widgetConfig.textColor;
+            setting.nameEl.style.fontWeight = widgetConfig.fontWeight === 'bold' ? 'bold' : 'normal';
+            setting.nameEl.style.fontStyle = widgetConfig.fontWeight === 'italic' ? 'italic' : 'normal';
+            setting.nameEl.style.fontSize = `${widgetConfig.fontSize}px`;
+        }
+    } else if (isCustomHeatmap) {
+        setting.setName(customHeatmapConfig?.name || displayName);
+        setting.setDesc('Type: Custom Heatmap');
+    } else {
+        // --- CORE & CUSTOM WIDGETS ---
+        
+        // Use the extracted name string here!
+        setting.setName(displayName);
+
+        // Determine Type & Size
+        // 1. Try to get it from the widgetConfig (User Custom Widget)
+        // 2. Or from the passed widgetObj (Core Widget updated in constants)
+        // 3. Or fallback to global constant lookup
+        const coreConfig = DASHBOARDWIDGETS.tasks[key] || DASHBOARDWIDGETS.creation[key];
+        
+        const widgetType = widgetConfig?.chartType || widgetObj.type || coreConfig?.type || 'Core widget';
+        const widgetSize = widgetConfig?.size || widgetObj.size || coreConfig?.size || 'N/A';
+
+        setting.setDesc(`Type: ${widgetType} | Size: ${widgetSize}`);
+    }
+
+    // Toggle visibility
+    setting.addToggle(toggle => {
+        toggle.setValue(visibilitySettings[key] ?? true)
+            .onChange(async (value) => {
+                visibilitySettings[key] = value;
+                await this.saveAndUpdate();
+            });
+    });
+
+    // ... [Rest of your button/drag event logic remains the same] ...
+    
+    // Keep your existing Button Logic (Settings/Trash) and Drag Events here
+    // (Copy the bottom half of your previous function exactly as is)
+    
+    // Case A: Section Headers 
+    if (isSectionHeader) {
+        setting.addButton(button => {
+            button.setIcon('settings').setTooltip('Configure').onClick(() => {
+                new SectionHeaderModal(this.app, this.plugin, async (updatedConfig) => {
+                    Object.assign(widgetConfig, updatedConfig);
+                    await this.plugin.saveSettings();
+                    this.renderTasksDashboardSettings(containerEl);
+                    this.triggerDashboardRefresh();
+                }, widgetConfig).open();
+            });
+        });
+        setting.addButton(button => button.setIcon('trash').setWarning().onClick(async () => {
+            if (confirm(`Delete section header "${displayName}"?`)) {
+                 // ... delete logic ...
+                 const idx = this.plugin.settings.tasksStatsWidgets.findIndex(w => w.widgetKey === key);
+                 if (idx > -1) {
+                     this.plugin.settings.tasksStatsWidgets.splice(idx, 1);
+                 }
+                 if (this.plugin.settings.tasksDashboardWidgets[key]) {
+                     delete this.plugin.settings.tasksDashboardWidgets[key];
+                 }
+                 this.plugin.settings.tasksDashboardOrder = this.plugin.settings.tasksDashboardOrder.filter(k => k !== key);
+                 await this.plugin.saveSettings();
+                 this.renderTasksDashboardSettings(containerEl);
+                 this.triggerDashboardRefresh();
+            }
+        }));
+    }
+    // Case B: Custom Task Widgets 
+    else if (widgetConfig && key.startsWith('custom-') && visibilityKey === 'tasksDashboardWidgets') {
+         setting.addButton(button => {
+            button.setIcon('settings').setTooltip('Configure').onClick(() => {
+                new WidgetBuilderModal(this.app, this.plugin, widgetConfig, async (updatedConfig) => {
+                    const idx = this.plugin.settings.tasksStatsWidgets.findIndex(w => w.widgetKey === key);
+                    this.plugin.settings.tasksStatsWidgets[idx] = updatedConfig;
+                    await this.plugin.saveSettings();
+                    this.renderTasksDashboardSettings(containerEl);
+                    this.triggerDashboardRefresh();
+                }).open();
+            });
+        });
+        setting.addButton(button => button.setIcon('trash').setWarning().onClick(async () => {
+            if (confirm(`Delete ${displayName}?`)) {
+                // ... delete logic ...
+                const idx = this.plugin.settings.tasksStatsWidgets.findIndex(w => w.widgetKey === key);
+                this.plugin.settings.tasksStatsWidgets.splice(idx, 1);
+                delete this.plugin.settings.tasksDashboardWidgets[key];
+                this.plugin.settings.tasksDashboardOrder = this.plugin.settings.tasksDashboardOrder.filter(k => k !== key);
+                await this.plugin.saveSettings();
+                this.renderTasksDashboardSettings(containerEl);
+                this.triggerDashboardRefresh();
+            }
+        }));
+    }
+    // Case C: Custom Heatmaps
+    else if (isCustomHeatmap) {
+        // ... Keep your existing Heatmap button logic ...
+         setting.addButton(button => {
+            button.setIcon('settings').setTooltip('Configure Heatmap').onClick(() => {
+                if (customHeatmapConfig) {
+                    new FileCreationHeatmapModal(this.app, customHeatmapConfig, 
+                        async (updatedHeatmap) => {
+                            this.plugin.settings.customHeatmaps[customHeatmapIndex] = updatedHeatmap;
+                            await this.plugin.saveSettings();
+                            this.renderDashboardSettings('creation');
+                            this.triggerDashboardRefresh();
+                        },
+                        async () => { 
+                             // Call the delete logic you had in your code
+                             if (confirm(`Delete heatmap "${customHeatmapConfig.name || 'this heatmap'}"?`)) {
+                                this.plugin.settings.customHeatmaps.splice(customHeatmapIndex, 1);
+                                // ... (Your re-indexing logic) ...
+                                await this.plugin.saveSettings();
+                                this.renderDashboardSettings('creation');
+                                this.triggerDashboardRefresh();
+                             }
+                        }
+                    ).open();
+                }
+            });
+        });
+        setting.addButton(button => {
+            button.setIcon('trash').setTooltip('Delete Heatmap').setWarning().onClick(async () => {
+                 // Call the delete logic you had in your code
+                 if (confirm(`Delete heatmap "${displayName}"?`)) {
+                    this.plugin.settings.customHeatmaps.splice(customHeatmapIndex, 1);
+                    // ... (Your re-indexing logic) ...
+                    await this.plugin.saveSettings();
+                    this.renderDashboardSettings('creation');
+                    this.triggerDashboardRefresh();
+                 }
+            });
+        });
+    }
+    else {
+        setting.addButton(button => button.setIcon('settings').setTooltip('Core widgets cannot be configured').setDisabled(true));
+        setting.addButton(button => button.setIcon('trash').setTooltip('Core widgets cannot be deleted, use the toggle to hide').setDisabled(true));
+    }
+
+    // Events
+    widgetEl.draggable = true;
+    widgetEl.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', key);
+        e.dataTransfer.effectAllowed = 'move';
+        widgetEl.addClass('dragging');
+        this._draggingElement = widgetEl;
+    });
+    widgetEl.addEventListener('dragend', () => {
+        widgetEl.removeClass('dragging');
+        this._draggingElement = null;
+    });
+
+    return widgetEl;
+}
+
+
+
+
+    /*
     createWidgetElement(key, name, visibilitySettings, visibilityKey, index, containerEl, activeTabName) {
         // 1. Determine Widget Type
         const widgetConfig = this.plugin.settings.tasksStatsWidgets?.find(w => w.widgetKey === key);
@@ -492,7 +708,7 @@ export class PeriodSettingsTab extends PluginSettingTab {
 
         return widgetEl;
     }
-
+*/
 
     /**
      * Attach optimized drag handlers with throttling and event delegation
@@ -678,7 +894,8 @@ export class PeriodSettingsTab extends PluginSettingTab {
 
             const widgetEl = this.createWidgetElement(
                 key,
-                allWidgets[key].name || 'Unknown widget',
+                //allWidgets[key].name || 'Unknown widget',
+                allWidgets[key],
                 visibilitySettings,
                 visibilityKey,
                 index,
@@ -692,8 +909,6 @@ export class PeriodSettingsTab extends PluginSettingTab {
         // Single event listener using delegation
         this.attachDragHandlers(draggableContainer, orderKey);
     }
-
-
 
     // Utility function to capitalize the first letter of a string
     capitalizeFirstLetter(str) {
@@ -1357,6 +1572,41 @@ export class PeriodSettingsTab extends PluginSettingTab {
         this.createRgbaColorSetting(containerEl, "Period/Week column font color (Dark Mode)", "Text color for the Period/Week column in dark theme.", "pwColumnFontColorDark");
         this.createRgbaColorSetting(containerEl, "Week number column font color (Light Mode)", "Text color for the week number column in light theme.", "weekNumberFontColorLight");
         this.createRgbaColorSetting(containerEl, "Week number column font color (Dark Mode)", "Text color for the week number column in dark theme.", "weekNumberFontColorDark");
+    
+        new Setting(containerEl).setName("Vertical calendar grid view").setHeading();
+
+
+        new Setting(containerEl)
+            .setName('Years previous')
+            .setDesc('Number of previous months / years to load before the current month in vertical view.')
+            .addDropdown(dropdown => dropdown
+                .addOption('0.5', '6 months')
+                .addOption('1', '1 Year')
+                .addOption('2', '2 Years')
+                .addOption('3', '3 Years')
+                .setValue(String(this.plugin.settings.verticalViewYearsPast))
+                .onChange(async (value) => {
+                    this.plugin.settings.verticalViewYearsPast = Number(value);
+                    await this.plugin.saveSettings();
+                    // Optional: Trigger a refresh if the view is open
+                    this.plugin.app.workspace.trigger('cpwn-pm-dashboard-refresh'); 
+                }));
+
+        new Setting(containerEl)
+            .setName('Years ahead')
+            .setDesc('Number of future months / years to load after the current month in vertical view.')
+            .addDropdown(dropdown => dropdown
+                .addOption('0.5', '6 months')
+                .addOption('1', '1 Year')
+                .addOption('2', '2 Years')
+                .addOption('3', '3 Years')
+                .setValue(String(this.plugin.settings.verticalViewYearsFuture))
+                .onChange(async (value) => {
+                    this.plugin.settings.verticalViewYearsFuture = Number(value);
+                    await this.plugin.saveSettings();
+                    this.plugin.app.workspace.trigger('cpwn-pm-dashboard-refresh');
+                }));
+
     }
 
     renderFunctionalSettings() {
@@ -2227,7 +2477,7 @@ export class PeriodSettingsTab extends PluginSettingTab {
 
         //new Setting(containerEl).setName("Task sort order").setDesc("The default order for tasks within each group. Note tasks with alerts set will take precedence.").addDropdown(dropdown => dropdown.addOption('dueDate', 'By Due Date').addOption('a-z', 'A-Z').addOption('z-a', 'Z-A').setValue(this.plugin.settings.taskSortOrder).onChange(async (value) => { this.plugin.settings.taskSortOrder = value; await this.saveAndUpdate(); }));
         new Setting(containerEl)
-            .setName('Checkbox Gap')
+            .setName('Checkbox gap')
             .setDesc('Space between the checkbox and the task content.')
             .addSlider(slider => slider
                 // 1. Allow negative values
@@ -2245,13 +2495,13 @@ export class PeriodSettingsTab extends PluginSettingTab {
         new Setting(containerEl).setName("Group tasks by").setDesc("Choose how to group tasks in the view. Second-clicking the Tasks tab will also toggle this.").addDropdown(dropdown => dropdown.addOption('date', 'Date (Overdue, Today, etc.)').addOption('tag', 'Tag').setValue(this.plugin.settings.taskGroupBy).onChange(async (value) => { this.plugin.settings.taskGroupBy = value; await this.saveAndUpdate(); this.refreshDisplay(); }));
 
         new Setting(containerEl)
-            .setName('Task Layout')
+            .setName('Task layout')
             .setDesc('Choose the layout structure for tasks in the list.')
             .addDropdown(dropdown => {
                 Object.keys(TASK_LAYOUTS).forEach(key => {
                     dropdown.addOption(key, TASK_LAYOUTS[key].name);
                 });
-                dropdown.addOption('custom', 'Custom Layout');
+                dropdown.addOption('custom', 'Custom layout');
                 dropdown.setValue(this.plugin.settings.taskLayout || 'default')
                     .onChange(async (value) => {
                         this.plugin.settings.taskLayout = value;
@@ -2275,10 +2525,10 @@ export class PeriodSettingsTab extends PluginSettingTab {
         // Edit Button (Conditional)
         if (this.plugin.settings.taskLayout === 'custom') {
             new Setting(containerEl)
-                .setName('Customize Layout')
+                .setName('Customize layout')
                 .setDesc('Edit your custom drag-and-drop configuration.')
                 .addButton(btn => btn
-                    .setButtonText('Open Builder')
+                    .setButtonText('Open builder')
                     .setIcon('layout')
                     .onClick(() => this.openBuilder())
                 );
@@ -2286,7 +2536,7 @@ export class PeriodSettingsTab extends PluginSettingTab {
 
 
         // 2. Preview Container
-        containerEl.createEl('h3', { text: 'Layout Preview' });
+        containerEl.createEl('h3', { text: 'Layout preview' });
         const previewContainer = containerEl.createDiv({ cls: 'cpwn-task-preview-container' });
 
         // Apply some basic styles to the preview box so it looks like a real task
@@ -2393,7 +2643,6 @@ export class PeriodSettingsTab extends PluginSettingTab {
     /**
     * Helper to render the live preview using the same engine as the real view
     */
-
     renderTaskPreview(container, layoutId) {
         container.empty();
 
@@ -2516,7 +2765,7 @@ export class PeriodSettingsTab extends PluginSettingTab {
             });
 
 
-        containerEl.createEl('h3', { text: 'Vacation & Pauses' });
+        containerEl.createEl('h3', { text: 'Vacation & pauses' });
 
         // --- FIX: LOCAL CHECK LOGIC ---
         const today = moment();
@@ -2532,12 +2781,12 @@ export class PeriodSettingsTab extends PluginSettingTab {
                 cls: 'setting-item-description',
                 style: 'color: var(--text-accent); margin-bottom: 12px; font-weight: bold; display: flex; align-items: center; gap: 6px;'
             });
-            notice.createSpan({ text: 'Scheduled Vacation is currently ACTIVE today.' });
+            notice.createSpan({ text: 'Scheduled vacation is currently ACTIVE today.' });
         }
 
         // 2. MANUAL TOGGLE
         new Setting(containerEl)
-            .setName('Manual Override')
+            .setName('Manual override')
             .setDesc('Force pause all goals immediately, regardless of schedule.')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.vacationModeGlobal)
@@ -2547,7 +2796,7 @@ export class PeriodSettingsTab extends PluginSettingTab {
                 }));
 
         // 3. DATE RANGES UI
-        containerEl.createDiv({ text: 'Scheduled Vacations', cls: 'setting-item-name', style: 'margin-top: 18px; font-weight: bold;' });
+        containerEl.createDiv({ text: 'Scheduled vacations', cls: 'setting-item-name', style: 'margin-top: 18px; font-weight: bold;' });
         containerEl.createDiv({ text: 'Goals will automatically pause during these dates.', cls: 'setting-item-description' });
 
         const rangeList = containerEl.createDiv({ cls: 'cpwn-vacation-list', style: 'margin-top: 10px;' });
@@ -2580,7 +2829,7 @@ export class PeriodSettingsTab extends PluginSettingTab {
             });
 
             // Add Button
-            const addBtn = rangeList.createEl('button', { text: '+ Schedule Vacation', style: 'margin-top: 8px;' });
+            const addBtn = rangeList.createEl('button', { text: '+ Schedule vacation', style: 'margin-top: 8px;' });
             addBtn.onclick = async () => {
                 const today = moment().format('YYYY-MM-DD');
                 this.plugin.settings.vacationRanges.push({ start: today, end: today });
@@ -2590,9 +2839,6 @@ export class PeriodSettingsTab extends PluginSettingTab {
         };
 
         renderRanges();
-
-
-
 
         containerEl.createEl('h3', { text: 'Level ladder' });
 
@@ -3424,7 +3670,7 @@ export class PeriodSettingsTab extends PluginSettingTab {
         const headerContent = header.createDiv({ cls: 'cpwn-note-group-header-content' });
         const collapseIcon = headerContent.createDiv({ cls: 'cpwn-note-group-collapse-icon' });
         setIcon(collapseIcon, 'chevron-down');
-        headerContent.createSpan({ text: "Custom Heatmap Widget Guide" });
+        headerContent.createSpan({ text: "Custom heatmap widget guide" });
 
         header.addEventListener('click', () => {
             const isNowCollapsed = guideContainer.classList.toggle('cpwn-is-collapsed');
@@ -3437,7 +3683,7 @@ export class PeriodSettingsTab extends PluginSettingTab {
         helpText.setAttr('style', 'user-select: text; font-size: 0.9em; line-height: 1.6; padding: 15px; margin: 0; border-radius: 8px; background-color: var(--background-secondary);');
 
         const guideHtml = `
-<p>Use the Custom Heatmap section to add personalized heatmaps to your <strong>Creation</strong> dashboard...</p>
+<p>Use the 'Custom heatmap' section to add personalized heatmaps to your <strong>Creation</strong> dashboard...</p>
 <h2>Key Features</h2>
 <ul>
     <li><strong>Date Range:</strong> Set a custom date range...</li>

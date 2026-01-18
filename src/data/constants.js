@@ -3,41 +3,46 @@ export const VIEW_TYPE_PERIOD = "calendar-period-week";
 
 export const DASHBOARDWIDGETS = {
     tasks: {
-        weeklyGoalPoints: { name: 'Week goal momentum', size: 'medium' },
-        goalStatusList: { name: 'Daily goals', size: 'medium' },
-        goalStatusListCondensed: { name: 'Daily goals', size: 'small' },
-        weeklyGoalPointsCondensed: { name: 'Week goal momentum', size: 'small' },
-        swipeableMomentum: { name: 'Goal momentum', size: 'large' },
-        today: { name: 'Today', size: 'small' },
-        tomorrow: { name: 'Tomorrow', size: 'small' },
-        next7days: { name: 'Next 7 days', size: 'small' },
-        futureNoDue: { name: 'Future / No due', size: 'small' },
-        upcomingoverdue: { name: 'Upcoming & overdue tasks', size: 'medium' },
-        taskstatusoverview: { name: 'Task status overview', size: 'large' },
-        taskcompletionheatmap: { name: 'Task completion activity', size: 'medium' },
+        weeklyGoalPoints: { name: 'Week goal momentum', type: 'Line chart (core widget)', size: 'medium' },
+        goalStatusList: { name: 'Daily goals', type: 'Status (core widget)', size: 'medium' },
+        goalStatusListCondensed: { name: 'Daily goals', type: 'Status (core widget)', size: 'small' },
+        weeklyGoalPointsCondensed: { name: 'Week goal momentum', type: 'Line chart (core widget)', size: 'small' },
+        swipeableMomentum: { name: 'Goal momentum', type: 'Line chart (core widget)', size: 'large' },
+        today: { name: 'Today', type: 'Status bar (core widget)', size: 'small' },
+        tomorrow: { name: 'Tomorrow', type: 'Status bar (core widget)', size: 'small' },
+        next7days: { name: 'Next 7 days', type: 'Status bar (core widget)', size: 'small' },
+        futureNoDue: { name: 'Future / No due', type: 'Status bar (core widget)', size: 'small' },
+        combinedTaskHeatmap: { name: 'Task status activity', type: 'Heatmap (core widget)', size: 'medium' },
+        upcomingoverdue: { name: 'Upcoming & overdue tasks', type: 'Heatmap (core widget)', size: 'medium' },
+        taskstatusoverview: { name: 'Task status overview', type: 'Bar chart (core widget)', size: 'large' },
+        taskcompletionheatmap: { name: 'Task completion activity', type: 'Heatmap (core widget)', size: 'medium' },
+        taskScorecard: { name: 'Task scorecard', type: 'Scorecard (core widget)', size: 'large' },
+        opentaskprogressbar: { name: 'Tasks progress bar', type: 'Progress bar (core widget)', size: 'medium' },
+        opentaskprogressbarsegments: { name: 'Tasks progress segment bar', type: 'Progress bar (core widget)', size: 'medium' }
     },
     creation: {
-        allfilesheatmap: { name: 'All files' },
-        dailynotesheatmap: { name: 'Daily notes' },
-        regularnotesheatmap: { name: 'Regular notes' },
-        assetsheatmap: { name: 'Assets' }
+        allfilesheatmap: { name: 'All files', type: 'Heatmap (core widget)' },
+        dailynotesheatmap: { name: 'Daily notes', type: 'Heatmap (core widget)' },
+        regularnotesheatmap: { name: 'Regular notes', type: 'Heatmap (core widget)' },
+        assetsheatmap: { name: 'Assets', type: 'Heatmap (core widget)' }
     }
 };
 
 export const PINNED_HIGHLIGHT_COLORS = 
     [
-        { id: 'red',    label: 'Red',    rgba: 'rgba(255,0,0,0.35)' },
-        { id: 'orange', label: 'Orange', rgba: 'rgba(255,165,0,0.35)' },
-        { id: 'yellow', label: 'Yellow', rgba: 'rgba(255,235,59,0.35)' },
-        { id: 'green',  label: 'Green',  rgba: 'rgba(76,175,80,0.35)' },
-        { id: 'blue',   label: 'Blue',   rgba: 'rgba(33,150,243,0.35)' },
-        { id: 'teal',   label: 'Teal',   rgba: 'rgba(0,150,136,0.35)' },
-        { id: 'purple', label: 'Purple', rgba: 'rgba(156,39,176,0.35)' },
-        { id: 'pink',   label: 'Pink',   rgba: 'rgba(233,30,99,0.35)' },
-        { id: 'brown',  label: 'Brown',  rgba: 'rgba(121,85,72,0.35)' },
-        { id: 'black',  label: 'Black',  rgba: 'rgba(0,0,0,0.35)' },
-        { id: 'gray',   label: 'Gray',   rgba: 'rgba(158,158,158,0.35)' },
-        { id: 'white',  label: 'White',  rgba: 'rgba(255,255,255,0.35)' },
+        { id: 'red',    label: 'Red',    rgba: 'rgba(205,28,24,0.75)' },
+        { id: 'orange', label: 'Orange', rgba: 'rgba(255,177,24,0.75)' },
+        { id: 'coral',  label: 'Coral',  rgba: 'rgba(255,133,89,0.75)' },
+        { id: 'yellow', label: 'Yellow', rgba: 'rgba(251,236,93,0.75)' },
+        { id: 'green',  label: 'Green',  rgba: 'rgba(11,218,81,0.75)' },
+        { id: 'blue',   label: 'Blue',   rgba: 'rgba(33,150,243,0.75)' },
+        { id: 'teal',   label: 'Teal',   rgba: 'rgba(0,150,136,0.75)' },
+        { id: 'purple', label: 'Purple', rgba: 'rgba(127,0,255,0.75)' },
+        { id: 'pink',   label: 'Pink',   rgba: 'rgba(255,141,161,0.75)' },
+        { id: 'brown',  label: 'Brown',  rgba: 'rgba(212,126,48,0.75)' },
+        { id: 'black',  label: 'Black',  rgba: 'rgba(0,0,0,0.75)' },
+        { id: 'gray',   label: 'Gray',   rgba: 'rgba(154, 154, 154, 0.75)' },
+        { id: 'white',  label: 'White',  rgba: 'rgba(255,255,255,0.75)' },
     ];
 
 
@@ -91,6 +96,8 @@ export const DEFAULT_SETTINGS = {
     },
     calendarLayout: "normal",
     weekStartDay: "sunday",
+    verticalViewYearsPast: 0.5, 
+    verticalViewYearsFuture: 1,
 
     // Scratchpad
     fixedNoteFile: "Scratchpad.md",
@@ -284,19 +291,24 @@ export const DEFAULT_SETTINGS = {
         assetsheatmap: true,
     },
 
-    tasksDashboardOrder: ['goalStatusList', 'weeklyGoalPoints', 'swipeableMomentum', 'goalStatusListCondensed', 'weeklyGoalPointsCondensed', 'today', 'tomorrow', 'next7days', 'futureNoDue', 'upcomingoverdue', 'taskcompletionheatmap', 'taskstatusoverview'],
+    tasksDashboardOrder: ['goalStatusList', 'weeklyGoalPoints', 'swipeableMomentum', 'goalStatusListCondensed', 'weeklyGoalPointsCondensed', 'opentaskprogressbarsegments', 'opentaskprogressbar', 'today', 'tomorrow', 'next7days', 'futureNoDue', 'combinedTaskHeatmap', 'upcomingoverdue', 'taskcompletionheatmap', 'taskScorecard', 'taskstatusoverview'],
     tasksDashboardWidgets: {
+        
         goalStatusList: false,
         weeklyGoalPoints: false,
         swipeableMomentum: false,
         goalStatusListCondensed: false,
         weeklyGoalPointsCondensed: false,
+        opentaskprogressbar: false,
+        opentaskprogressbarsegments: true,  
         today: true,
         tomorrow: true,
         next7days: true,
         futureNoDue: true,
+        combinedTaskHeatmap: true,
         upcomingoverdue: true,
         taskstatusoverview: true,
+        taskScorecard: true,
         taskcompletionheatmap: true,
     },
     collapsedHeatmaps: {},
