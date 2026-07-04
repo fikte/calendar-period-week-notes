@@ -51,6 +51,9 @@ _NEW: Dashboard Custom Heatmaps - create your own configurable heatmaps with pow
 
 _NEW: Dashboard Custom Heatmaps - example of a custom heatmap showing in the Dashboard tab._ 
 
+<img width="404" height="400" alt="image" src="https://github.com/user-attachments/assets/13ab7524-85ea-42c2-a31e-68e7a26eb691" />
+
+_NEW: Set your goals with 15 levels to achieve._ 
 
 ---
 

@@ -2345,10 +2345,8 @@ export class PeriodMonthView extends ItemView {
                 if (isOtherMonth) dayNumber.addClass("cpwn-day-number-other-month");
                 if (isSameDay(dayDate, today) && !isOtherMonth) cell.addClass("cpwn-today-cell");
 
-
                 const dotsContainer = contentDiv.createDiv({ cls: 'cpwn-dots-container' });
                 const layout = this.plugin.settings.calendarLayout || 'normal';
-
 
                 dotsContainer.classList.remove('layout-condensed', 'layout-normal', 'layout-spacious');
                 dotsContainer.classList.add(`layout-${layout}`);
@@ -2406,11 +2404,9 @@ export class PeriodMonthView extends ItemView {
                 if (hasPopupContent) {
                     const cellDate = dayDate;
 
-
                     cell.addEventListener('mouseenter', () => {
                         // Safety: Don't run hover logic on phones if Platform.isMobile is true
                         if (Platform.isMobile) return;
-
 
                         if (this.activeHoverCell !== cell) {
                             window.clearTimeout(this.hideTimeout);
@@ -2423,7 +2419,6 @@ export class PeriodMonthView extends ItemView {
 
                         this.hoverTimeout = window.setTimeout(() => {
                             if (this.activeHoverCell !== cell) return;
-
 
                             const liveTasksForDay = this.allTasks.filter(task => {
                                 const isDone = task.status.type === 'DONE';
