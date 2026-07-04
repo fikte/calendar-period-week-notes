@@ -524,7 +524,7 @@ export class WidgetBuilderModal extends Modal {
 
         new Setting(contentEl)
             .setName('Include/Exclude tags')
-            .setDesc('Enter tags to include. Prefix with "-" to exclude a tag. Leave blank for all tags. e.g., #work, -#personal')
+            .setDesc('Enter tags to include. Prefix with "+" to be incldued as an AND operator when configuring with multiple tags. Prefix with "-" to exclude a tag. Leave blank for to search for any of the tags. e.g., #work, +#goal, -#personal')
             .addTextArea(text => text
                 .setPlaceholder('#include, -#exclude')
                 .setValue(this.config.tags || '')

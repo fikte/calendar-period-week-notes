@@ -581,6 +581,297 @@ body.is-mobile .cpwn-pm-search-input {
     box-shadow: 0 0 0 1px var(--interactive-accent);
 }
 
+.cpwn-search-action-btn {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    margin-left: 6px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    background: var(--interactive-normal);
+    color: var(--text-normal);
+    cursor: pointer;
+}
+
+.cpwn-search-action-btn:hover {
+    background: var(--interactive-hover);
+}
+
+.cpwn-search-action-btn .svg-icon {
+    width: 16px;
+    height: 16px;
+}
+
+.cpwn-add-todoist-task-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    font-size: 18px;
+    line-height: 1;
+    font-weight: 600;
+}
+
+.cpwn-add-todoist-task-icon .svg-icon {
+    display: block;
+}
+
+.cpwn-pm-search-container.cpwn-has-search-action .cpwn-search-input-clear-btn {
+    right: 40px;
+}
+
+.cpwn-todoist-task-modal-root {
+    width: min(1050px, calc(100vw - 96px));
+    max-width: 100%;
+}
+
+.cpwn-todoist-task-modal-root textarea {
+    display: block;
+    width: 100%;
+    border: 0 !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    resize: none;
+    padding: 0;
+}
+
+.cpwn-todoist-task-modal-root textarea:hover,
+.cpwn-todoist-task-modal-root textarea:focus {
+    border: 0 !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+}
+
+.cpwn-todoist-task-name-input {
+    min-height: 42px;
+    overflow: hidden;
+    font-size: var(--font-ui-large);
+    font-weight: var(--font-semibold);
+    line-height: 1.35;
+}
+
+.cpwn-todoist-task-description-input {
+    min-height: 32px;
+    overflow: hidden;
+    color: var(--text-muted);
+    font-size: var(--font-ui-medium);
+    line-height: 1.35;
+}
+
+.cpwn-todoist-task-selectors {
+    margin-top: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.cpwn-todoist-task-selectors-group {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 12px;
+}
+
+.cpwn-todoist-task-chip,
+.cpwn-todoist-icon-button,
+.cpwn-todoist-project-button {
+    height: 58px;
+    min-height: 0;
+    border: 1px solid var(--color-base-25);
+    border-radius: var(--radius-s);
+    background-color: transparent !important;
+    color: var(--text-muted);
+    box-shadow: none;
+}
+
+.cpwn-todoist-task-chip {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: 12px;
+    width: 205px;
+    padding: 0 18px;
+}
+
+.cpwn-todoist-chip-due,
+.cpwn-todoist-chip-labels {
+    width: 205px;
+}
+
+.cpwn-todoist-chip-priority {
+    width: 210px;
+}
+
+.cpwn-todoist-chip-deadline {
+    width: 245px;
+}
+
+.cpwn-todoist-task-chip:focus-within,
+.cpwn-todoist-task-chip:hover,
+.cpwn-todoist-icon-button:hover,
+.cpwn-todoist-project-button:hover {
+    border-color: var(--interactive-accent);
+    box-shadow: var(--box-shadow-hover);
+}
+
+.cpwn-todoist-task-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    color: var(--text-muted);
+}
+
+.cpwn-todoist-task-icon .svg-icon {
+    width: 24px;
+    height: 24px;
+}
+
+.cpwn-todoist-task-chip-input,
+.cpwn-todoist-task-chip-select {
+    min-width: 0;
+    flex: 1 1 auto;
+    width: 1px;
+    height: 34px;
+    border: 0 !important;
+    background: transparent !important;
+    color: var(--text-muted);
+    box-shadow: none !important;
+    font-size: var(--font-ui-medium);
+    font-weight: var(--font-medium);
+    padding: 0 !important;
+}
+
+.cpwn-todoist-task-chip-input:hover,
+.cpwn-todoist-task-chip-input:focus,
+.cpwn-todoist-task-chip-select:hover,
+.cpwn-todoist-task-chip-select:focus {
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.cpwn-todoist-task-chip-select {
+    appearance: auto;
+}
+
+.cpwn-todoist-icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 88px;
+    width: 88px;
+    padding: 0;
+}
+
+.cpwn-todoist-task-extra {
+    margin-top: 12px;
+    display: flex;
+}
+
+.cpwn-todoist-task-extra.is-hidden {
+    display: none;
+}
+
+.cpwn-todoist-task-extra .cpwn-todoist-task-chip {
+    width: 245px;
+    height: 52px;
+}
+
+.cpwn-todoist-task-notes ul {
+    margin: 22px 0 26px;
+    padding-inline-start: 32px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-medium);
+    font-weight: var(--font-medium);
+}
+
+.cpwn-todoist-task-modal-root hr {
+    margin: 0 0 30px;
+    border-color: var(--color-base-25);
+}
+
+.cpwn-todoist-task-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+.cpwn-todoist-project-button {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 208px;
+    gap: 12px;
+    width: 208px;
+    min-width: 0;
+    padding: 0 24px;
+    font-size: var(--font-ui-medium);
+    font-weight: var(--font-medium);
+}
+
+.cpwn-todoist-task-controls .task-creation-action {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: 30px;
+}
+
+.cpwn-todoist-add-button-group {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 0;
+}
+
+.cpwn-todoist-add-primary {
+    height: 42px;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.cpwn-todoist-add-menu {
+    height: 42px;
+    min-width: 64px;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-left: 1px solid var(--background-modifier-border);
+    padding: 0 14px;
+}
+
+.cpwn-todoist-add-menu .cpwn-todoist-task-icon .svg-icon {
+    width: 20px;
+    height: 20px;
+}
+
+@media (max-width: 700px) {
+    .cpwn-todoist-task-modal-root {
+        width: calc(100vw - 48px);
+    }
+
+    .cpwn-todoist-task-selectors,
+    .cpwn-todoist-task-controls {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .cpwn-todoist-task-chip,
+    .cpwn-todoist-icon-button,
+    .cpwn-todoist-project-button {
+        width: 100%;
+    }
+
+    .cpwn-todoist-task-controls .task-creation-action {
+        justify-content: flex-end;
+        gap: 12px;
+    }
+}
+
 /* -- Scratchpad Content & Buttons -- */
 .cpwn-scratchpad-wrapper {
    flex: 1 1 auto;
@@ -5073,6 +5364,20 @@ div[class^="cpwn-area-"] {
     padding: 0 !important;
 }
 
+.cpwn-todoist-task-description {
+    display: block;
+    margin-top: 2px;
+    color: var(--text-muted);
+    font-size: 0.92em;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.cpwn-todoist-task-description p {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
 /* Ensure icons inherit text color from parent */
 .cpwn-text-muted,
 .cpwn-text-muted .svg-icon {
@@ -6253,4 +6558,457 @@ div[class^="cpwn-area-"] {
     text-shadow: 0 1px 2px var(--background-primary);
 }
 
+/* Main Grid Layout */
+.cpwn-kpi-grid {
+    display: grid;
+    /* 2 columns by default, responsive */
+    grid-template-columns: repeat(2, 1fr); 
+    gap: 9px;
+    width: 100%;
+}
 
+/* Card Container */
+.cpwn-kpi-card {
+    background-color: var(--background-primary-alt);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* Center content vertically */
+    align-items: flex-start; /* Align text to left */
+    min-height: 80px;
+    position: relative;
+    transition: background-color 0.2s;
+}
+
+.cpwn-kpi-card:hover {
+    background-color: var(--background-secondary);
+}
+
+/* Label Styling - Uppercase, Muted, Professional */
+.cpwn-kpi-card .kpi-label {
+    font-size: 0.7rem;
+   /* text-transform: uppercase;*/
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    font-weight: 600;
+}
+
+/* Value Row - Holds Icon and Number */
+.cpwn-kpi-card .kpi-value-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* The Big Number */
+.cpwn-kpi-card .kpi-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text-normal);
+    line-height: 1.2;
+}
+
+/* The Icon - Subtle visual cue */
+.cpwn-kpi-card .kpi-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted); /* Default neutral color */
+    opacity: 0.8;
+}
+
+.cpwn-kpi-card .kpi-icon svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* --- Status Colors (Applied to Icon Only) --- */
+
+/* Good Status (e.g., On-Time Rate > 90%) */
+.cpwn-kpi-card.status-good .kpi-icon {
+    color: var(--color-green);
+}
+
+/* Bad Status (e.g., Longest Overdue > 7 days) */
+.cpwn-kpi-card.status-bad .kpi-icon {
+    color: var(--color-red);
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 400px) {
+    .cpwn-kpi-grid {
+        grid-template-columns: 1fr; /* Stack vertically on very small screens */
+    }
+}
+
+/* Tooltip Indicator - Subtle underline appears on hover */
+.cpwn-kpi-card {
+    cursor: help; /* Changes cursor to indicate more info is available */
+}
+
+.cpwn-kpi-card:hover {
+    background-color: var(--background-secondary);
+    border-color: var(--interactive-accent); /* Subtle accent on hover */
+}
+
+
+
+
+
+
+
+
+
+
+/* Tag Heatmap Settings Icon */
+.cpwn-heatmap-settings-icon {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    margin-left: auto;
+    margin-right: 8px;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.cpwn-heatmap-settings-icon:hover {
+    opacity: 1;
+}
+
+.cpwn-heatmap-settings-icon.is-active {
+    opacity: 1;
+    color: var(--interactive-accent);
+}
+
+.cpwn-heatmap-settings-icon .svg-icon {
+    width: 16px;
+    height: 16px;
+}
+
+
+
+
+
+
+/* Tag Heatmap Settings Container - Horizontal Layout */
+.cpwn-heatmap-settings-container {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    max-height: 250px;
+    overflow: hidden;
+}
+
+.cpwn-settings-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid var(--background-modifier-border);
+    flex-shrink: 0;
+    padding: 0 8px;
+    background: var(--background-primary);
+    justify-content: space-between;
+    align-items: center;
+}
+
+.cpwn-settings-tab {
+    padding: 8px 16px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+    transition: all 0.2s;
+    margin-bottom: -2px;
+}
+
+.cpwn-settings-tab:hover {
+    color: var(--text-normal);
+    background: var(--background-modifier-hover);
+}
+
+.cpwn-settings-tab.is-active {
+    color: var(--interactive-accent);
+    border-bottom-color: var(--interactive-accent);
+}
+
+/* Action buttons in tab bar */
+.cpwn-settings-action-buttons {
+    display: flex;
+    gap: 6px;
+    margin-left: auto;
+    padding: 4px 0;
+}
+
+.cpwn-settings-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--background-modifier-hover);
+    color: var(--text-muted);
+}
+
+.cpwn-settings-action-btn:hover {
+    background: var(--background-modifier-border);
+    color: var(--text-normal);
+}
+
+.cpwn-settings-action-btn.cpwn-save-btn {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+
+.cpwn-settings-action-btn.cpwn-save-btn:hover {
+    opacity: 0.9;
+    transform: scale(1.05);
+}
+
+.cpwn-settings-action-btn .svg-icon {
+    width: 16px;
+    height: 16px;
+}
+
+.cpwn-settings-tab-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 12px;
+    min-height: 100px;
+}
+
+/* Horizontal Row Layout */
+.cpwn-setting-row {
+    display: flex;
+    gap: 12px;
+}
+
+.cpwn-setting-item {
+    margin-bottom: 12px;
+}
+
+.cpwn-flex-grow {
+    flex: 1;
+}
+
+.cpwn-setting-label {
+    font-weight: 500;
+    margin-bottom: 6px;
+    padding-top: 6px;
+    font-size: 12px;
+    color: var(--text-normal);
+}
+
+.cpwn-setting-sublabel {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.cpwn-setting-description {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    line-height: 1.4;
+    padding: 3px 10px;
+    background: var(--background-secondary);
+    border-radius: 4px;
+    border-left: 2px solid var(--interactive-accent);
+}
+
+.cpwn-setting-item input[type="text"] {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background: var(--background-primary);
+    color: var(--text-normal);
+    font-size: 12px;
+    transition: border-color 0.2s;
+}
+
+.cpwn-setting-item input[type="text"]:focus {
+    outline: none;
+    border-color: var(--interactive-accent);
+    box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+
+/* Color Picker - Inline */
+.cpwn-color-picker-inline {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cpwn-color-picker-inline input[type="color"] {
+    width: 60px;
+    height: 32px;
+    padding: 2px;
+    border: 2px solid var(--background-modifier-border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.cpwn-color-picker-inline input[type="color"]:hover {
+    transform: scale(1.05);
+}
+
+.cpwn-setting-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.cpwn-setting-checkbox-label:hover {
+    color: var(--text-normal);
+}
+
+.cpwn-setting-checkbox-label input[type="checkbox"] {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+}
+
+.cpwn-setting-checkbox-label span {
+    font-size: 12px;
+}
+
+/* Tag Input Section */
+.cpwn-add-tag-input-section {
+    min-width: 200px;
+    max-width: 250px;
+}
+
+.cpwn-add-tag-input-wrapper {
+    display: flex;
+    gap: 6px;
+    align-items: stretch;
+}
+
+.cpwn-tag-input {
+    flex: 1;
+    min-width: 0;
+}
+
+.cpwn-add-tag-input-wrapper button {
+    padding: 6px 12px;
+    flex-shrink: 0;
+    font-size: 12px;
+}
+
+/* Tag Pills - Inline Layout */
+.cpwn-tag-pill-list-inline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px;
+    background: var(--background-secondary);
+    border-radius: 4px;
+    min-height: 44px;
+    max-height: 90px;
+    overflow-y: auto;
+}
+
+.cpwn-tag-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px;
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    transition: all 0.2s;
+    height: fit-content;
+}
+
+.cpwn-tag-pill:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.cpwn-tag-pill-text {
+    line-height: 1;
+}
+
+.cpwn-tag-pill-remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    border-radius: 50%;
+    transition: background-color 0.2s;
+}
+
+.cpwn-tag-pill-remove:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.cpwn-tag-pill-remove .svg-icon {
+    width: 10px;
+    height: 10px;
+    color: currentColor;
+}
+
+.cpwn-tag-empty-state {
+    width: 100%;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-style: italic;
+    padding: 8px;
+}
+
+/* Frontmatter Fields */
+.cpwn-frontmatter-fields {
+    margin-top: 6px;
+    margin-left: 24px;
+}
+
+.cpwn-frontmatter-input {
+    font-family: var(--font-monospace);
+    font-size: 11px;
+}
+
+.cpwn-setting-help {
+    margin: 10px 0 16px;
+    padding: 12px 14px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    background: var(--background-secondary);
+    color: var(--text-normal);
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.cpwn-setting-help h3 {
+    margin: 0 0 8px;
+    font-size: 14px;
+}
+
+.cpwn-setting-help p {
+    margin: 8px 0;
+}
+
+.cpwn-setting-help ol {
+    margin: 8px 0;
+    padding-left: 22px;
+}

@@ -119,6 +119,7 @@ A powerful set of panels located below the calendar. All tabs can be reordered v
     -   **Group tasks** by due date (`Overdue`, `Today`...) or by `#tag`. Toggle the grouping method by **clicking the tab**.
     -   **Animated Groups**: Task groups smoothly expand and collapse.
     -   Check off tasks directly from the list to update the source file instantly.
+    -   **Todoist Sync support**: Optionally read active tasks from the third-party [Todoist Sync](https://github.com/jamiebrynes7/obsidian-todoist-plugin) community plugin, combine Todoist with Obsidian Tasks, complete Todoist tasks from the list, and add Todoist tasks from the Tasks tab using Todoist Sync's native add-task modal.
 -   **🖼️ Assets Tab**:
     -   **Toggle between list and grid view** by clicking the tab.
     -   **Unused Asset Indicator**: An icon highlights assets not linked from any note.
@@ -159,6 +160,27 @@ The folder structure should be:
 ├── manifest.json
 ├── styles.css
 ```
+
+### Optional Todoist Sync Integration
+
+Calendar Period Week Notes can integrate with Todoist through the third-party [Todoist Sync](https://github.com/jamiebrynes7/obsidian-todoist-plugin) community plugin by `jamiebrynes7`.
+
+Todoist Sync is not bundled with Calendar Period Week Notes. To use Todoist tasks in this plugin, you must install, enable and configure Todoist Sync separately, including connecting it to your Todoist account.
+
+When Todoist Sync is available, Calendar Period Week Notes can:
+
+-   Use Todoist as the task source, or combine Todoist with Obsidian Tasks.
+-   Show active Todoist tasks in the Tasks tab and task dashboard widgets.
+-   Group Todoist tasks into the configured date groups: `Overdue`, `Today`, `Tomorrow`, `Next 7 days`, `Future`, and `Someday`.
+-   Complete Todoist tasks from the task list.
+-   Add Todoist tasks from the Tasks tab using Todoist Sync's native add-task modal.
+-   Display Todoist task descriptions as secondary text under the task title.
+
+Limitations:
+
+-   Todoist completed-history widgets require Obsidian Tasks data. Todoist Sync exposes active/query tasks, but not the same local completed-task history as Obsidian Tasks.
+-   If the Todoist filter setting is left blank, Calendar Period Week Notes reads all active Todoist tasks. Add a Todoist filter only when you intentionally want to narrow the Todoist tasks shown.
+-   External Todoist app changes are refreshed while the Tasks tab is open with a quiet in-place refresh; the list is not cleared before updating.
 
 ---
 
@@ -239,8 +261,9 @@ The plugin offers extensive options organized into the following tabs.
 | **Grid Highlight Color (Light/Dark)** | Color for row/column hover effects. | `rgba(163,163,163,0.2)` / `rgba(51,51,51,1)` |
 | **Highlight weekends** | Shades Saturday and Sunday columns. | `true` |
 | **Weekend shade color (Light/Dark)**| Background color for weekend columns. | `rgba(0,0,0,0.03)` / `rgba(255,255,255,0.03)` |
-| **External calendar URL (.ics)** | URL for an external .ics calendar feed. | `""` |
-| **Auto-refresh Interval** | How often to refresh the external calendar (15 min, 30 min, 1 hr, 3 hr, 6 hr, 12 hr). | `60` |
+| **Allow external calendar network requests** | Enables fetching the optional .ics feed URL. The URL is stored in local plugin settings and sent only to the calendar server you configure. | `false` |
+| **External calendar URL (.ics)** | Optional .ics calendar feed URL, used only when external calendar network requests are enabled. | `""` |
+| **Refresh behavior** | External calendar events refresh when the plugin view is opened or re-rendered. No background polling is scheduled. | `On view refresh` |
 | **Calendar Event Indicator** | Display events as `Dot Only`, `Add to Heatmap` or `Add to Task Badge`. | `dot` |
 | **Calendar Events Placeholder** | Placeholder in daily notes for event insertion (e.g., `%%CALENDAR_EVENTS%%`). | `%%CALENDAR_EVENTS%%` |
 | **Calendar Event Format** | Template for each event. Use `{{summary}}`, `{{startTime}}`, `{{endTime}}`. | `- {{startTime}} - {{endTime}}: {{summary}}` |
@@ -375,6 +398,8 @@ The plugin offers extensive options organized into the following tabs.
 
 | Setting | Description | Default Value |
 | :--- | :--- | :--- |
+| **Task source** | Choose `Obsidian Tasks`, `Todoist Sync`, or both as the source for task lists and dashboard metrics. | `Obsidian Tasks` |
+| **Todoist dashboard filter** | Optional Todoist filter used when Todoist Sync is selected. Leave blank to show all active Todoist tasks; add a Todoist filter only when you want to narrow the task list/dashboard. | Blank |
 | **Task heading font size** | Font size for group headings (e.g., 'Today', 'Overdue'). | `13px` |
 | **Task text font size** | Font size for individual task items. | `14px` |
 | **Truncate long task text**| If enabled, long task text is shortened with `...`. | `false` |
@@ -405,8 +430,5 @@ Contributions, issues, and feature requests are welcome! Feel free to check the 
 ## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE.md file for details.
-
-
-
 
 

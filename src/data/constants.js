@@ -18,13 +18,16 @@ export const DASHBOARDWIDGETS = {
         taskcompletionheatmap: { name: 'Task completion activity', type: 'Heatmap (core widget)', size: 'medium' },
         taskScorecard: { name: 'Task scorecard', type: 'Scorecard (core widget)', size: 'large' },
         opentaskprogressbar: { name: 'Tasks progress bar', type: 'Progress bar (core widget)', size: 'medium' },
-        opentaskprogressbarsegments: { name: 'Tasks progress segment bar', type: 'Progress bar (core widget)', size: 'medium' }
+        opentaskprogressbarsegments: { name: 'Tasks progress segment bar', type: 'Progress bar (core widget)', size: 'medium' },
+        taskStatistics: { name: 'Task statistics', type: 'Statistics (core widget)', size: 'medium' } 
+
     },
     creation: {
         allfilesheatmap: { name: 'All files', type: 'Heatmap (core widget)' },
         dailynotesheatmap: { name: 'Daily notes', type: 'Heatmap (core widget)' },
         regularnotesheatmap: { name: 'Regular notes', type: 'Heatmap (core widget)' },
-        assetsheatmap: { name: 'Assets', type: 'Heatmap (core widget)' }
+        assetsheatmap: { name: 'Assets', type: 'Heatmap (core widget)' },
+        tagHeatmap: { name: 'Tagged notes', type: 'Heatmap (core widget)' }
     }
 };
 
@@ -48,6 +51,8 @@ export const PINNED_HIGHLIGHT_COLORS =
 
 // Define the default settings for the plugin. This object is used as a fallback and for resetting configurations.
 export const DEFAULT_SETTINGS = {
+    widgetOverrides: {},
+
     // General Display
     appliedTheme: "Default-developer", 
     fontSize: "12px",
@@ -202,8 +207,8 @@ export const DEFAULT_SETTINGS = {
 
     //calendar events (from ICS) settings
     icsUrl: '',
+    icsNetworkEnabled: false,
     showIcsDot: true,
-    icsRefreshInterval: 60, // in minutes
     calendarEventsPlaceholder: '%%CALENDAR_EVENTS%%',
     calendarEventsFormat: '- {{startTime}} - {{endTime}}: {{summary}}',
     calendarEventIndicatorStyle: 'dot', // Options: 'dot', 'heatmap', 'badge'
@@ -251,6 +256,9 @@ export const DEFAULT_SETTINGS = {
     weeklyNoteDotColor: "rgba(128, 128, 128, 1)",
 
     // Tasks Tab Settings
+    taskSource: "obsidian",
+    todoistFilter: "",
+    todoistFilterMigratedFromOldDefault: false,
     taskIgnoreFolders: [],
     taskSortOrder: "dueDate",
     taskGroupBy: "date",
@@ -283,15 +291,16 @@ export const DEFAULT_SETTINGS = {
 
     //Dashboard Tab
     customHeatmaps: [],
-    creationDashboardOrder: ['dailynotesheatmap', 'regularnotesheatmap', 'assetsheatmap', 'allfilesheatmap'],
+    creationDashboardOrder: ['dailynotesheatmap', 'regularnotesheatmap', 'assetsheatmap', 'allfilesheatmap', 'tagHeatmap'],
     creationDashboardWidgets: {
         allfilesheatmap: true,
         dailynotesheatmap: true,
         regularnotesheatmap: true,
         assetsheatmap: true,
+        tagHeatmap: true
     },
 
-    tasksDashboardOrder: ['goalStatusList', 'weeklyGoalPoints', 'swipeableMomentum', 'goalStatusListCondensed', 'weeklyGoalPointsCondensed', 'opentaskprogressbarsegments', 'opentaskprogressbar', 'today', 'tomorrow', 'next7days', 'futureNoDue', 'combinedTaskHeatmap', 'upcomingoverdue', 'taskcompletionheatmap', 'taskScorecard', 'taskstatusoverview'],
+    tasksDashboardOrder: ['goalStatusList', 'weeklyGoalPoints', 'swipeableMomentum', 'goalStatusListCondensed', 'weeklyGoalPointsCondensed', 'opentaskprogressbarsegments', 'opentaskprogressbar', 'today', 'tomorrow', 'next7days', 'futureNoDue', 'combinedTaskHeatmap', 'upcomingoverdue', 'taskcompletionheatmap', 'taskScorecard', 'taskstatusoverview', 'taskStatistics'],
     tasksDashboardWidgets: {
         
         goalStatusList: false,
@@ -310,6 +319,7 @@ export const DEFAULT_SETTINGS = {
         taskstatusoverview: true,
         taskScorecard: true,
         taskcompletionheatmap: true,
+        taskStatistics: true
     },
     collapsedHeatmaps: {},
     smallWidgetStates: {},

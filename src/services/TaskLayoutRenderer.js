@@ -342,6 +342,16 @@ export class TaskLayoutRenderer {
                 }
             });
         }
+
+        const todoistDescription = (data.todoistDescription || '').trim();
+        if (data.source === 'todoist' && todoistDescription && todoistDescription !== data.cleanText) {
+            const descriptionEl = wrapper.createDiv({ cls: 'cpwn-todoist-task-description' });
+            if (component) {
+                MarkdownRenderer.render(this.app, todoistDescription, descriptionEl, data.path, component);
+            } else {
+                descriptionEl.setText(todoistDescription);
+            }
+        }
     }
 
 
@@ -701,6 +711,15 @@ export class TaskLayoutRenderer {
     }
 
     renderSource(parent, data, config = {}) {
+        if (data.source === 'todoist') {
+            const el = parent.createSpan({ cls: 'cpwn-task-source' });
+            this.applyStyles(el, config);
+            const iconSpan = el.createSpan({ cls: 'cpwn-meta-icon' });
+            setIcon(iconSpan, 'external-link');
+            el.createSpan({ text: 'Todoist', cls: 'cpwn-source-link' });
+            return;
+        }
+
         if (!data.path) return;
 
         // Clean filename: "Folder/File.md" -> "File"
