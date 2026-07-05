@@ -150,7 +150,7 @@ A powerful set of panels located below the calendar. All tabs can be reordered v
 
 ### Manual Installation
 
-1.  Download the zip file containing the `main.js`,  `manifest.json` and Theme files from the latest [GitHub release](https://github.com/fikte/calendar-period-week-notes/releases/).
+1.  Download `main.js`, `manifest.json`, and `styles.css` from the latest [GitHub release](https://github.com/fikte/calendar-period-week-notes/releases/).
 2.  Create a new folder named `Calendar Period Week Notes` inside your vault's plugin folder: `<VaultFolder>/.obsidian/plugins/`, (you may need to show hidden files for your operating system to view this)
 3.  Copy the downloaded files into this new folder.
 4.  Reload Obsidian, then go to **Settings** > **Community Plugins** and enable it.
@@ -449,7 +449,7 @@ Releases are published with GitHub Actions when a semantic version tag is pushed
     git push origin 1.9.1
     ```
 
-3.  GitHub Actions builds the plugin and publishes a release containing `main.js`, `manifest.json`, `styles.css`, and a zipped plugin folder.
+3.  GitHub Actions builds the plugin and publishes a release containing `main.js`, `manifest.json`, and `styles.css`.
 
 The release tag must match the version in `package.json` and `manifest.json`. Tags use `1.9.1` format, not `v1.9.1`.
 
