@@ -1,5 +1,9 @@
 # Version Change History 
 
+v1.9.0
+
+- Added ability to view Todoist tasks in the task tab view. This requires the Todoist Sync 3rd party plugin to be installed and configured.
+
 v1.7.0
 Major new feature: Task Style Layouts  
 - Choose one of 19 different task layout styles or create your own with a new drag drop user interface in the Task tab settings. Style and create your own task layout that applies across all task views, Task tab and popup windows
