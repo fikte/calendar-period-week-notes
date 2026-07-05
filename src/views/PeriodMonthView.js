@@ -5052,7 +5052,7 @@ export class PeriodMonthView extends ItemView {
         const text = this.noteTextarea.value;
         const term = this.scratchpadSearchTerm;
 
-        // 1. Clear the existing content (safe alternative to innerHTML = '')
+        // 1. Clear the existing content.
         this.scratchHighlighterEl.empty();
 
         if (!term) {
@@ -12047,7 +12047,7 @@ export class PeriodMonthView extends ItemView {
 
                                 // CHECK: Is the chart empty? If so, we MUST render it now.
                                 // This happens if it was collapsed by default on load.
-                                if (!contentWrapper.hasChildNodes() || contentWrapper.innerHTML === '') {
+                                if (!contentWrapper.hasChildNodes()) {
                                     // Fetch Data
                                     const chartDataObj = await GoalDataAggregator.getAllHistory(this.app, this.plugin.settings, this.allTasks);
                                     // Render
@@ -13213,7 +13213,9 @@ export class PeriodMonthView extends ItemView {
             if (filteredNotes.length === 0) {
                 const emptyMessageEl = listWrapper.createDiv({ cls: 'cpwn-pinned-notes-empty-message' });
                 const pinTag = this.plugin.settings.pinTag || 'pin'; // Safely get the tag
-                emptyMessageEl.innerHTML = `No pinned notes. To pin a note, add the <code>#${pinTag}</code> tag to its properties or body.`;
+                emptyMessageEl.appendText("No pinned notes. To pin a note, add the ");
+                emptyMessageEl.createEl("code", { text: `#${pinTag}` });
+                emptyMessageEl.appendText(" tag to its properties or body.");
             } else {
                 listWrapper.addEventListener('drop', async (e) => {
                     e.preventDefault();

@@ -1,0 +1,87 @@
+name: Release Obsidian plugin
+
+on:
+  push:
+    tags:
+      - "*.*.*"
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate release version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME}"
+          MANIFEST_VERSION="$(node -p "require('./manifest.json').version")"
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+
+          if [[ ! "$TAG_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Tag version $TAG_VERSION must use 1.2.3 format, without a leading v"
+            exit 1
+          fi
+
+          if [ "$TAG_VERSION" != "$MANIFEST_VERSION" ]; then
+            echo "Tag version $TAG_VERSION does not match manifest.json version $MANIFEST_VERSION"
+            exit 1
+          fi
+
+          if [ "$TAG_VERSION" != "$PACKAGE_VERSION" ]; then
+            echo "Tag version $TAG_VERSION does not match package.json version $PACKAGE_VERSION"
+            exit 1
+          fi
+
+      - name: Build
+        run: npm run build
+
+      - name: Validate release files
+        run: |
+          test -f main.js
+          test -f manifest.json
+          test -f styles.css
+
+      - name: Package plugin zip
+        run: |
+          PLUGIN_ID="$(node -p "require('./manifest.json').id")"
+          mkdir -p "release/$PLUGIN_ID"
+          cp main.js manifest.json styles.css "release/$PLUGIN_ID/"
+          cd release
+          zip -r "$PLUGIN_ID.zip" "$PLUGIN_ID"
+
+      - name: Attest release assets
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            main.js
+            manifest.json
+            styles.css
+            release/*.zip
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Calendar Period Week Notes ${{ github.ref_name }}
+          files: |
+            main.js
+            manifest.json
+            styles.css
+            release/*.zip
+          generate_release_notes: true

@@ -185,6 +185,12 @@ Limitations:
 -   If the Todoist filter setting is left blank, Calendar Period Week Notes reads all active Todoist tasks. Add a Todoist filter only when you intentionally want to narrow the Todoist tasks shown.
 -   External Todoist app changes are refreshed while the Tasks tab is open with a quiet in-place refresh; the list is not cleared before updating.
 
+### Network & Privacy Notes
+
+-   External calendar `.ics` requests are disabled by default. They are only made when you enable **Allow external calendar network requests** and provide an `.ics` URL in settings.
+-   The `.ics` URL is stored in local Obsidian plugin settings and is requested directly from the calendar server you configure.
+-   Todoist support depends on the separate Todoist Sync plugin. Calendar Period Week Notes does not connect directly to Todoist.
+
 ---
 
 ## 💡 How to Use
@@ -424,6 +430,31 @@ The plugin offers extensive options organized into the following tabs.
 
 ---
 
+## 🚢 Releasing
+
+Releases are published with GitHub Actions when a semantic version tag is pushed.
+
+1.  Update the version locally:
+
+    ```bash
+    npm version 1.9.1
+    ```
+
+    This updates `package.json`, `manifest.json`, and `versions.json`.
+
+2.  Push the commit and tag:
+
+    ```bash
+    git push
+    git push origin 1.9.1
+    ```
+
+3.  GitHub Actions builds the plugin and publishes a release containing `main.js`, `manifest.json`, `styles.css`, and a zipped plugin folder.
+
+The release tag must match the version in `package.json` and `manifest.json`. Tags use `1.9.1` format, not `v1.9.1`.
+
+---
+
 ## ❤️ Contributing
 
 Contributions, issues, and feature requests are welcome! Feel free to check the [GitHub issues page](https://github.com/fikte/calendar-period-week-notes/issues).
@@ -433,5 +464,3 @@ Contributions, issues, and feature requests are welcome! Feel free to check the 
 ## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE.md file for details.
-
-

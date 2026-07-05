@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "rollup --config -w",
-    "build": "rollup --config"
+    "build": "rollup --config",
+    "version": "node version-bump.mjs && git add manifest.json versions.json"
   },
   "keywords": [],
   "author": "Tim Williams",

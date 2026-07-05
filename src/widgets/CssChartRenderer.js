@@ -466,7 +466,7 @@ export class CssChartRenderer {
                 }
 
                 // Build tooltip
-                tooltipText.innerHTML = '';
+                tooltipText.replaceChildren();
                 const weekIdentifier = labels[activeIndex];
                 const dateText = moment(weekIdentifier, 'YYYY-[W]WW').format('MMM D');
                 const weekNumText = `(W${weekIdentifier.slice(-2)})`;
@@ -480,7 +480,19 @@ export class CssChartRenderer {
                 datasets.forEach((ds, i) => {
                     const tspan = document.createElementNS(svgNs, 'tspan');
                     Object.entries({ x: 0, dy: '1.3em' }).forEach(([k, v]) => tspan.setAttribute(k, v));
-                    tspan.innerHTML = `<tspan fill="${ds.color}">● </tspan><tspan>${ds.label}: </tspan><tspan font-weight="600">${ds.data[activeIndex]}</tspan>`;
+
+                    const colorDot = document.createElementNS(svgNs, 'tspan');
+                    colorDot.setAttribute('fill', ds.color);
+                    colorDot.textContent = '● ';
+
+                    const labelText = document.createElementNS(svgNs, 'tspan');
+                    labelText.textContent = `${ds.label}: `;
+
+                    const valueText = document.createElementNS(svgNs, 'tspan');
+                    valueText.setAttribute('font-weight', '600');
+                    valueText.textContent = String(ds.data[activeIndex]);
+
+                    tspan.append(colorDot, labelText, valueText);
                     tooltipText.appendChild(tspan);
                 });
 
