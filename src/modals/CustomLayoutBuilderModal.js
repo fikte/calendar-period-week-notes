@@ -854,12 +854,10 @@ export class CustomLayoutBuilderModal extends Modal {
             //style: 'width: 100%;', // Keeps the container full width
             items: rowState.items.map(item => {
                 if (item.type === 'spacer') {
-                    // FORCE the style in the JSON.
-                    // We use !important to override any renderer defaults.
                     return {
                         type: 'spacer',
                         flexible: true,
-                        style: 'flex-grow: 1 !important; width: auto !important; display: flex !important;'
+                        style: 'flex-grow: 1; width: auto; display: flex;'
                     };
                 }
                 // Pass other items through

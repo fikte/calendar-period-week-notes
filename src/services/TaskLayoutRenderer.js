@@ -136,18 +136,13 @@ export class TaskLayoutRenderer {
                 ...itemConfig
             };
 
-            //if (isFlow) {
-            // DEFINITIVE FIX 4: Every single child item must be inline
-            //    config.style = (config.style || '') + '; display: inline !important; width: auto !important;';
-            //}
-
             if (isFlow) {
                 if (type === 'title') {
-                    config.style = (config.style || '') + '; display: inline !important;';
+                    config.style = (config.style || '') + '; display: inline;';
                 } else {
                     // REMOVE 'vertical-align: baseline' from here! 
                     // Let applyStyles handle the alignment from the user's config.
-                    config.style = (config.style || '') + '; display: inline-flex !important;';
+                    config.style = (config.style || '') + '; display: inline-flex;';
                 }
             }
 
@@ -473,8 +468,7 @@ export class TaskLayoutRenderer {
 
             // C. TEXT COLOR LOGIC
             if (config.color) {
-                // Using !important to ensure user-configured color overrides any other theme defaults if they have explicity set tag text colors
-                pill.style.setProperty('color', config.color, 'important');
+                pill.style.setProperty('color', config.color);
 
             }
 

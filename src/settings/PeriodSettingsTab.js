@@ -1924,14 +1924,27 @@ export class PeriodSettingsTab extends PluginSettingTab {
         new Setting(containerEl).setName("Show '+ Task' button").setDesc("Show the button in the scratchpad area to quickly add a new task.").addToggle(toggle => toggle.setValue(this.plugin.settings.scratchpad?.showAddTaskButton ?? true).onChange(async (value) => { if (!this.plugin.settings.scratchpad) this.plugin.settings.scratchpad = {}; this.plugin.settings.scratchpad.showAddTaskButton = value; await this.saveAndUpdate(); }));
 
         const taskTitleSetting = new Setting(containerEl).setName("Task creation format");
-        taskTitleSetting.descEl.innerHTML = `
-                Use the following to insert as placeholders for the task creation date:
-                <br><code>{today}</code>, <code>{tomorrow}</code>
-                <br><code>{monday}</code>, <code>{tuesday}</code>, etc. for the next upcoming day.
-                <br><code>{date}+7</code> or <code>{date}-3</code> for dates in the future or past.
-                <br>
-                <br>Use <code>|</code> to set the final cursor position.
-            `;
+        taskTitleSetting.descEl.replaceChildren();
+        taskTitleSetting.descEl.appendText("Use the following to insert as placeholders for the task creation date:");
+        taskTitleSetting.descEl.createEl("br");
+        taskTitleSetting.descEl.createEl("code", { text: "{today}" });
+        taskTitleSetting.descEl.appendText(", ");
+        taskTitleSetting.descEl.createEl("code", { text: "{tomorrow}" });
+        taskTitleSetting.descEl.createEl("br");
+        taskTitleSetting.descEl.createEl("code", { text: "{monday}" });
+        taskTitleSetting.descEl.appendText(", ");
+        taskTitleSetting.descEl.createEl("code", { text: "{tuesday}" });
+        taskTitleSetting.descEl.appendText(", etc. for the next upcoming day.");
+        taskTitleSetting.descEl.createEl("br");
+        taskTitleSetting.descEl.createEl("code", { text: "{date}+7" });
+        taskTitleSetting.descEl.appendText(" or ");
+        taskTitleSetting.descEl.createEl("code", { text: "{date}-3" });
+        taskTitleSetting.descEl.appendText(" for dates in the future or past.");
+        taskTitleSetting.descEl.createEl("br");
+        taskTitleSetting.descEl.createEl("br");
+        taskTitleSetting.descEl.appendText("Use ");
+        taskTitleSetting.descEl.createEl("code", { text: "|" });
+        taskTitleSetting.descEl.appendText(" to set the final cursor position.");
 
         taskTitleSetting.addText(text => text
             .setPlaceholder("- [ ] ")
@@ -3185,7 +3198,6 @@ new Setting(container)
         const helpText = helpContentWrapper.createDiv();
         helpText.setAttr('style', 'user-select: text; font-size: 0.9em; line-height: 1.6; padding: 15px; margin: 0; border-radius: 8px; background-color: var(--background-secondary);');
 
-        // FIX: Use sanitizeHTMLToDom instead of innerHTML
         const guideHtml = `
 
     <div style="padding: 10px; border: 1px solid var(--background-modifier-border); border-radius: 8px; margin-bottom: 20px; background-color: var(--background-secondary-alt);">
@@ -4591,19 +4603,7 @@ new Setting(container)
 
         new Setting(containerEl)
             .setName("Support the developer")
-            .setDesc("If you find this plugin useful, please consider supporting its development. It's greatly appreciated!")
-            .addButton(button => {
-                button
-                    .setButtonText("☕ Buy me a coffee")
-                    .setTooltip("https://buymeacoffee.com/fikte")
-                    .onClick(() => {
-                        window.open("https://buymeacoffee.com/fikte");
-                    });
-                button.buttonEl.addClass('mod-cta');
-                button.buttonEl.style.backgroundColor = '#FFDD00';
-                button.buttonEl.style.color = '#000000';
-                button.buttonEl.style.cursor = 'pointer';
-            });
+            .setDesc("If you find this plugin useful, the project README includes an optional support link.");
     }
 
     async renderStartHereTab() {
