@@ -6,7 +6,7 @@ export default {
   input: 'src/main.js',
   output: {
     file: 'main.js',
-    sourcemap: 'inline',
+    sourcemap: false,
     format: 'cjs',
     exports: 'default',
   },

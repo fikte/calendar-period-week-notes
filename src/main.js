@@ -19,6 +19,11 @@ export default class PeriodMonthPlugin extends Plugin {
 
         this.registerView(VIEW_TYPE_PERIOD, leaf => new PeriodMonthView(leaf, this));
         this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+        if (!this.settings.todoistFilterMigratedFromOldDefault && this.settings.todoistFilter === 'today | overdue | no date') {
+            this.settings.todoistFilter = '';
+            this.settings.todoistFilterMigratedFromOldDefault = true;
+            await this.saveData(this.settings);
+        }
         const CORE_GOALS = [
             {
                 id: 'core-daily-note',
@@ -71,7 +76,6 @@ export default class PeriodMonthPlugin extends Plugin {
         this.updateStyles();
         this.addRibbonIcon("calendar-check", "Open Calendar Period Week Notes", () => this.activateView());
         this.addCommand({ id: "open-period-month-view", name: "Open Calendar Period Week Notes", callback: () => this.activateView() });
-        await this.resetIcsRefreshInterval();
         this.addSettingTab(new PeriodSettingsTab(this.app, this));
 
         const debouncedThemeChange = debounce(() => {
@@ -83,8 +87,6 @@ export default class PeriodMonthPlugin extends Plugin {
         });
 
         this.themeObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
-
-        this.icsRefreshIntervalId = null;
 
         this.registerEvent(
             this.app.workspace.on('tasks:changed', () => {
@@ -233,33 +235,6 @@ export default class PeriodMonthPlugin extends Plugin {
         this.app.workspace.revealLeaf(leaf);
     }
 
-    async resetIcsRefreshInterval() {
-        // If there's an old interval running, clear it first
-        if (this.icsRefreshIntervalId !== null) {
-            window.clearInterval(this.icsRefreshIntervalId);
-        }
-
-        const intervalMinutes = this.settings.icsRefreshInterval;
-
-        if (intervalMinutes > 0) {
-            const intervalMilliseconds = intervalMinutes * 60 * 1000;
-
-            this.icsRefreshIntervalId = this.registerInterval(
-                window.setInterval(async () => {
-                    //console.log(`Periodic Notes: Automatically refreshing ICS feed (interval: ${intervalMinutes} minutes).`);
-
-                    // We need to find the view to call its refresh method
-                    const views = this.app.workspace.getLeavesOfType(VIEW_TYPE_PERIOD);
-                    for (const leaf of views) {
-                        if (leaf.view && leaf.view.refreshIcsEvents) {
-                            await leaf.view.refreshIcsEvents();
-                        }
-                    }
-                }, intervalMilliseconds)
-            );
-        }
-    }
-
     async loadTemplates() {
 
         return Promise.resolve(BUNDLED_TEMPLATES);
@@ -278,5 +253,3 @@ export default class PeriodMonthPlugin extends Plugin {
 
     }
 }
-
-

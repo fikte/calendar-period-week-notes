@@ -22,6 +22,7 @@ import { TaskLayoutRenderer } from '../services/TaskLayoutRenderer';
 import { TASK_LAYOUTS } from '../data/taskLayouts';
 import { CustomLayoutBuilderModal } from '../modals/CustomLayoutBuilderModal';
 import { FileCreationHeatmapModal } from '../modals/FileCreationHeatmapModal.js';
+import { WidgetConfigModal } from '../modals/WidgetConfigModal.js';
 
 /**
  * The settings tab class for the plugin, responsible for building the settings UI.
@@ -159,232 +160,22 @@ export class PeriodSettingsTab extends PluginSettingTab {
      * Creates a widget element with all its settings and drag handlers
      */
     // Change the 2nd argument from 'name' to 'widgetObj' to be clear it's an object
-createWidgetElement(key, widgetObj, visibilitySettings, visibilityKey, index, containerEl, activeTabName) {
-    
-    // 1. EXTRACT THE NAME STRING
-    // Handle both cases: if it's the full object (new way) or just a string (old way safety)
-    const displayName = typeof widgetObj === 'object' ? (widgetObj.name || 'Unknown Widget') : widgetObj;
+    createWidgetElement(key, widgetObj, visibilitySettings, visibilityKey, index, containerEl, activeTabName) {
 
-    // 2. Determine Widget Config (for custom widgets)
-    const widgetConfig = this.plugin.settings.tasksStatsWidgets?.find(w => w.widgetKey === key);
-    const isSectionHeader = widgetConfig?.type === 'section-header';
+        // 1. EXTRACT THE NAME STRING
+        // Handle both cases: if it's the full object (new way) or just a string (old way safety)
+        const displayName = typeof widgetObj === 'object' ? (widgetObj.name || 'Unknown Widget') : widgetObj;
 
-    // Check for Custom Heatmaps
-    const isCustomHeatmap = visibilityKey === 'creationDashboardWidgets' && key.startsWith('custom-');
-    const customHeatmapIndex = isCustomHeatmap ? parseInt(key.split('-')[1]) : -1;
-    const customHeatmapConfig = isCustomHeatmap ? this.plugin.settings.customHeatmaps[customHeatmapIndex] : null;
-
-    // Indentation Logic
-    let isInSection = false;
-    if (!isSectionHeader && this.plugin.settings.tasksStatsWidgets && visibilityKey === 'tasksDashboardWidgets') {
-        const allKeys = this.getMemoizedFinalOrder(
-            { ...DASHBOARDWIDGETS.tasks },
-            'tasksDashboardOrder'
-        );
-        for (let i = index - 1; i >= 0; i--) {
-            const prevConfig = this.plugin.settings.tasksStatsWidgets.find(w => w.widgetKey === allKeys[i]);
-            if (prevConfig?.type === 'section-header') {
-                isInSection = true;
-                break;
-            }
-        }
-    }
-
-    const widgetEl = createDiv({
-        cls: `cpwn-pm-draggable-widget-item ${isSectionHeader ? 'cpwn-pm-section-header-item' : ''} ${isInSection && !isSectionHeader ? 'cpwn-pm-indented-item' : ''}`,
-        attr: { 'data-widget-key': key }
-    });
-
-    // Drag handle
-    const dragHandle = widgetEl.createDiv({ cls: 'cpwn-pm-drag-handle' });
-    setIcon(dragHandle, 'grip-vertical');
-
-    // Setting wrapper
-    const settingWrapper = widgetEl.createDiv({ cls: 'cpwn-pm-setting-wrapper' });
-    const setting = new Setting(settingWrapper);
-
-    if (isSectionHeader) {
-        setting.setName(widgetConfig.name);
-        const visibilityStatus = widgetConfig.isVisible !== false ? 'Visible' : 'Not visible';
-        setting.setDesc(`Type: Section header | ${visibilityStatus}`);
-
-        if (widgetConfig.icon) {
-            const iconPreview = setting.nameEl.createSpan({ cls: 'cpwn-pm-section-icon-preview' });
-            setIcon(iconPreview, widgetConfig.icon);
-            iconPreview.style.color = widgetConfig.iconColor;
-            iconPreview.style.marginRight = '8px';
-            setting.nameEl.prepend(iconPreview);
-            setting.nameEl.style.color = widgetConfig.textColor;
-            setting.nameEl.style.fontWeight = widgetConfig.fontWeight === 'bold' ? 'bold' : 'normal';
-            setting.nameEl.style.fontStyle = widgetConfig.fontWeight === 'italic' ? 'italic' : 'normal';
-            setting.nameEl.style.fontSize = `${widgetConfig.fontSize}px`;
-        }
-    } else if (isCustomHeatmap) {
-        setting.setName(customHeatmapConfig?.name || displayName);
-        setting.setDesc('Type: Custom Heatmap');
-    } else {
-        // --- CORE & CUSTOM WIDGETS ---
-        
-        // Use the extracted name string here!
-        setting.setName(displayName);
-
-        // Determine Type & Size
-        // 1. Try to get it from the widgetConfig (User Custom Widget)
-        // 2. Or from the passed widgetObj (Core Widget updated in constants)
-        // 3. Or fallback to global constant lookup
-        const coreConfig = DASHBOARDWIDGETS.tasks[key] || DASHBOARDWIDGETS.creation[key];
-        
-        const widgetType = widgetConfig?.chartType || widgetObj.type || coreConfig?.type || 'Core widget';
-        const widgetSize = widgetConfig?.size || widgetObj.size || coreConfig?.size || 'N/A';
-
-        setting.setDesc(`Type: ${widgetType} | Size: ${widgetSize}`);
-    }
-
-    // Toggle visibility
-    setting.addToggle(toggle => {
-        toggle.setValue(visibilitySettings[key] ?? true)
-            .onChange(async (value) => {
-                visibilitySettings[key] = value;
-                await this.saveAndUpdate();
-            });
-    });
-
-    // ... [Rest of your button/drag event logic remains the same] ...
-    
-    // Keep your existing Button Logic (Settings/Trash) and Drag Events here
-    // (Copy the bottom half of your previous function exactly as is)
-    
-    // Case A: Section Headers 
-    if (isSectionHeader) {
-        setting.addButton(button => {
-            button.setIcon('settings').setTooltip('Configure').onClick(() => {
-                new SectionHeaderModal(this.app, this.plugin, async (updatedConfig) => {
-                    Object.assign(widgetConfig, updatedConfig);
-                    await this.plugin.saveSettings();
-                    this.renderTasksDashboardSettings(containerEl);
-                    this.triggerDashboardRefresh();
-                }, widgetConfig).open();
-            });
-        });
-        setting.addButton(button => button.setIcon('trash').setWarning().onClick(async () => {
-            if (confirm(`Delete section header "${displayName}"?`)) {
-                 // ... delete logic ...
-                 const idx = this.plugin.settings.tasksStatsWidgets.findIndex(w => w.widgetKey === key);
-                 if (idx > -1) {
-                     this.plugin.settings.tasksStatsWidgets.splice(idx, 1);
-                 }
-                 if (this.plugin.settings.tasksDashboardWidgets[key]) {
-                     delete this.plugin.settings.tasksDashboardWidgets[key];
-                 }
-                 this.plugin.settings.tasksDashboardOrder = this.plugin.settings.tasksDashboardOrder.filter(k => k !== key);
-                 await this.plugin.saveSettings();
-                 this.renderTasksDashboardSettings(containerEl);
-                 this.triggerDashboardRefresh();
-            }
-        }));
-    }
-    // Case B: Custom Task Widgets 
-    else if (widgetConfig && key.startsWith('custom-') && visibilityKey === 'tasksDashboardWidgets') {
-         setting.addButton(button => {
-            button.setIcon('settings').setTooltip('Configure').onClick(() => {
-                new WidgetBuilderModal(this.app, this.plugin, widgetConfig, async (updatedConfig) => {
-                    const idx = this.plugin.settings.tasksStatsWidgets.findIndex(w => w.widgetKey === key);
-                    this.plugin.settings.tasksStatsWidgets[idx] = updatedConfig;
-                    await this.plugin.saveSettings();
-                    this.renderTasksDashboardSettings(containerEl);
-                    this.triggerDashboardRefresh();
-                }).open();
-            });
-        });
-        setting.addButton(button => button.setIcon('trash').setWarning().onClick(async () => {
-            if (confirm(`Delete ${displayName}?`)) {
-                // ... delete logic ...
-                const idx = this.plugin.settings.tasksStatsWidgets.findIndex(w => w.widgetKey === key);
-                this.plugin.settings.tasksStatsWidgets.splice(idx, 1);
-                delete this.plugin.settings.tasksDashboardWidgets[key];
-                this.plugin.settings.tasksDashboardOrder = this.plugin.settings.tasksDashboardOrder.filter(k => k !== key);
-                await this.plugin.saveSettings();
-                this.renderTasksDashboardSettings(containerEl);
-                this.triggerDashboardRefresh();
-            }
-        }));
-    }
-    // Case C: Custom Heatmaps
-    else if (isCustomHeatmap) {
-        // ... Keep your existing Heatmap button logic ...
-         setting.addButton(button => {
-            button.setIcon('settings').setTooltip('Configure Heatmap').onClick(() => {
-                if (customHeatmapConfig) {
-                    new FileCreationHeatmapModal(this.app, customHeatmapConfig, 
-                        async (updatedHeatmap) => {
-                            this.plugin.settings.customHeatmaps[customHeatmapIndex] = updatedHeatmap;
-                            await this.plugin.saveSettings();
-                            this.renderDashboardSettings('creation');
-                            this.triggerDashboardRefresh();
-                        },
-                        async () => { 
-                             // Call the delete logic you had in your code
-                             if (confirm(`Delete heatmap "${customHeatmapConfig.name || 'this heatmap'}"?`)) {
-                                this.plugin.settings.customHeatmaps.splice(customHeatmapIndex, 1);
-                                // ... (Your re-indexing logic) ...
-                                await this.plugin.saveSettings();
-                                this.renderDashboardSettings('creation');
-                                this.triggerDashboardRefresh();
-                             }
-                        }
-                    ).open();
-                }
-            });
-        });
-        setting.addButton(button => {
-            button.setIcon('trash').setTooltip('Delete Heatmap').setWarning().onClick(async () => {
-                 // Call the delete logic you had in your code
-                 if (confirm(`Delete heatmap "${displayName}"?`)) {
-                    this.plugin.settings.customHeatmaps.splice(customHeatmapIndex, 1);
-                    // ... (Your re-indexing logic) ...
-                    await this.plugin.saveSettings();
-                    this.renderDashboardSettings('creation');
-                    this.triggerDashboardRefresh();
-                 }
-            });
-        });
-    }
-    else {
-        setting.addButton(button => button.setIcon('settings').setTooltip('Core widgets cannot be configured').setDisabled(true));
-        setting.addButton(button => button.setIcon('trash').setTooltip('Core widgets cannot be deleted, use the toggle to hide').setDisabled(true));
-    }
-
-    // Events
-    widgetEl.draggable = true;
-    widgetEl.addEventListener('dragstart', (e) => {
-        e.dataTransfer.setData('text/plain', key);
-        e.dataTransfer.effectAllowed = 'move';
-        widgetEl.addClass('dragging');
-        this._draggingElement = widgetEl;
-    });
-    widgetEl.addEventListener('dragend', () => {
-        widgetEl.removeClass('dragging');
-        this._draggingElement = null;
-    });
-
-    return widgetEl;
-}
-
-
-
-
-    /*
-    createWidgetElement(key, name, visibilitySettings, visibilityKey, index, containerEl, activeTabName) {
-        // 1. Determine Widget Type
+        // 2. Determine Widget Config (for custom widgets)
         const widgetConfig = this.plugin.settings.tasksStatsWidgets?.find(w => w.widgetKey === key);
         const isSectionHeader = widgetConfig?.type === 'section-header';
 
-        // Check for Custom Heatmaps (New Logic)
+        // Check for Custom Heatmaps
         const isCustomHeatmap = visibilityKey === 'creationDashboardWidgets' && key.startsWith('custom-');
         const customHeatmapIndex = isCustomHeatmap ? parseInt(key.split('-')[1]) : -1;
         const customHeatmapConfig = isCustomHeatmap ? this.plugin.settings.customHeatmaps[customHeatmapIndex] : null;
 
-        // Indentation Logic (Visual only)
+        // Indentation Logic
         let isInSection = false;
         if (!isSectionHeader && this.plugin.settings.tasksStatsWidgets && visibilityKey === 'tasksDashboardWidgets') {
             const allKeys = this.getMemoizedFinalOrder(
@@ -430,23 +221,24 @@ createWidgetElement(key, widgetObj, visibilitySettings, visibilityKey, index, co
                 setting.nameEl.style.fontSize = `${widgetConfig.fontSize}px`;
             }
         } else if (isCustomHeatmap) {
-            // --- NEW LOGIC FOR CUSTOM HEATMAPS ---
-            setting.setName(customHeatmapConfig?.name || name);
+            setting.setName(customHeatmapConfig?.name || displayName);
             setting.setDesc('Type: Custom Heatmap');
         } else {
+            // --- CORE & CUSTOM WIDGETS ---
 
-            // 1. Try to find config in User Settings (Custom Widgets)
-            // 2. Fallback to Constants (Core Widgets)
+            // Use the extracted name string here!
+            setting.setName(displayName);
+
+            // Determine Type & Size
+            // 1. Try to get it from the widgetConfig (User Custom Widget)
+            // 2. Or from the passed widgetObj (Core Widget updated in constants)
+            // 3. Or fallback to global constant lookup
             const coreConfig = DASHBOARDWIDGETS.tasks[key] || DASHBOARDWIDGETS.creation[key];
 
-            const widgetType = widgetConfig?.chartType || 'Core widget';
+            const widgetType = widgetConfig?.chartType || widgetObj.type || coreConfig?.type || 'Core widget';
+            const widgetSize = widgetConfig?.size || widgetObj.size || coreConfig?.size || 'N/A';
 
-            // FIX: Look in widgetConfig first, then fallback to coreConfig from constants
-            const widgetSize = widgetConfig?.size || coreConfig?.size || 'N/A';
-
-            setting.setName(name);
             setting.setDesc(`Type: ${widgetType} | Size: ${widgetSize}`);
-
         }
 
         // Toggle visibility
@@ -457,6 +249,11 @@ createWidgetElement(key, widgetObj, visibilitySettings, visibilityKey, index, co
                     await this.saveAndUpdate();
                 });
         });
+
+        // ... [Rest of your button/drag event logic remains the same] ...
+
+        // Keep your existing Button Logic (Settings/Trash) and Drag Events here
+        // (Copy the bottom half of your previous function exactly as is)
 
         // Case A: Section Headers 
         if (isSectionHeader) {
@@ -471,31 +268,22 @@ createWidgetElement(key, widgetObj, visibilitySettings, visibilityKey, index, co
                 });
             });
             setting.addButton(button => button.setIcon('trash').setWarning().onClick(async () => {
-                if (confirm(`Delete section header "${name}"?`)) {
-                    // 1. Find and remove from the main storage array
+                if (confirm(`Delete section header "${displayName}"?`)) {
+                    // ... delete logic ...
                     const idx = this.plugin.settings.tasksStatsWidgets.findIndex(w => w.widgetKey === key);
                     if (idx > -1) {
                         this.plugin.settings.tasksStatsWidgets.splice(idx, 1);
                     }
-
-                    // 2. Clean up Visibility Map
                     if (this.plugin.settings.tasksDashboardWidgets[key]) {
                         delete this.plugin.settings.tasksDashboardWidgets[key];
                     }
-
-                    // 3. Clean up Order List
                     this.plugin.settings.tasksDashboardOrder = this.plugin.settings.tasksDashboardOrder.filter(k => k !== key);
-
-                    // 4. Save
                     await this.plugin.saveSettings();
-
-                    // 5. Refresh UI
                     this.renderTasksDashboardSettings(containerEl);
                     this.triggerDashboardRefresh();
                 }
             }));
         }
-
         // Case B: Custom Task Widgets 
         else if (widgetConfig && key.startsWith('custom-') && visibilityKey === 'tasksDashboardWidgets') {
             setting.addButton(button => {
@@ -509,9 +297,9 @@ createWidgetElement(key, widgetObj, visibilitySettings, visibilityKey, index, co
                     }).open();
                 });
             });
-            // Delete button for task widgets...
             setting.addButton(button => button.setIcon('trash').setWarning().onClick(async () => {
-                if (confirm(`Delete ${name}?`)) {
+                if (confirm(`Delete ${displayName}?`)) {
+                    // ... delete logic ...
                     const idx = this.plugin.settings.tasksStatsWidgets.findIndex(w => w.widgetKey === key);
                     this.plugin.settings.tasksStatsWidgets.splice(idx, 1);
                     delete this.plugin.settings.tasksDashboardWidgets[key];
@@ -522,178 +310,64 @@ createWidgetElement(key, widgetObj, visibilitySettings, visibilityKey, index, co
                 }
             }));
         }
-
-        // Case C: Custom Heatmaps (NEW)
+        // Case C: Custom Heatmaps
         else if (isCustomHeatmap) {
-            // 1. Edit Button
+            // ... Keep your existing Heatmap button logic ...
             setting.addButton(button => {
-                button.setIcon('settings')
-                    .setTooltip('Configure Heatmap')
-                    .onClick(() => {
-                        if (customHeatmapConfig) {
-                            new FileCreationHeatmapModal(
-                                this.app,
-                                customHeatmapConfig,
-                                // 3rd Arg: Save Callback
-                                async (updatedHeatmap) => {
-                                    this.plugin.settings.customHeatmaps[customHeatmapIndex] = updatedHeatmap;
+                button.setIcon('settings').setTooltip('Configure Heatmap').onClick(() => {
+                    if (customHeatmapConfig) {
+                        new FileCreationHeatmapModal(this.app, customHeatmapConfig,
+                            async (updatedHeatmap) => {
+                                this.plugin.settings.customHeatmaps[customHeatmapIndex] = updatedHeatmap;
+                                await this.plugin.saveSettings();
+                                this.renderDashboardSettings('creation');
+                                this.triggerDashboardRefresh();
+                            },
+                            async () => {
+                                // Call the delete logic you had in your code
+                                if (confirm(`Delete heatmap "${customHeatmapConfig.name || 'this heatmap'}"?`)) {
+                                    this.plugin.settings.customHeatmaps.splice(customHeatmapIndex, 1);
+                                    // ... (Your re-indexing logic) ...
                                     await this.plugin.saveSettings();
                                     this.renderDashboardSettings('creation');
                                     this.triggerDashboardRefresh();
-                                },
-                                // 4th Arg: Delete Callback 
-                                async () => {
-                                    if (confirm(`Delete heatmap "${customHeatmapConfig.name || 'this heatmap'}"?`)) {
-
-                                        // 1. Remove the actual data
-                                        this.plugin.settings.customHeatmaps.splice(customHeatmapIndex, 1);
-
-                                        // 2. INTELLIGENT RE-INDEXING (PRESERVES SORT ORDER)
-                                        // We must map old keys to new keys without losing their relative positions.
-
-                                        const oldOrder = this.plugin.settings.creationDashboardOrder;
-                                        const newOrder = [];
-                                        const newVisibility = {};
-
-                                        // Step A: Keep Core Widgets exactly where they are
-                                        const coreItemsInOrder = oldOrder.filter(k => !k.startsWith('custom-'));
-
-                                        // Step B: Rebuild the list. 
-                                        // Strategy: Iterate through the OLD order.
-                                        // If it's a core widget -> keep it.
-                                        // If it's a custom widget -> calculate its NEW index (shifted down if needed).
-
-                                        for (const key of oldOrder) {
-                                            if (!key.startsWith('custom-')) {
-                                                // Keep core widget in place
-                                                newOrder.push(key);
-                                                newVisibility[key] = this.plugin.settings.creationDashboardWidgets[key];
-                                            } else {
-                                                const oldIdx = parseInt(key.split('-')[1]);
-
-                                                if (oldIdx === customHeatmapIndex) {
-                                                    // This is the deleted item -> SKIP IT
-                                                    continue;
-                                                }
-
-                                                // Calculate new index
-                                                // If old index was > deleted index, it shifts down by 1 (e.g. 2 becomes 1)
-                                                // If old index was < deleted index, it stays the same (e.g. 0 stays 0)
-                                                const newIdx = oldIdx > customHeatmapIndex ? oldIdx - 1 : oldIdx;
-                                                const newKey = `custom-${newIdx}`;
-
-                                                newOrder.push(newKey);
-                                                newVisibility[newKey] = true;
-                                            }
-                                        }
-
-                                        // 3. Update Settings
-                                        this.plugin.settings.creationDashboardOrder = newOrder;
-                                        this.plugin.settings.creationDashboardWidgets = newVisibility;
-
-                                        // 4. Save & Refresh
-                                        await this.plugin.saveSettings();
-                                        this.renderDashboardSettings('creation');
-                                        this.triggerDashboardRefresh();
-                                    }
-                                }
-
-                            ).open();
-                        }
-                    });
-            });
-
-            // 2. Delete Button
-            setting.addButton(button => {
-                button.setIcon('trash')
-                    .setTooltip('Delete Heatmap')
-                    .setWarning()
-                    .onClick(async () => {
-                        if (confirm(`Delete heatmap "${name}"?`)) {
-                            // 1. Remove the actual data
-                            this.plugin.settings.customHeatmaps.splice(customHeatmapIndex, 1);
-
-                            // 2. INTELLIGENT RE-INDEXING
-                            // We need to map the OLD keys to the NEW keys to preserve order.
-                            // Old: [custom-0, custom-1 (deleted), custom-2]
-                            // New: [custom-0, custom-1 (was 2)]
-
-                            const oldOrder = this.plugin.settings.creationDashboardOrder;
-                            const newOrder = [];
-
-                            // A. Keep all Core Widgets exactly where they were
-                            // B. When we hit a Custom Widget, we skip the deleted one, 
-                            //    and shift the subsequent ones down by 1 index.
-
-                            let shiftCount = 0; // How many custom items we've seen so far in the order
-
-                            // First, let's map out which indices are valid now
-                            // If we deleted index 1, then old index 0 stays 0, old index 2 becomes 1.
-
-                            // Rebuild the order list from scratch based on the NEW array
-                            // This is safer than trying to splice the order array.
-
-                            // Step 1: Extract non-custom items (Core widgets) preserving their relative order
-                            const coreItemsInOrder = oldOrder.filter(k => !k.startsWith('custom-'));
-
-                            // Step 2: Extract custom items preserving their relative order
-                            const customItemsInOrder = oldOrder
-                                .filter(k => k.startsWith('custom-'))
-                                .map(k => parseInt(k.split('-')[1])) // Get the index: [0, 1, 2]
-                                .filter(idx => idx !== customHeatmapIndex) // Remove deleted: [0, 2]
-                                .map(idx => (idx > customHeatmapIndex) ? idx - 1 : idx); // Shift: [0, 1]
-
-                            // Step 3: We can't easily merge them back purely by position if they were mixed.
-                            // STRATEGY: Iterate through old order, if it's core -> keep it.
-                            // If it's custom -> if it's the deleted one, drop it. 
-                            // If it's a kept custom one -> calculate its NEW index key.
-
-                            const reindexedOrder = [];
-                            const newVisibility = {};
-
-                            for (const key of oldOrder) {
-                                if (!key.startsWith('custom-')) {
-                                    // Keep core widget
-                                    reindexedOrder.push(key);
-                                    newVisibility[key] = this.plugin.settings.creationDashboardWidgets[key];
-                                } else {
-                                    const oldIdx = parseInt(key.split('-')[1]);
-                                    if (oldIdx === customHeatmapIndex) {
-                                        // This is the deleted item, skip it
-                                        continue;
-                                    }
-
-                                    // Calculate new index
-                                    // If it was BEFORE the deleted one (e.g. 0 < 1), it stays 0.
-                                    // If it was AFTER the deleted one (e.g. 2 > 1), it becomes 1 (2-1).
-                                    const newIdx = oldIdx > customHeatmapIndex ? oldIdx - 1 : oldIdx;
-                                    const newKey = `custom-${newIdx}`;
-
-                                    reindexedOrder.push(newKey);
-                                    newVisibility[newKey] = true; // Default to visible or carry over if you track it
                                 }
                             }
-
-                            this.plugin.settings.creationDashboardOrder = reindexedOrder;
-                            this.plugin.settings.creationDashboardWidgets = newVisibility;
-
-                            // 3. Save & Refresh
-                            await this.plugin.saveSettings();
-                            this.renderDashboardSettings('creation');
-                            this.triggerDashboardRefresh();
-                        }
-                    });
+                        ).open();
+                    }
+                });
             });
-
+            setting.addButton(button => {
+                button.setIcon('trash').setTooltip('Delete Heatmap').setWarning().onClick(async () => {
+                    // Call the delete logic you had in your code
+                    if (confirm(`Delete heatmap "${displayName}"?`)) {
+                        this.plugin.settings.customHeatmaps.splice(customHeatmapIndex, 1);
+                        // ... (Your re-indexing logic) ...
+                        await this.plugin.saveSettings();
+                        this.renderDashboardSettings('creation');
+                        this.triggerDashboardRefresh();
+                    }
+                });
+            });
         }
-
-        // Case D: Core Widgets (Disabled)
         else {
-            setting.addButton(button => button.setIcon('settings').setTooltip('Core widgets cannot be configured').setDisabled(true));
+            //setting.addButton(button => button.setIcon('settings').setTooltip('Core widgets cannot be configured').setDisabled(true));
+            setting.addButton(button => button
+            .setIcon("settings")
+            .setTooltip("Configure widget")
+            .onClick(() => {
+                // Import WidgetConfigModal at top of file if not present
+                new WidgetConfigModal(this.app, key, this.plugin, async () => {
+                    // Refresh UI callback
+                    await this.plugin.saveSettings();
+                    this.app.workspace.trigger('cpwn-pm-dashboard-refresh');
+                }).open();
+            }));
+
             setting.addButton(button => button.setIcon('trash').setTooltip('Core widgets cannot be deleted, use the toggle to hide').setDisabled(true));
         }
 
-        // Make draggable and cache element on dragstart
+        // Events
         widgetEl.draggable = true;
         widgetEl.addEventListener('dragstart', (e) => {
             e.dataTransfer.setData('text/plain', key);
@@ -708,7 +382,6 @@ createWidgetElement(key, widgetObj, visibilitySettings, visibilityKey, index, co
 
         return widgetEl;
     }
-*/
 
     /**
      * Attach optimized drag handlers with throttling and event delegation
@@ -1572,7 +1245,7 @@ createWidgetElement(key, widgetObj, visibilitySettings, visibilityKey, index, co
         this.createRgbaColorSetting(containerEl, "Period/Week column font color (Dark Mode)", "Text color for the Period/Week column in dark theme.", "pwColumnFontColorDark");
         this.createRgbaColorSetting(containerEl, "Week number column font color (Light Mode)", "Text color for the week number column in light theme.", "weekNumberFontColorLight");
         this.createRgbaColorSetting(containerEl, "Week number column font color (Dark Mode)", "Text color for the week number column in dark theme.", "weekNumberFontColorDark");
-    
+
         new Setting(containerEl).setName("Vertical calendar grid view").setHeading();
 
 
@@ -1589,7 +1262,7 @@ createWidgetElement(key, widgetObj, visibilitySettings, visibilityKey, index, co
                     this.plugin.settings.verticalViewYearsPast = Number(value);
                     await this.plugin.saveSettings();
                     // Optional: Trigger a refresh if the view is open
-                    this.plugin.app.workspace.trigger('cpwn-pm-dashboard-refresh'); 
+                    this.plugin.app.workspace.trigger('cpwn-pm-dashboard-refresh');
                 }));
 
         new Setting(containerEl)
@@ -1741,8 +1414,18 @@ createWidgetElement(key, widgetObj, visibilitySettings, visibilityKey, index, co
         new Setting(containerEl).setName("Integrate external calendar events").setHeading();
 
         new Setting(containerEl)
+            .setName('Allow external calendar network requests')
+            .setDesc('When enabled, this plugin requests the .ics URL you provide below so it can display calendar events. The URL may include private calendar tokens; it is stored only in this plugin\'s local Obsidian settings and is sent only to that calendar server.')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.icsNetworkEnabled)
+                .onChange(async (value) => {
+                    this.plugin.settings.icsNetworkEnabled = value;
+                    await this.saveAndUpdate();
+                }));
+
+        new Setting(containerEl)
             .setName('External calendar URL (.ics)')
-            .setDesc('Integrate an external .ics feed calendar URL (e.g., from Google Calendar using the \'Secret address in iCal format\' or \'Public address in iCal Format\') to indicate events as dots in the calendar grid and event details in the date popup box.')
+            .setDesc('Optional .ics feed URL used only when external calendar network requests are enabled above. The feed is fetched from the calendar provider to show event dots and event details in date popups.')
             .addText(text => {
                 text
                     .setPlaceholder('https://calendar.google.com/calendar/ical/.../basic.ics')
@@ -1757,23 +1440,14 @@ createWidgetElement(key, widgetObj, visibilitySettings, visibilityKey, index, co
             .settingEl.style.alignItems = "flex-start";
 
         new Setting(containerEl)
-            .setName('Auto-refresh interval')
-            .setDesc('How often the external calendar URL should be automatically refreshed in the background.')
+            .setName('Refresh behavior')
+            .setDesc('External calendar events refresh when the Calendar Period Week Notes view is opened or re-rendered. No background polling is scheduled.')
             .addDropdown(dropdown => {
                 dropdown
-                    .addOption('15', '15 minutes')
-                    .addOption('30', '30 minutes')
-                    .addOption('60', '1 hour')
-                    .addOption('180', '3 hours')
-                    .addOption('360', '6 hours')
-                    .addOption('720', '12 hours')
-                    .setValue(this.plugin.settings.icsRefreshInterval.toString())
-                    .onChange(async (value) => {
-                        this.plugin.settings.icsRefreshInterval = parseInt(value, 10);
+                    .addOption('view', 'On view refresh')
+                    .setValue('view')
+                    .onChange(async () => {
                         await this.plugin.saveSettings();
-
-                        // Call a method on the main plugin to reset the timer
-                        this.plugin.resetIcsRefreshInterval();
                     });
             });
 
@@ -2440,6 +2114,47 @@ createWidgetElement(key, widgetObj, visibilitySettings, visibilityKey, index, co
 
         containerEl.createEl("h1", { text: "Tasks tab settings" });
 
+        new Setting(containerEl).setName("Task provider").setHeading();
+
+        const todoistHelp = containerEl.createDiv({ cls: 'cpwn-setting-help cpwn-todoist-help' });
+        todoistHelp.createEl('h3', { text: 'Using Todoist Sync' });
+        todoistHelp.createEl('p', {
+            text: 'Calendar Period Week Notes can read active Todoist tasks through the Todoist Sync community plugin. Install and configure Todoist Sync first, then choose Todoist Sync or Both as the task source below.'
+        });
+        const todoistSteps = todoistHelp.createEl('ol');
+        todoistSteps.createEl('li', { text: 'Install and enable the Todoist Sync plugin, then connect it to your Todoist account.' });
+        todoistSteps.createEl('li', { text: 'Choose Todoist Sync to use only Todoist tasks, or Both to combine Todoist with Obsidian Tasks.' });
+        todoistSteps.createEl('li', { text: 'Leave the Todoist filter blank to show all active tasks, or enter a Todoist filter to narrow the dashboard. Examples: today | overdue, no date, p1 | p2, or @work.' });
+        todoistSteps.createEl('li', { text: 'Use due dates, labels and priorities in Todoist to power calendar indicators, task groups and dashboard counts.' });
+        todoistHelp.createEl('p', {
+            text: 'Todoist Sync provides active/query tasks and completion actions. Completed-history widgets still need Obsidian Tasks data unless you also keep Obsidian Tasks enabled.'
+        });
+
+        new Setting(containerEl)
+            .setName("Task source")
+            .setDesc("Choose where Calendar Period Week Notes reads tasks from. Todoist requires the Todoist Sync community plugin to be installed, enabled, and configured.")
+            .addDropdown(dropdown => dropdown
+                .addOption('obsidian', 'Obsidian Tasks')
+                .addOption('todoist', 'Todoist Sync')
+                .addOption('both', 'Obsidian Tasks and Todoist Sync')
+                .setValue(this.plugin.settings.taskSource || 'obsidian')
+                .onChange(async (value) => {
+                    this.plugin.settings.taskSource = value;
+                    await this.saveAndUpdate();
+                    this.triggerDashboardRefresh();
+                }));
+
+        new Setting(containerEl)
+            .setName("Todoist dashboard filter")
+            .setDesc("Optional Todoist filter used when Todoist Sync is selected. Leave blank to show all active Todoist tasks so your configured date groups can include Today, Tomorrow, Next 7 days, Future and Someday.")
+            .addText(text => text
+                .setPlaceholder("Leave blank for all active tasks")
+                .setValue(this.plugin.settings.todoistFilter || "")
+                .onChange(async (value) => {
+                    this.plugin.settings.todoistFilter = value.trim();
+                    await this.saveAndUpdate();
+                    this.triggerDashboardRefresh();
+                }));
 
         //OS toast notifications for tasks to complete 
         new Setting(containerEl).setName("Desktop notifications").setHeading();
@@ -2459,7 +2174,7 @@ createWidgetElement(key, widgetObj, visibilitySettings, visibilityKey, index, co
 
         new Setting(containerEl)
             .setName("Task date format")
-            .setDesc("The format used for dates displayed in the task layout (e.g., YYYY-MM-DD, DD-MM-YYYY).")
+            .setDesc("The format used for dates displayed in the task layout (e.g., YYYY-MM-DD, DD-MM-YYYY, ddd Do MMM YYYY).")
             .addText(text => text
                 .setPlaceholder("YYYY-MM-DD")
                 .setValue(this.plugin.settings.taskDateFormat || "YYYY-MM-DD")
@@ -3384,6 +3099,25 @@ createWidgetElement(key, widgetObj, visibilitySettings, visibilityKey, index, co
         // --- 3. Spacer and Other Settings ---
         container.createEl('div', { cls: 'cpwn-setting-spacer' });
 
+        container.createEl('div', { cls: 'cpwn-setting-spacer' });
+
+new Setting(container)
+    .setName("Widget configuration overrides")
+    .setDesc("Reset all manual title/chevron overrides set via right-click on widgets.")
+    .addButton(button => button
+        .setButtonText("Reset all overrides")
+        .setTooltip("Clears all custom titles and visibility settings")
+        .onClick(async () => {
+            if (confirm("Are you sure you want to reset all widget overrides? Custom titles and visibility settings will be lost.")) {
+                this.plugin.settings.widgetOverrides = {};
+                await this.plugin.saveSettings();
+                
+                // Refresh the dashboard if open
+                this.app.workspace.trigger('cpwn-pm-dashboard-refresh');
+                new Notice("All widget overrides reset.");
+            }
+        }));
+
         new Setting(container).setName("Task status colors").setHeading();
 
         this.createRgbaColorSetting(
@@ -3455,9 +3189,9 @@ createWidgetElement(key, widgetObj, visibilitySettings, visibilityKey, index, co
         const guideHtml = `
 
     <div style="padding: 10px; border: 1px solid var(--background-modifier-border); border-radius: 8px; margin-bottom: 20px; background-color: var(--background-secondary-alt);">
-    <h4 style="margin-top: 0;">Important: Requires Obsidian Tasks Plugin</h4>
+    <h4 style="margin-top: 0;">Important: Choose a task source</h4>
     <p style="margin-bottom: 0;">
-        For the <strong>Tasks Tab</strong> and all <strong>Dashboard Task Widgets</strong> to function, you <strong>MUST</strong> have the official <a href="https://github.com/obsidian-tasks-group/obsidian-tasks">Obsidian Tasks</a> plugin installed and enabled. This plugin provides the core engine for finding and processing tasks in your vault.
+        The <strong>Tasks Tab</strong> and <strong>Dashboard Task Widgets</strong> can read from the official <a href="https://github.com/obsidian-tasks-group/obsidian-tasks">Obsidian Tasks</a> plugin, the <a href="https://github.com/jamiebrynes7/obsidian-todoist-plugin">Todoist Sync</a> plugin, or both. Todoist supports active task counts and due-date widgets; completed-history widgets need Obsidian Tasks data.
     </p>
 </div>
 
@@ -4899,9 +4633,9 @@ createWidgetElement(key, widgetObj, visibilitySettings, visibilityKey, index, co
 
 
     <div style="padding: 10px; border: 1px solid var(--background-modifier-border); border-radius: 8px; margin-bottom: 20px; background-color: var(--background-secondary-alt);">
-    <h4 style="margin-top: 0;">Important: Requires Obsidian Tasks Plugin</h4>
+    <h4 style="margin-top: 0;">Important: Choose a task source</h4>
     <p style="margin-bottom: 0;">
-        For the <strong>Tasks Tab</strong> and all <strong>Dashboard Task Widgets</strong> to function, you <strong>MUST</strong> have the official <a href="https://github.com/obsidian-tasks-group/obsidian-tasks">Obsidian Tasks</a> plugin installed and enabled. This plugin provides the core engine for finding and processing tasks in your vault.
+        The <strong>Tasks Tab</strong> and <strong>Dashboard Task Widgets</strong> can read from the official <a href="https://github.com/obsidian-tasks-group/obsidian-tasks">Obsidian Tasks</a> plugin, the <a href="https://github.com/jamiebrynes7/obsidian-todoist-plugin">Todoist Sync</a> plugin, or both. Todoist supports active task counts and due-date widgets; completed-history widgets need Obsidian Tasks data.
     </p>
 </div>
 

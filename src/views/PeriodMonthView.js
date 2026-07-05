@@ -38,11 +38,13 @@ import { CssChartRenderer } from '../widgets/CssChartRenderer.js';
 // Modals
 import { ActionChoiceModal } from '../modals/ActionChoiceModal.js';
 import { ConfirmationModal } from '../modals/ConfirmationModal.js';
+import { TodoistTaskModal } from '../modals/TodoistTaskModal.js';
 import { FilterSuggest, TagSuggest } from '../utils/suggesters.js';
 import { GoalDataAggregator } from '../widgets/GoalDataAggregator';
 import { GoalTracker } from "../logic/GoalTracker.js";
 //import { TASK_LAYOUTS } from '../data/taskLayouts.js';
 import { TaskLayoutRenderer } from '../services/TaskLayoutRenderer';
+import { TaskProviderService } from '../services/TaskProviderService.js';
 
 export { VIEW_TYPE_PERIOD };
 
@@ -64,6 +66,10 @@ export class PeriodMonthView extends ItemView {
         this.dashboardTaskDebounceTimer = null;
         this.dashboardCreationDebounceTimer = null;
         this.dashboardRefreshTimers = new Map();
+        this.todoistModalCloseObserver = null;
+        this.todoistModalRefreshTimeout = null;
+        this.todoistExternalRefreshTimer = null;
+        this.todoistTaskAutoRefreshInterval = null;
         this.fileToHeatmapCache = new Map();
         this.statusBarObserver = null;
         this.heatmapRefreshDebounceTimer = null;
@@ -106,6 +112,7 @@ export class PeriodMonthView extends ItemView {
         // These maps store pre-processed data to avoid re-scanning the vault on every render.
         this.noteText = "";
         this.allTasks = [];
+        this.taskProvider = new TaskProviderService(this.app, this.plugin);
         this.createdNotesMap = new Map();
         this.modifiedNotesMap = new Map();
         this.assetCreationMap = new Map();
@@ -406,27 +413,7 @@ export class PeriodMonthView extends ItemView {
         // Ensure ID is set
         widgetContainer.id = `cpwn-widget-${widgetKey}`;
 
-
-        let showTitle;
-        if (typeof this.plugin.settings.overrideShowTitle === 'boolean') {
-            showTitle = this.plugin.settingsoverrideShowTitle;
-
-        } else if (typeof this.plugin.settings.showTaskWidgetTitles === 'boolean') {
-            showTitle = this.plugin.settings.showTaskWidgetTitles;
-
-        } else {
-            showTitle = true; // default fallback
-        }
-
-        let showChevron;
-        if (typeof this.plugin.settings.overrideShowChevron === 'boolean') {
-            showChevron = this.plugin.settings.overrideShowChevron;
-
-        } else if (typeof this.plugin.settings.showTaskWidgetChevrons === 'boolean') {
-            showChevron = this.plugin.settings.showTaskWidgetChevrons;
-        } else {
-            showChevron = true; // default fallback
-        }
+        let { title: titleNew, showTitle, showChevron } = this.getWidgetDisplayConfig(widgetKey, title);
 
         // --- State Management ---
         const states = ['full', 'mini'];
@@ -441,7 +428,7 @@ export class PeriodMonthView extends ItemView {
             toggleIcon = header.createDiv({ cls: 'cpwn-summary-toggle-icon' });
         }
         if (showTitle) {
-            const titleEl = header.createEl('h3', { text: title });
+            const titleEl = header.createEl('h3', { text: titleNew });
         }
 
         // --- Core Rendering Logic ---
@@ -641,30 +628,7 @@ export class PeriodMonthView extends ItemView {
             return;
         }
 
-        // ============================================================
-        // COLD START: Build the DOM Structure
-        // ============================================================
-
-        let showTitle;
-        if (typeof this.plugin.settings.overrideShowTitle === 'boolean') {
-            showTitle = this.plugin.settingsoverrideShowTitle;
-        } else if (typeof this.plugin.settings.showTaskWidgetTitles === 'boolean') {
-            showTitle = this.plugin.settings.showTaskWidgetTitles;
-        } else {
-            showTitle = true;
-        }
-
-        let showChevron;
-
-        if (options && typeof options.overrideShowChevron === 'boolean') {
-            showChevron = options.overrideShowChevron;
-        }
-        else if (typeof this.plugin.settings.showTaskWidgetChevrons === 'boolean') {
-            showChevron = this.plugin.settings.showTaskWidgetChevrons;
-        }
-        else {
-            showChevron = true;
-        }
+        let { title: titleNew, showTitle, showChevron } = this.getWidgetDisplayConfig(widgetKey, title);
 
         widgetContainer.empty();
 
@@ -685,7 +649,7 @@ export class PeriodMonthView extends ItemView {
         let titleEl = '';
         // 2. Clickable Title
         if (showTitle) {
-            titleEl = header.createEl('h3', { text: title });
+            titleEl = header.createEl('h3', { text: titleNew });
 
             // 3. Total Count
             const totalCountEl = header.createDiv({
@@ -699,6 +663,9 @@ export class PeriodMonthView extends ItemView {
                 if (!isNaN(index)) {
                     linkPath = this.plugin.settings.customHeatmaps[index]?.linkPath;
                 }
+            } else if (widgetKey === 'tagHeatmap') {
+                // NEW: Check tagHeatmapConfig for link
+                linkPath = this.plugin.settings.tagHeatmapConfig?.linkPath;
             } else {
                 linkPath = this.plugin.settings.heatmapLinkConfig[widgetKey];
             }
@@ -750,14 +717,14 @@ export class PeriodMonthView extends ItemView {
                 if (todayCell) {
                     // Calculate max possible scroll (rightmost edge)
                     const maxScrollLeft = heatmapContainer.scrollWidth - heatmapContainer.clientWidth;
-                    
+
                     // Calculate where 'today' is physically located in the big grid
                     const todayLeft = todayCell.offsetLeft;
-                    
+
                     // We want 'today' to be, say, 100px from the right edge of the VISIBLE container
                     // Formula: ScrollPos = (Today's Position) - (Container Width) + (Desired Padding from Right)
                     // Let's say we want 2 weeks (~40px) padding from the right:
-                    let targetScroll = todayLeft - heatmapContainer.clientWidth + 45; 
+                    let targetScroll = todayLeft - heatmapContainer.clientWidth + 45;
 
                     // Clamp it: Can't scroll past the actual end (maxScrollLeft)
                     // But also ensure we don't underscroll if there's plenty of future space
@@ -949,6 +916,122 @@ export class PeriodMonthView extends ItemView {
                 }, this.plugin.settings.popupHideDelay);
             });
 
+            cell.addEventListener("click", (event) => {
+                if (this.isPopupLocked) return;
+
+                // 1. FETCH LIVE DATA (same as mouseenter)
+                const context = this.liveHeatmapData.get(widgetKey);
+                if (!context) return;
+
+                const { mainMap, options: liveOptions } = context;
+                const dateKey = cell.dataset.date;
+
+                let itemsOnDay;
+                if (widgetKey === 'taskcompletionheatmap' && liveOptions && liveOptions.completionMap instanceof Map) {
+                    itemsOnDay = liveOptions.completionMap.get(dateKey) || [];
+                } else {
+                    itemsOnDay = mainMap.get(dateKey) || [];
+                }
+                if (itemsOnDay.length === 0) return;
+
+                // 2. Exactly 1 item → open immediately
+                let uniqueFiles = [];
+                if (itemsOnDay[0].description !== undefined) {
+                    // Tasks → unique file paths (keep your existing logic)
+                    const filePaths = Array.from(new Set(itemsOnDay.map(task => task.path)));
+                    uniqueFiles = filePaths
+                        .map(path => this.app.vault.getAbstractFileByPath(path))
+                        .filter(file => file instanceof TFile);
+                } else {
+                    // Files/Custom tags → unique by OBJECT REFERENCE (not path)
+                    const seenFiles = new Set();
+                    uniqueFiles = itemsOnDay
+                        .filter(file => {
+                            if (!(file instanceof TFile)) return false;
+                            if (seenFiles.has(file)) return false;  // Same file object = skip
+                            seenFiles.add(file);
+                            return true;
+                        });
+                }
+
+                // Now check uniqueFiles.length (1 = direct open)
+                if (uniqueFiles.length === 1) {
+                    const file = uniqueFiles[0];
+                    this.handleFileClick(file, event);
+                    this.hideFilePopup();
+                    event.stopPropagation();
+                    return;
+                }
+
+                // 3. Multiple items → build popupData (EXACT copy from your mouseenter)
+                var popupData = {};
+
+                if (itemsOnDay[0].description !== undefined) {
+                    // Task logic
+                    var filePaths = Array.from(new Set(itemsOnDay.map(function (task) { return task.path; })));
+                    var filesOnDay = filePaths
+                        .map(function (path) { return this.app.vault.getAbstractFileByPath(path); }.bind(this))
+                        .filter(function (file) { return file instanceof TFile; });
+
+                    var dailyNotes = [];
+                    var createdNotes = [];
+                    var modifiedNotes = [];
+                    var assets = [];
+
+                    filesOnDay.forEach(function (file) {
+                        if (this.isDailyNote(file)) {
+                            dailyNotes.push(file);
+                        } else if (file.path && file.path.toLowerCase().endsWith('.md')) {
+                            createdNotes.push(file);
+                        } else {
+                            assets.push(file);
+                        }
+                    }.bind(this));
+
+                    popupData = {
+                        tasks: itemsOnDay,
+                        daily: dailyNotes,
+                        created: createdNotes,
+                        modified: modifiedNotes,
+                        assets: assets
+                    };
+                } else {
+                    // File logic
+                    var dailyNotes2 = [];
+                    var createdNotes2 = [];
+                    var modifiedNotes2 = [];
+                    var assets2 = [];
+
+                    itemsOnDay.forEach(function (file) {
+                        if (this.isDailyNote(file)) {
+                            dailyNotes2.push(file);
+                        } else if (file.path && file.path.toLowerCase().endsWith('.md')) {
+                            createdNotes2.push(file);
+                        } else {
+                            assets2.push(file);
+                        }
+                    }.bind(this));
+
+                    popupData = {
+                        daily: dailyNotes2,
+                        created: createdNotes2,
+                        modified: modifiedNotes2,
+                        assets: assets2,
+                        tasks: [],
+                        suppressTaskFetch: true
+                    };
+                }
+
+                if (widgetKey === 'taskcompletionheatmap') {
+                    popupData.isCompletionHeatmap = true;
+                }
+
+                // 4. Show popup (same as mouseenter)
+                this.showFilePopup(cell, popupData, cellDate.toDate(), this.plugin.settings.otherNoteHoverDelay);
+                event.stopPropagation();
+            });
+
+
             if (dayOfWeek === 6) {
                 colIndex++;
             }
@@ -1001,19 +1084,19 @@ export class PeriodMonthView extends ItemView {
 
         window.setTimeout(() => {
             const todayCell = grid.querySelector('.cpwn-heatmap-today-cell');
-            
-            
-             if (todayCell) {
+
+
+            if (todayCell) {
                 // Calculate max possible scroll (rightmost edge)
                 const maxScrollLeft = heatmapContainer.scrollWidth - heatmapContainer.clientWidth;
-                
+
                 // Calculate where 'today' is physically located in the big grid
                 const todayLeft = todayCell.offsetLeft;
-                
+
                 // We want 'today' to be, say, 100px from the right edge of the VISIBLE container
                 // Formula: ScrollPos = (Today's Position) - (Container Width) + (Desired Padding from Right)
                 // Let's say we want 2 weeks (~40px) padding from the right:
-                let targetScroll = todayLeft - heatmapContainer.clientWidth + 45; 
+                let targetScroll = todayLeft - heatmapContainer.clientWidth + 45;
 
                 // Clamp it: Can't scroll past the actual end (maxScrollLeft)
                 // But also ensure we don't underscroll if there's plenty of future space
@@ -1029,7 +1112,7 @@ export class PeriodMonthView extends ItemView {
             } else {
                 heatmapContainer.scrollLeft = heatmapContainer.scrollWidth;
             }*/
-            
+
         }, 150);
 
         // --- 3. INITIAL PAINT ---
@@ -1789,7 +1872,7 @@ export class PeriodMonthView extends ItemView {
         this.processedEventSignatures.clear();
 
         const icsUrl = this.plugin.settings.icsUrl;
-        if (!icsUrl) {
+        if (!this.plugin.settings.icsNetworkEnabled || !icsUrl) {
             if (this.isCalendarRendered) {
                 this.renderCalendar();
             }
@@ -1971,6 +2054,503 @@ export class PeriodMonthView extends ItemView {
     }
 
     generateMonthGrid(dateForMonth, targetBodyEl) {
+        const { settings } = this.plugin;
+        const today = new Date();
+        const year = dateForMonth.getFullYear();
+        const month = dateForMonth.getMonth();
+        const firstDayOfMonth = new Date(year, month, 1);
+
+        // --- 1. SETTINGS SYNC ---
+        // Try to get settings from the Core Daily Notes plugin first for accuracy
+        let folder = settings.dailyNotesFolder || "";
+        let format = settings.dailyNoteDateFormat || "YYYY-MM-DD";
+
+        const dailyNotesPlugin = this.app.internalPlugins.plugins['daily-notes'];
+        if (dailyNotesPlugin && dailyNotesPlugin.enabled) {
+            folder = dailyNotesPlugin.instance.options.folder || folder;
+            format = dailyNotesPlugin.instance.options.format || format;
+        }
+
+        // --- 2. BUILD PATH CACHE (Fixed) ---
+        // Store full paths instead of basenames to handle subfolders
+        const existingFilePaths = new Set(this.app.vault.getMarkdownFiles().map(file => file.path));
+
+
+        const startDayNumber = this.plugin.settings.weekStartDay === 'monday' ? 1 : 0;
+        moment.updateLocale('en', { week: { dow: startDayNumber } });
+
+
+        let dayOfWeek = firstDayOfMonth.getDay();
+
+
+        let diff = dayOfWeek - startDayNumber;
+        if (diff < 0) {
+            diff += 7;
+        }
+
+
+        let currentDay = new Date(firstDayOfMonth);
+        currentDay.setDate(firstDayOfMonth.getDate() - diff);
+
+
+        const requiredRows = 6;
+        for (let i = 0; i < requiredRows; i++) {
+            const row = targetBodyEl.createEl("tr");
+
+
+            if (settings.highlightCurrentWeek) {
+                const todayMoment = moment();
+                const startOfWeekMoment = moment(currentDay);
+                if (todayMoment.weekYear() === startOfWeekMoment.weekYear() && todayMoment.week() === startOfWeekMoment.week()) {
+                    row.addClass('current-week-row');
+                }
+            }
+
+
+            const weekMoment = moment(new Date(currentDay));
+            const isoWeek = weekMoment.isoWeek();
+            const isoYear = weekMoment.isoWeekYear();
+            const isoMonth = weekMoment.month();
+            const periodWeekData = getPeriodWeek(new Date(currentDay), settings.startOfPeriod1Date);
+
+
+            const dateInfoForWeek = {
+                year: isoYear,
+                month: isoMonth,
+                period: periodWeekData.period,
+                week: periodWeekData.week,
+                calendarWeek: isoWeek,
+                weekSinceStart: periodWeekData.weekSinceStart
+            };
+
+
+            const clickHandler = () => {
+                this.openWeeklyNote(dateInfoForWeek);
+            };
+
+
+            let weeklyNoteExists = false;
+            if (settings.enableWeeklyNotes) {
+                const pweek = ((dateInfoForWeek.weekSinceStart - 1) % 52) + 1;
+                const replacements = {
+                    YYYY: dateInfoForWeek.year,
+                    MM: String(dateInfoForWeek.month + 1).padStart(2, '0'),
+                    PN: "P" + dateInfoForWeek.period,
+                    PW: "W" + dateInfoForWeek.week,
+                    WKP: String(pweek).padStart(2, '0'),
+                    WKC: String(dateInfoForWeek.calendarWeek).padStart(2, '0')
+                };
+                const expectedFileName = settings.weeklyNoteFormat.replace(/YYYY|WKP|WKC|MM|PN|PW/g, match => replacements[match]);
+
+
+                //console.log("Checking weekly note existence for:", expectedFileName);
+
+
+                const expectedPath = `${settings.weeklyNoteFolder}/${expectedFileName}.md`;
+                weeklyNoteExists = this.existingWeeklyNotes.has(expectedPath);
+
+
+                //console.log(`Weekly note for ${expectedFileName} exists:`, weeklyNoteExists);
+            }
+
+
+            if (settings.showPWColumn) {
+                const pwCell = row.createEl("td", { cls: "cpwn-pw-label-cell" });
+                const pwContent = pwCell.createDiv({ cls: "cpwn-day-content" });
+                pwContent.createDiv({ cls: "cpwn-day-number" }).setText(this.formatPW(periodWeekData.period, periodWeekData.week));
+
+
+                if (this.plugin.settings.highlightTodayPWLabel) {
+                    for (let d = 0; d < 7; d++) {
+                        const checkDate = new Date(currentDay);
+                        checkDate.setDate(currentDay.getDate() + d);
+                        if (isSameDay(checkDate, today)) {
+                            pwCell.addClass("today-pw-label");
+                            break;
+                        }
+                    }
+                }
+
+
+                if (weeklyNoteExists && settings.showWeeklyNoteDot && !settings.showWeekNumbers) {
+                    const dotsContainer = pwContent.createDiv({ cls: 'cpwn-dots-container' });
+                    const layout = this.plugin.settings.calendarLayout || 'normal';
+                    dotsContainer.classList.remove('layout-condensed', 'layout-normal', 'layout-spacious');
+                    dotsContainer.classList.add(`layout-${layout}`);
+                    dotsContainer.createDiv({ cls: 'cpwn-calendar-dot cpwn-weekly-note-dot' });
+                }
+                pwCell.addEventListener('click', clickHandler);
+
+
+                const handleRowHoverEnter = () => {
+                    if (this.plugin.settings.enableRowHighlight) {
+                        row.classList.add('row-hover');
+                    }
+                };
+                const handleRowHoverLeave = () => {
+                    row.classList.remove('row-hover');
+                };
+
+
+                pwCell.addEventListener('mouseenter', handleRowHoverEnter);
+                pwCell.addEventListener('mouseleave', handleRowHoverLeave);
+            }
+
+
+            if (settings.showWeekNumbers) {
+                const weekNum = settings.weekNumberType === 'period' ? periodWeekData.weekSinceStart : isoWeek;
+                const weekCell = row.createEl("td", { cls: "cpwn-week-number-cell" });
+                const weekContent = weekCell.createDiv({ cls: "cpwn-day-content" });
+                weekContent.createDiv({ cls: "cpwn-day-number" }).setText(weekNum.toString());
+
+
+                weekCell.classList.add('cpwn-clickable');
+
+
+                if (this.plugin.settings.highlightTodayPWLabel) {
+                    for (let d = 0; d < 7; d++) {
+                        const checkDate = new Date(currentDay);
+                        checkDate.setDate(currentDay.getDate() + d);
+                        if (isSameDay(checkDate, today)) {
+                            weekCell.addClass("today-pw-label");
+                            break;
+                        }
+                    }
+                }
+
+
+                if (weeklyNoteExists && settings.showWeeklyNoteDot) {
+                    const dotsContainer = weekContent.createDiv({ cls: 'cpwn-dots-container' });
+                    const layout = this.plugin.settings.calendarLayout || 'normal';
+                    dotsContainer.classList.remove('layout-condensed', 'layout-normal', 'layout-spacious');
+                    dotsContainer.classList.add(`layout-${layout}`);
+                    dotsContainer.createDiv({ cls: 'cpwn-calendar-dot cpwn-weekly-note-dot' });
+                }
+                weekCell.addEventListener('click', clickHandler);
+
+
+                const handleRowHoverEnter = () => {
+                    if (this.plugin.settings.enableRowHighlight) {
+                        row.classList.add('row-hover');
+                    }
+                };
+                const handleRowHoverLeave = () => {
+                    row.classList.remove('row-hover');
+                };
+
+
+                weekCell.addEventListener('mouseenter', handleRowHoverEnter);
+                weekCell.addEventListener('mouseleave', handleRowHoverLeave);
+            }
+
+
+            for (let d = 0; d < 7; d++) {
+                const dayDate = new Date(currentDay);
+                dayDate.setDate(currentDay.getDate() + d);
+                const isOtherMonth = dayDate.getMonth() !== month;
+                const cell = row.createEl("td");
+
+
+
+                if (d === 0 && this.plugin.settings.showPWColumnSeparator &&
+                    (this.plugin.settings.showPWColumn || this.plugin.settings.showWeekNumbers)) {
+                    cell.addClass('first-date-column');
+                }
+
+
+
+                const contentDiv = cell.createDiv("cpwn-day-content");
+                const dayNumber = contentDiv.createDiv("cpwn-day-number");
+                dayNumber.textContent = dayDate.getDate().toString();
+                const dateKey = moment(dayDate).format("YYYY-MM-DD");
+                const icsEventsForDay = this.icsEventsByDate.get(dateKey);
+                const tasksForDay = this.tasksByDate.get(dateKey);
+                const createdFiles = this.createdNotesMap.get(dateKey) || [];
+                const modifiedFiles = this.modifiedNotesMap.get(dateKey) || [];
+                const assetsCreated = this.assetCreationMap.get(dateKey) || [];
+
+                // --- 3. PATH MATCHING LOGIC (Using Regex instead of external function) ---
+                const dailyNoteFormatted = formatDate(dayDate, format);
+
+                // Manually normalize: Join, replace // with /, remove leading /
+                let rawPath = (folder ? folder + "/" : "") + dailyNoteFormatted + ".md";
+                let expectedDailyPath = rawPath.replace(/\/+/g, '/');
+                if (expectedDailyPath.startsWith('/')) expectedDailyPath = expectedDailyPath.substring(1);
+
+                // Check if the specific file path exists
+                const dailyNoteExists = existingFilePaths.has(expectedDailyPath);
+
+
+                let totalTaskCount = tasksForDay ? tasksForDay.length : 0;
+                const calendarEventCount = icsEventsForDay ? icsEventsForDay.length : 0;
+                const eventIndicatorStyle = this.plugin.settings.calendarEventIndicatorStyle;
+
+
+
+                if (eventIndicatorStyle === 'heatmap' || eventIndicatorStyle === 'badge') {
+                    totalTaskCount += calendarEventCount;
+                }
+
+
+
+                const isToday = isSameDay(dayDate, today)
+                if (totalTaskCount > 0) {
+                    if (settings.taskIndicatorStyle === 'badge') {
+                        contentDiv.createDiv({ cls: 'cpwn-task-count-badge', text: totalTaskCount.toString() });
+                    } else if (settings.taskIndicatorStyle === 'heatmap') {
+                        const shouldApplyHeatmap = !(isToday && settings.todayHighlightStyle === 'cell');
+
+
+
+                        if (shouldApplyHeatmap) {
+                            const startColor = parseRgbaString(settings.taskHeatmapStartColor);
+                            const midColor = parseRgbaString(settings.taskHeatmapMidColor);
+                            const endColor = parseRgbaString(settings.taskHeatmapEndColor);
+                            const midPoint = settings.taskHeatmapMidpoint;
+                            const maxPoint = settings.taskHeatmapMaxpoint;
+
+
+
+                            if (startColor && midColor && endColor) {
+                                let finalColor;
+                                if (totalTaskCount >= maxPoint) { finalColor = settings.taskHeatmapEndColor; }
+                                else if (totalTaskCount >= midPoint) { const factor = (totalTaskCount - midPoint) / (maxPoint - midPoint); finalColor = blendRgbaColors(midColor, endColor, factor); }
+                                else { const divisor = midPoint - 1; const factor = divisor > 0 ? (totalTaskCount - 1) / divisor : 1; finalColor = blendRgbaColors(startColor, midColor, factor); }
+
+
+
+                                contentDiv.classList.add('cpwn-heatmap-cell');
+                                contentDiv.style.setProperty('--cpwn-heatmap-color', finalColor);
+
+
+
+                                const isInHighlightedRow = settings.highlightCurrentWeek &&
+                                    row.classList.contains('current-week-row');
+
+
+
+                                if (isInHighlightedRow) {
+                                    const borderColor = document.body.classList.contains('cpwn-theme-dark')
+                                        ? settings.rowHighlightColorDark
+                                        : settings.rowHighlightColorLight;
+                                } else {
+                                    contentDiv.style.border = `${this.plugin.settings.contentBorderWidth} solid var(--background-secondary)`;
+                                }
+                                contentDiv.addClass('cpwn-content-heatmap-cell-box');
+                            }
+                        }
+                    }
+                }
+
+                if (isOtherMonth) dayNumber.addClass("cpwn-day-number-other-month");
+                if (isSameDay(dayDate, today) && !isOtherMonth) cell.addClass("cpwn-today-cell");
+
+                const dotsContainer = contentDiv.createDiv({ cls: 'cpwn-dots-container' });
+                const layout = this.plugin.settings.calendarLayout || 'normal';
+
+                dotsContainer.classList.remove('layout-condensed', 'layout-normal', 'layout-spacious');
+                dotsContainer.classList.add(`layout-${layout}`);
+
+                if (dailyNoteExists) { dotsContainer.createDiv({ cls: "cpwn-period-month-daily-note-dot cpwn-calendar-dot" }); }
+                if (settings.showOtherNoteDot && createdFiles.length > 0) { dotsContainer.createDiv({ cls: 'cpwn-other-note-dot cpwn-calendar-dot' }); }
+                if (settings.showModifiedFileDot && modifiedFiles.length > 0) { dotsContainer.createDiv({ cls: 'cpwn-modified-file-dot cpwn-calendar-dot' }); }
+                if (settings.showAssetDot && assetsCreated.length > 0) { dotsContainer.createDiv({ cls: 'cpwn-asset-dot cpwn-calendar-dot' }); }
+                if (settings.showTaskDot && totalTaskCount > 0) { dotsContainer.createDiv({ cls: 'cpwn-task-dot cpwn-calendar-dot' }); }
+
+                if (eventIndicatorStyle === 'dot' && calendarEventCount > 0 || settings.showIcsDot && calendarEventCount > 0) {
+                    dotsContainer.createDiv({ cls: 'cpwn-calendar-dot cpwn-ics-event-dot' });
+                }
+
+                const hasPopupContent = dailyNoteExists || (totalTaskCount > 0) || (createdFiles.length > 0) || (modifiedFiles.length > 0) || (assetsCreated.length > 0) || (calendarEventCount > 0);
+
+                let dataToShow = {};
+                if (hasPopupContent) {
+                    // Use the calculated full path for retrieval
+                    const dailyNoteFile = dailyNoteExists ? this.app.vault.getAbstractFileByPath(expectedDailyPath) : null;
+                    dataToShow = {
+                        tasks: tasksForDay,
+                        daily: dailyNoteFile ? [dailyNoteFile] : [],
+                        created: settings.showOtherNoteDot ? createdFiles : [],
+                        modified: settings.showModifiedFileDot ? modifiedFiles : [],
+                        assets: settings.showAssetDot ? assetsCreated : [],
+                        ics: icsEventsForDay || [],
+                    };
+                }
+                let longPressOccurred = false;
+                let touchTimer = null;
+
+                // --- 1. TOUCH HANDLING (Long Press) ---
+                if (Platform.isMobile) {
+                    cell.addEventListener('touchstart', (e) => {
+                        longPressOccurred = false;
+                        if (hasPopupContent) {
+                            touchTimer = window.setTimeout(() => {
+                                longPressOccurred = true;
+
+
+                                // Shows popup AND sets state so next tap opens note
+                                this.hideFilePopup();
+                                this.showFilePopup(cell, dataToShow, dayDate, true);
+                                this.activeHoverCell = cell;
+                            }, 500);
+                        }
+                    });
+                    const cancelLongPress = () => window.clearTimeout(touchTimer);
+                    cell.addEventListener('touchend', cancelLongPress);
+                    cell.addEventListener('touchmove', cancelLongPress);
+                }
+
+                // --- 2. MOUSE HOVER HANDLING (Desktop + iPad) ---
+                if (hasPopupContent) {
+                    const cellDate = dayDate;
+
+                    cell.addEventListener('mouseenter', () => {
+                        // Safety: Don't run hover logic on phones if Platform.isMobile is true
+                        if (Platform.isMobile) return;
+
+                        if (this.activeHoverCell !== cell) {
+                            window.clearTimeout(this.hideTimeout);
+                            window.clearTimeout(this.hoverTimeout);
+                            this.hideFilePopup();
+                            this.activeHoverCell = cell;
+                        }
+
+                        if (this.isPopupLocked || this.isMouseDown) return;
+
+                        this.hoverTimeout = window.setTimeout(() => {
+                            if (this.activeHoverCell !== cell) return;
+
+                            const liveTasksForDay = this.allTasks.filter(task => {
+                                const isDone = task.status.type === 'DONE';
+                                if (isDone) {
+                                    return task.done?.moment?.isSame(cellDate, 'day');
+                                } else {
+                                    const matchesStartDate = task.start?.moment?.isSame(cellDate, 'day');
+                                    const matchesScheduledDate = task.scheduled?.moment?.isSame(cellDate, 'day');
+                                    const matchesDueDate = task.due?.moment?.isSame(cellDate, 'day');
+                                    return matchesStartDate || matchesScheduledDate || matchesDueDate;
+                                }
+                            });
+
+                            const freshDataToShow = { ...dataToShow, tasks: liveTasksForDay };
+                            this.showFilePopup(cell, freshDataToShow, cellDate, false);
+                        }, this.plugin.settings.otherNoteHoverDelay);
+                    });
+
+                    cell.addEventListener('mouseleave', () => {
+                        if (Platform.isMobile) return;
+
+                        window.clearTimeout(this.hoverTimeout);
+
+                        if (this.activeHoverCell === cell) {
+                            this.hideTimeout = window.setTimeout(() => {
+                                if (!this.isPopupLocked) {
+                                    this.hideFilePopup();
+                                    if (this.activeHoverCell === cell) {
+                                        this.activeHoverCell = null;
+                                    }
+                                }
+                            }, this.plugin.settings.popupHideDelay);
+                        }
+                    });
+                }
+
+                // --- 3. UNIFIED CLICK HANDLER ---
+                cell.addEventListener('click', (event) => {
+                    if (longPressOccurred) return;
+
+                    const popupsEnabled = this.plugin.settings.listPopupTrigger !== 'none';
+
+                    // --- MOBILE LOGIC ---
+                    if (Platform.isMobile) {
+                        if (!popupsEnabled) {
+                            this.openDailyNote(dayDate);
+                            return;
+                        }
+
+
+
+                        if (hasPopupContent) {
+                            const isAlreadyOpen = (this.activeHoverCell === cell);
+
+
+
+                            if (isAlreadyOpen) {
+                                // SECOND TAP: Open Note
+                                this.hideFilePopup();
+                                this.openDailyNote(dayDate);
+                            } else {
+                                // FIRST TAP: Show Popup
+                                event.preventDefault();
+                                event.stopPropagation();
+
+
+
+                                this.hideFilePopup();
+                                this.showFilePopup(cell, dataToShow, dayDate, true);
+                                this.activeHoverCell = cell;
+                            }
+                            return;
+                        }
+                    }
+                    // --- DESKTOP / DEFAULT LOGIC ---
+                    this.hideFilePopup();
+                    this.openDailyNote(dayDate);
+                });
+
+                // --- ROW HIGHLIGHT ---
+                cell.addEventListener('mouseenter', () => {
+                    if (!this.plugin.settings.enableRowToDateHighlight) return;
+                    const highlightColor = document.body.classList.contains('cpwn-theme-dark')
+                        ? this.plugin.settings.rowHighlightColorDark
+                        : this.plugin.settings.rowHighlightColorLight;
+                    const row = cell.parentElement;
+                    const allRows = Array.from(row.parentElement.children);
+                    const rowIndex = allRows.indexOf(row);
+                    const colIndex = Array.from(row.children).indexOf(cell);
+                    const table = cell.closest('table');
+                    for (let j = 0; j <= colIndex; j++) {
+                        const cellToHighlight = row.children[j];
+                        if (cellToHighlight) {
+                            cellToHighlight.classList.add('cpwn-highlighted');
+                            cellToHighlight.style.setProperty('--highlight-color', highlightColor);
+                        }
+                    }
+                    for (let i = 0; i < rowIndex; i++) {
+                        const priorRow = allRows[i];
+                        const cellToHighlight = priorRow.children[colIndex];
+                        if (cellToHighlight) {
+                            cellToHighlight.classList.add('cpwn-highlighted');
+                            cellToHighlight.style.setProperty('--highlight-color', highlightColor);
+                        }
+                    }
+                    if (table) {
+                        const headerRow = table.querySelector('thead tr');
+                        if (headerRow) {
+                            const headerCell = headerRow.children[colIndex];
+                            if (headerCell) {
+                                headerCell.classList.add('cpwn-highlighted');
+                                headerCell.style.setProperty('--highlight-color', highlightColor);
+                            }
+                        }
+                    }
+                });
+                cell.addEventListener('mouseleave', () => {
+                    if (!this.plugin.settings.enableRowToDateHighlight) return;
+                    const table = cell.closest('table');
+                    if (table) {
+                        const allCells = table.querySelectorAll('tbody td, thead th');
+                        allCells.forEach(c => c.style.backgroundColor = '');
+                    }
+                });
+            }
+            currentDay.setDate(currentDay.getDate() + 7);
+        }
+    }
+
+
+
+    /*generateMonthGrid(dateForMonth, targetBodyEl) {
         const { settings } = this.plugin;
         const today = new Date();
         const year = dateForMonth.getFullYear();
@@ -2420,7 +3000,7 @@ export class PeriodMonthView extends ItemView {
 
             currentDay.setDate(currentDay.getDate() + 7);
         }
-    }
+    }*/
 
     /**
      * Finds all markdown files that link to or embed the given asset file.
@@ -2591,11 +3171,67 @@ export class PeriodMonthView extends ItemView {
         }
     }
 
+    getCoreDailyNotesConfig() {
+        // Fallback to your plugin settings
+        let folder = this.plugin.settings.dailyNotesFolder || "";
+        let format = this.plugin.settings.dailyNoteDateFormat || "YYYY-MM-DD";
+
+        // Prefer core Daily Notes plugin config if enabled
+        const dailyNotesPlugin = this.app.internalPlugins?.plugins?.['daily-notes'];
+        if (dailyNotesPlugin?.enabled && dailyNotesPlugin?.instance?.options) {
+            folder = dailyNotesPlugin.instance.options.folder ?? folder;
+            format = dailyNotesPlugin.instance.options.format ?? format;
+        }
+
+        // Normalize folder: no trailing slash, no leading slash
+        folder = (folder || "").replace(/\/+$/g, "").replace(/^\/+/g, "");
+        return { folder, format };
+    }
+
+    getDailyNoteMomentFromFile(file) {
+        if (!file || file.extension !== 'md') return null;
+
+        const { folder, format } = this.getCoreDailyNotesConfig();
+
+        // Build a parseable string that matches the daily note *format*.
+        // If format contains subfolders (YYYY/MM/DD), we must parse using the relative path, not basename.
+        let rel = null;
+
+        if (folder) {
+            const prefix = folder + '/';
+            if (!file.path.startsWith(prefix)) return null;
+            rel = file.path.substring(prefix.length);
+        } else {
+            // Folder is root; allow subfolders driven by the format itself.
+            rel = file.path;
+        }
+
+        // Strip extension
+        rel = rel.replace(/\.md$/i, "");
+
+        // Try strict parse with the configured format
+        const m1 = moment(rel, format, true);
+        if (m1.isValid()) return m1;
+
+        // Fallback: if the format is filename-only but user has daily note files that still parse by basename
+        const m2 = moment(file.basename, format, true);
+        if (m2.isValid()) return m2;
+
+        return null;
+    }
+
+
     /**
      * Determines if a file is a daily note based on its name format and location.
      * @param {TFile} file The file to check.
      * @returns {boolean} True if the file matches the daily note criteria.
      */
+    isDailyNote(file) {
+        const m = this.getDailyNoteMomentFromFile(file);
+        return !!(m && m.isValid());
+    }
+
+    /*
     isDailyNote(file) {
         const settings = this.plugin.settings;
         const dailyNoteFolder = settings.dailyNotesFolder;
@@ -2614,7 +3250,7 @@ export class PeriodMonthView extends ItemView {
 
         // If no folder is set, the file must be in the vault's root directory.
         return file.parent?.path === '/';
-    }
+    }*/
 
     /**
      * Toggles the scratchpad between edit and preview mode and triggers a re-render.
@@ -2694,8 +3330,9 @@ export class PeriodMonthView extends ItemView {
             // The Tasks API uses status.type: 'TODO', 'IN_PROGRESS', 'DONE', 'CANCELLED'
             const isCompletedOrCancelled = task.status.type === 'DONE' || task.status.type === 'CANCELLED';
 
-            if (!isCompletedOrCancelled && task.due?.moment) {
-                const dateKey = task.due.moment.format('YYYY-MM-DD');
+            const dueMoment = this.getTaskDueMoment(task);
+            if (!isCompletedOrCancelled && dueMoment) {
+                const dateKey = dueMoment.format('YYYY-MM-DD');
 
                 // Add the task to the map for the given due date.
                 if (!this.tasksByDate.has(dateKey)) {
@@ -2704,11 +3341,13 @@ export class PeriodMonthView extends ItemView {
                 this.tasksByDate.get(dateKey).push(task);
 
                 // Also update the reverse-lookup map for efficient updates.
-                const filePath = task.file.path;
-                if (!this.fileToTaskDates.has(filePath)) {
+                const filePath = task.file?.path || task.path;
+                if (filePath && !this.fileToTaskDates.has(filePath)) {
                     this.fileToTaskDates.set(filePath, new Set());
                 }
-                this.fileToTaskDates.get(filePath).add(dateKey);
+                if (filePath) {
+                    this.fileToTaskDates.get(filePath).add(dateKey);
+                }
             }
         }
     }
@@ -2721,16 +3360,169 @@ export class PeriodMonthView extends ItemView {
     async buildAllTasksList() {
 
         this.allTasks = [];
+        this.allTasks = await this.taskProvider.getTasks();
+    }
 
-        const tasksPlugin = this.app.plugins.plugins['obsidian-tasks-plugin'];
+    taskSourceIncludesTodoist() {
+        const source = this.plugin.settings.taskSource || 'obsidian';
+        return source === 'todoist' || source === 'both';
+    }
 
+    canCreateTodoistTasks() {
+        const todoistPlugin = this.taskProvider?.getTodoistPlugin();
+        const todoistService = todoistPlugin?.services?.todoist;
+        const todoistModal = todoistPlugin?.services?.modals?.taskCreation;
+        return this.taskSourceIncludesTodoist() && (!!todoistModal || !!todoistService?.actions?.createTask);
+    }
 
-        if (tasksPlugin && typeof tasksPlugin.getTasks === 'function') {
-            this.allTasks = tasksPlugin.getTasks();
+    async addTodoistTaskFromTasksTab() {
+        if (!this.canCreateTodoistTasks()) {
+            new Notice('Enable Todoist Sync and select Todoist as a task source to add Todoist tasks here.');
+            return;
+        }
 
-        } else {
-            console.error("Obsidian tasks plugin not found or is not ready. Task-based widgets will be empty.");
-            this.allTasks = [];
+        const todoistPlugin = this.taskProvider?.getTodoistPlugin();
+        if (typeof todoistPlugin?.services?.modals?.taskCreation === 'function') {
+            todoistPlugin.services.modals.taskCreation({
+                initialContent: '',
+                fileContext: undefined,
+                options: {}
+            });
+            this.refreshTasksWhenTodoistModalCloses();
+            return;
+        }
+
+        new TodoistTaskModal(this.app, async ({ content, description, dueDate, deadlineDate, labels, priority }) => {
+            try {
+                await this.taskProvider.createTodoistTask(content, {
+                    description,
+                    dueDate,
+                    deadlineDate,
+                    labels,
+                    priority
+                });
+                new Notice('Todoist task added.');
+                this.lastTasksState = '';
+                await this.populateTasks();
+                if (this.dashboardViewMode === 'tasks') {
+                    this.lastTasksDashboardState = '';
+                }
+            } catch (error) {
+                console.error('Failed to add Todoist task.', error);
+                new Notice('Failed to add Todoist task.');
+            }
+        }).open();
+    }
+
+    refreshTasksWhenTodoistModalCloses() {
+        this.clearTodoistModalCloseWatcher();
+
+        const modalSelector = '.task-creation-modal-root';
+        let sawTodoistModal = false;
+        let refreshStarted = false;
+
+        const refreshAfterClose = async () => {
+            if (refreshStarted) return;
+            refreshStarted = true;
+            this.clearTodoistModalCloseWatcher();
+
+            try {
+                await this.refreshTasksFromProviderWithoutClearing();
+            } catch (error) {
+                console.error('Failed to refresh tasks after Todoist modal closed.', error);
+            }
+        };
+
+        const checkModalState = () => {
+            const modalEl = document.querySelector(modalSelector);
+            if (modalEl) {
+                sawTodoistModal = true;
+                return;
+            }
+
+            if (sawTodoistModal) {
+                refreshAfterClose();
+            }
+        };
+
+        this.todoistModalCloseObserver = new MutationObserver(checkModalState);
+        this.todoistModalCloseObserver.observe(document.body, { childList: true, subtree: true });
+
+        window.setTimeout(checkModalState, 0);
+
+        this.todoistModalRefreshTimeout = window.setTimeout(() => {
+            this.clearTodoistModalCloseWatcher();
+        }, 2 * 60 * 1000);
+    }
+
+    clearTodoistModalCloseWatcher() {
+        if (this.todoistModalCloseObserver) {
+            this.todoistModalCloseObserver.disconnect();
+            this.todoistModalCloseObserver = null;
+        }
+        if (this.todoistModalRefreshTimeout) {
+            window.clearTimeout(this.todoistModalRefreshTimeout);
+            this.todoistModalRefreshTimeout = null;
+        }
+    }
+
+    async refreshTasksFromProviderWithoutClearing() {
+        await this.buildAllTasksList();
+        await this.buildTasksByDateMap();
+        this.reconcileCurrentTaskGroups();
+        if (this.dashboardViewMode === 'tasks') {
+            this.lastTasksDashboardState = '';
+        }
+    }
+
+    registerTodoistExternalTaskRefresh() {
+        this.taskProvider?.subscribeTodoistChanges?.(() => {
+            this.scheduleTodoistExternalTaskRefresh();
+        });
+    }
+
+    scheduleTodoistExternalTaskRefresh() {
+        if (this.todoistExternalRefreshTimer) {
+            window.clearTimeout(this.todoistExternalRefreshTimer);
+        }
+
+        this.todoistExternalRefreshTimer = window.setTimeout(async () => {
+            this.todoistExternalRefreshTimer = null;
+
+            try {
+                if (this.activeTab === 'tasks') {
+                    await this.refreshTasksFromProviderWithoutClearing();
+                } else {
+                    await this.buildAllTasksList();
+                    await this.buildTasksByDateMap();
+                    if (this.dashboardViewMode === 'tasks') {
+                        this.lastTasksDashboardState = '';
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to refresh tasks after Todoist Sync update.', error);
+            }
+        }, 250);
+    }
+
+    startTodoistTaskAutoRefresh() {
+        if (!this.taskSourceIncludesTodoist() || this.todoistTaskAutoRefreshInterval) return;
+
+        this.todoistTaskAutoRefreshInterval = window.setInterval(async () => {
+            if (this.activeTab !== 'tasks' || this.isTogglingTask) return;
+
+            try {
+                await this.refreshTasksFromProviderWithoutClearing();
+            } catch (error) {
+                console.error('Failed to auto-refresh Todoist tasks.', error);
+            }
+        }, 10000);
+    }
+
+    stopTodoistTaskAutoRefresh() {
+        if (this.todoistTaskAutoRefreshInterval) {
+            window.clearInterval(this.todoistTaskAutoRefreshInterval);
+            this.todoistTaskAutoRefreshInterval = null;
         }
     }
 
@@ -2954,34 +3746,20 @@ export class PeriodMonthView extends ItemView {
         await this.buildHeatmapFileCache();
 
 
-        // Poll for Tasks plugin availability (max 5 seconds, checks every 500ms)
+        // Poll for configured task provider availability (max 5 seconds, checks every 500ms)
         let pollAttempts = 0;
         const maxAttempts = 10; // 5 seconds total
         const pollInterval = 500; // ms
         this.lastKnownDate = new Date().toDateString();
 
         const pollForTasks = async () => {
-            const tasksPlugin = this.app.plugins.plugins["obsidian-tasks-plugin"];
-            const hasGetTasks = tasksPlugin && typeof tasksPlugin.getTasks === "function";
-
-            let tasks = [];
-
-            if (hasGetTasks) {
-                try {
-                    const result = tasksPlugin.getTasks();
-                    if (Array.isArray(result)) {
-                        tasks = result;
-                    }
-                } catch (e) {
-                    console.error("Error calling Tasks getTasks()", e);
-                }
-            }
+            await this.buildAllTasksList();
+            const tasks = this.allTasks || [];
 
             // CASE 1: Tasks API is available AND we have at least one task:
             // treat this as "ready" and build everything once.
-            if (hasGetTasks && tasks.length > 0) {
+            if (tasks.length > 0) {
                 //console.log("[CPWN] Tasks ready with", tasks.length, "tasks");
-                this.allTasks = tasks;
                 await this.buildTasksByDateMap();
                 this.render();
                 return; // Stop polling
@@ -2996,11 +3774,10 @@ export class PeriodMonthView extends ItemView {
                 window.setTimeout(pollForTasks, pollInterval);
             } else {
                 console.warn(
-                    "[CPWN] Tasks plugin API not ready or vault has no tasks after startup timeout – rendering without tasks."
+                    "[CPWN] Configured task provider not ready or has no tasks after startup timeout - rendering without tasks."
                 );
 
                 // Fallback: render with whatever we have (likely zero tasks).
-                this.allTasks = tasks;
                 await this.buildTasksByDateMap();
                 this.render();
             }
@@ -3021,49 +3798,57 @@ export class PeriodMonthView extends ItemView {
         this.render();
 
         this.setupReorderMode();
+        this.registerTodoistExternalTaskRefresh();
         this.registerDomEvent(document, 'keydown', this.handleKeyDown.bind(this));
 
-        // --- Register events and intervals ---
+        // --- Register events and timers ---
         const intervalMs = this.plugin.settings.autoReloadInterval || 5000;
 
-        this.registerInterval(window.setInterval(async () => {
-            const activeEl = document.activeElement;
-            const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+        const scheduleScratchpadReload = () => {
+            this.scratchpadReloadTimeout = window.setTimeout(async () => {
+                const activeEl = document.activeElement;
+                const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
 
-            // --- NEW: Mobile Keyboard Detection ---
-            let isKeyboardOpen = false;
-            if (this.app.isMobile && window.visualViewport) {
-                // Heuristic: If the visual viewport height is significantly smaller than
-                // the window height, it's very likely the on-screen keyboard is open.
-                isKeyboardOpen = window.visualViewport.height < window.innerHeight * 0.7;
-            }
-
-            if (isTyping || isKeyboardOpen) {
-                return; // Pause refresh if typing or if mobile keyboard is open
-            }
-
-            const latestFullContent = (await this.loadNote()) || "";
-            const currentFullContent = this.scratchpadFrontmatter + this.noteText;
-
-            if (latestFullContent !== currentFullContent) {
-                const {
-                    frontmatter,
-                    body
-                } = this.getScratchpadParts(latestFullContent);
-                this.scratchpadFrontmatter = frontmatter;
-                this.noteText = body;
-
-                if (this.noteTextarea) {
-                    this.noteTextarea.value = this.noteText;
-                }
-                if (this.isScratchpadPreview) {
-                    this.renderScratchpadContent();
+                // --- NEW: Mobile Keyboard Detection ---
+                let isKeyboardOpen = false;
+                if (this.app.isMobile && window.visualViewport) {
+                    // Heuristic: If the visual viewport height is significantly smaller than
+                    // the window height, it's very likely the on-screen keyboard is open.
+                    isKeyboardOpen = window.visualViewport.height < window.innerHeight * 0.7;
                 }
 
-                this.updateScratchpadSearchCount();
-                this.updateScratchpadHighlights();
-            }
-        }, intervalMs));
+                try {
+                    if (isTyping || isKeyboardOpen) {
+                        return; // Pause refresh if typing or if mobile keyboard is open
+                    }
+
+                    const latestFullContent = (await this.loadNote()) || "";
+                    const currentFullContent = this.scratchpadFrontmatter + this.noteText;
+
+                    if (latestFullContent !== currentFullContent) {
+                        const {
+                            frontmatter,
+                            body
+                        } = this.getScratchpadParts(latestFullContent);
+                        this.scratchpadFrontmatter = frontmatter;
+                        this.noteText = body;
+
+                        if (this.noteTextarea) {
+                            this.noteTextarea.value = this.noteText;
+                        }
+                        if (this.isScratchpadPreview) {
+                            this.renderScratchpadContent();
+                        }
+
+                        this.updateScratchpadSearchCount();
+                        this.updateScratchpadHighlights();
+                    }
+                } finally {
+                    scheduleScratchpadReload();
+                }
+            }, intervalMs);
+        };
+        scheduleScratchpadReload();
 
         // This listener checks the date when the app window gets focus.
         // This solves a 'stale date highlight after a device sleep' issue.
@@ -3134,6 +3919,27 @@ export class PeriodMonthView extends ItemView {
                     }
                 }, 200); // Reduced to 200ms for snappier response
             }
+
+            // ========================================
+            // HEATMAP TAG CHANGE LOGIC
+            // v1.9.0 changes: We now check if the changed file affects heatmaps from the metadata change.
+            // ========================================
+            if (this.activeTab === 'dashboard' && this.dashboardViewMode === 'creation') {
+                // Check custom heatmaps
+                const affectsCustomHeatmap = await this.checkIfFileAffectsHeatmaps(file);
+
+                // Check if tag heatmap is visible and file has tags
+                const hasTagHeatmap = this.plugin.settings.tagHeatmapConfig?.tags?.length > 0;
+                const fileHasTags = cache?.tags?.length > 0 || cache?.frontmatter?.tags;
+
+                if (affectsCustomHeatmap || (hasTagHeatmap && fileHasTags)) {
+                    window.clearTimeout(this.granularUpdateTimer);
+                    this.granularUpdateTimer = window.setTimeout(() => {
+                        this.refreshUI({ updateType: 'creation', file });
+                    }, 500);
+                }
+            }
+
         }));
 
         this.debouncedMomentumUpdate = debounce(
@@ -3142,13 +3948,13 @@ export class PeriodMonthView extends ItemView {
             true
         );
 
+        
         this.granularUpdateTimer = null;
 
         this.registerEvent(
             this.app.vault.on('modify', (file) => {
                 if (this.activeTab !== 'dashboard') return;
-                if (this.dashboardViewMode !== 'creation') return;
-
+                if (this.dashboardViewMode !== 'tasks') return;
                 // Clear previous timer
                 if (this.granularUpdateTimer) window.clearTimeout(this.granularUpdateTimer);
 
@@ -3157,8 +3963,8 @@ export class PeriodMonthView extends ItemView {
                     this.refreshUI({ updateType: 'creation', file });
                 }, 500);
             })
-        );
-
+        );        
+        
         // Handle file renames (Filename, File Path, and File Type filters)
         this.registerEvent(this.app.vault.on('rename', async (file, oldPath) => {
             if (!(file instanceof TFile)) return;
@@ -3442,15 +4248,14 @@ export class PeriodMonthView extends ItemView {
         const now = new Date();
         const delay = (60 - now.getSeconds()) * 1000 - now.getMilliseconds() + 10; // +10ms buffer
 
-        // 3. Schedule the FIRST interval to start exactly at the next minute
+        // 3. Schedule the FIRST check to start exactly at the next minute
         this.alertTimeout = window.setTimeout(() => {
-            this.updateAlertHeader();
-
-            // 4. Now start the regular 60s interval
-            this.alertInterval = window.setInterval(() => {
+            const scheduleNextAlertCheck = () => {
                 this.updateAlertHeader();
-            }, 60000);
+                this.alertTimeout = window.setTimeout(scheduleNextAlertCheck, 60000);
+            };
 
+            scheduleNextAlertCheck();
         }, delay);
     }
 
@@ -3528,6 +4333,7 @@ export class PeriodMonthView extends ItemView {
                 await this.updateTaskWidget('taskScorecard');
                 await this.updateTaskWidget('opentaskprogressbar');
                 await this.updateTaskWidget('opentaskprogressbarsegments');
+                await this.updateTaskWidget('taskStatistics');
                 await this.updateMomentumWidget();
 
                 // 3. Custom Widgets
@@ -3619,6 +4425,33 @@ export class PeriodMonthView extends ItemView {
                 const prgressBarSegmentMetrics = await this.getTaskMetrics(); // Using your overview-style aggregator
                 this.renderOpenTaskProgressBarSegmentsWidget(null, prgressBarSegmentMetrics, 'opentaskprogressbarsegments', container);
                 break;
+            }
+
+            case 'taskStatistics': {
+                // 1. Calculate values for signature
+                const onTime = this.getOnTimeRate('30d');
+                const overdueDays = this.getLongestOverdueDays();
+                const drift = this.getPriorityDrift();
+                const cycle = this.getAvgCycleTime();
+                const abandon = this.getAbandonmentRate();
+                const velocity = this.getWeeklyVelocity();
+
+                const statsSig = `${onTime}|${overdueDays}|${drift}|${cycle}|${abandon}|${velocity}`;
+
+                if (this.widgetSignatures.get(widgetKey) === statsSig) return;
+                this.widgetSignatures.set(widgetKey, statsSig);
+
+                // 2. FIND EXISTING CONTAINER specifically for this widget
+                // 'container' passed to updateTaskWidget is usually the dashboard grid
+                let statsContainer = container.querySelector(`#cpwn-widget-${widgetKey}`);
+
+                // 3. Render
+                // Pass the specific container if found, or the parent grid if not (render function handles creation)
+                this.renderTaskStatistics(statsContainer || container, widgetKey);
+
+                //console.log("Updated Task Statistics Widget");
+                break;
+
             }
 
             // --- HEATMAP 1: Upcoming/Overdue ---
@@ -3869,6 +4702,274 @@ export class PeriodMonthView extends ItemView {
             }
         }
     }
+
+    getWidgetDisplayConfig(widgetKey, defaultTitle) {
+        const overrides = this.plugin.settings.widgetOverrides?.[widgetKey] || {};
+
+        // 1. Title Text
+        const title = overrides.customTitle ? overrides.customTitle : defaultTitle;
+
+        // 2. Title Visibility
+        let showTitle = true; // Default fallback
+        if (overrides.showTitle === 'show') showTitle = true;
+        else if (overrides.showTitle === 'hide') showTitle = false;
+        else {
+            // Use Global Settings
+            showTitle = this.plugin.settings.showTaskWidgetTitles ?? true;
+        }
+
+        // 3. Chevron Visibility
+        let showChevron = true; // Default fallback
+        if (overrides.showChevron === 'show') showChevron = true;
+        else if (overrides.showChevron === 'hide') showChevron = false;
+        else {
+            // Use Global Settings
+            showChevron = this.plugin.settings.showTaskWidgetChevrons ?? true;
+        }
+
+        return { title, showTitle, showChevron };
+    }
+
+    renderTaskStatistics(container, widgetKey) {
+        // 1. Setup Container (Standard Logic)
+        let widgetContainer;
+        if (container.classList.contains('cpwn-pm-dashboard-grid')) {
+            widgetContainer = container.querySelector(`#cpwn-widget-${widgetKey}`);
+            if (!widgetContainer) {
+                widgetContainer = container.createDiv({ cls: 'cpwn-pm-widget-container cpwn-pm-widget-medium' });
+                widgetContainer.id = `cpwn-widget-${widgetKey}`;
+                widgetContainer.dataset.widgetKey = widgetKey;
+            }
+        } else {
+            widgetContainer = container;
+        }
+        widgetContainer.empty();
+
+        // 2. Settings & Header
+        const { title, showTitle, showChevron } = this.getWidgetDisplayConfig(widgetKey, 'Task statistics');
+
+        const isCollapsed = this.plugin.settings.collapsedWidgets?.[widgetKey] || false;
+
+        if (isCollapsed) widgetContainer.addClass('collapsed');
+
+        const header = widgetContainer.createDiv({ cls: 'cpwn-pm-widget-header' });
+
+        let toggleIcon;
+        if (showChevron) {
+            toggleIcon = header.createDiv({ cls: 'cpwn-widget-toggle-icon' });
+            setIcon(toggleIcon, isCollapsed ? 'chevron-right' : 'chevron-down');
+        }
+        if (showTitle) {
+            header.createEl('h3', { text: title });
+        }
+
+        // 3. Content Wrapper
+        const contentWrapper = widgetContainer.createDiv({ cls: 'cpwn-widget-content' });
+        if (isCollapsed) contentWrapper.style.display = 'none';
+
+        // 4. Grid Container
+        const grid = contentWrapper.createDiv({ cls: 'cpwn-kpi-grid' });
+
+        // 5. Data Calculation
+        const onTime = this.getOnTimeRate('30d');
+        const overdueDays = this.getLongestOverdueDays();
+        const drift = this.getPriorityDrift();
+        const cycle = this.getAvgCycleTime();
+        const abandon = this.getAbandonmentRate();
+        const velocity = this.getWeeklyVelocity();
+
+        // 6. Metrics Definition with Semantics
+        // 'trendDir': 'up' | 'down' | 'neutral'
+        // 'status': 'good' | 'bad' | 'neutral'
+
+
+        const kpis = [
+            {
+                label: "On-time rate",
+                value: `${onTime}%`,
+                icon: "check-circle",
+                status: onTime > 90 ? "good" : "neutral",
+                tooltip: "Percentage of tasks completed on or before their due date (last 30 days)"
+            },
+            {
+                label: "Longest overdue",
+                value: `${overdueDays}d`,
+                icon: "alert-circle",
+                status: overdueDays > 7 ? "bad" : "good",
+                tooltip: "Number of days since the earliest overdue task's due date"
+            },
+            {
+                label: "High-priority drift",
+                value: `${drift}%`,
+                icon: "trending-down",
+                status: drift < 5 ? "good" : "bad",
+                tooltip: "Percentage of High Priority tasks that are currently overdue"
+            },
+            {
+                label: "Avg cycle time",
+                value: `${cycle}d`,
+                icon: "clock",
+                status: "neutral",
+                tooltip: "Average number of days between task creation and completion"
+            },
+            {
+                label: "Abandon rate",
+                value: `${abandon}%`,
+                icon: "x-circle",
+                status: abandon < 5 ? "good" : "bad",
+                tooltip: "Percentage of cancelled tasks vs. total completed/cancelled (last 30 days)"
+            },
+            {
+                label: "Weekly velocity",
+                value: velocity,
+                icon: "zap",
+                status: "neutral",
+                tooltip: "Total number of tasks completed this week"
+            }
+        ];
+
+        // 7. Render Cards
+        kpis.forEach(kpi => {
+            const card = grid.createDiv({ cls: 'cpwn-kpi-card' });
+
+            // Add semantic status class
+            card.addClass(`status-${kpi.status}`);
+
+            // ADD TOOLTIP via aria-label
+            card.setAttribute('aria-label', kpi.tooltip);
+
+            // Label (Top)
+            card.createDiv({ cls: 'kpi-label', text: kpi.label });
+
+            // Value Row (Middle)
+            const valueRow = card.createDiv({ cls: 'kpi-value-row' });
+
+            // Icon
+            const iconSpan = valueRow.createSpan({ cls: 'kpi-icon' });
+            setIcon(iconSpan, kpi.icon);
+
+            // Value
+            valueRow.createSpan({ cls: 'kpi-value', text: kpi.value });
+        });
+
+
+        // 8. Collapse Handler
+        header.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const currentlyCollapsed = widgetContainer.classList.toggle('collapsed');
+            contentWrapper.style.display = currentlyCollapsed ? 'none' : '';
+            if (toggleIcon) {
+                toggleIcon.empty();
+                setIcon(toggleIcon, currentlyCollapsed ? 'chevron-right' : 'chevron-down');
+            }
+            if (!this.plugin.settings.collapsedWidgets) this.plugin.settings.collapsedWidgets = {};
+            this.plugin.settings.collapsedWidgets[widgetKey] = currentlyCollapsed;
+            await this.plugin.saveSettings();
+        });
+    }
+
+
+
+    // --- Statistics Helper Methods ---
+    getOnTimeRate(period) {
+        const now = moment();
+        const cutoff = now.clone().subtract(30, 'days');
+
+        const completedRecent = this.allTasks.filter(t =>
+            t.status.type === 'DONE' &&
+            t.done?.moment &&
+            t.done.moment.isAfter(cutoff)
+        );
+
+        if (completedRecent.length === 0) return 0;
+
+        const onTimeCount = completedRecent.filter(t => {
+            // If no due date, count as on time
+            if (!t.due?.moment) return true;
+            return t.done.moment.isSameOrBefore(t.due.moment, 'day');
+        }).length;
+
+        return Math.round((onTimeCount / completedRecent.length) * 100);
+    }
+
+    getLongestOverdueDays() {
+        const now = moment();
+        const overdueTasks = this.allTasks.filter(t =>
+            t.status.type !== 'DONE' &&
+            t.status.type !== 'CANCELLED' &&
+            t.due?.moment &&
+            t.due.moment.isBefore(now, 'day')
+        );
+
+        if (overdueTasks.length === 0) return 0;
+
+        // Find earliest due date
+        const earliest = moment.min(overdueTasks.map(t => t.due.moment));
+        return now.diff(earliest, 'days');
+    }
+
+    getPriorityDrift() {
+        // Drift: % of High Priority tasks that are overdue
+        // Priority 1 is typically High in Obsidian Tasks
+        const highPrioTasks = this.allTasks.filter(t =>
+            t.priority === 1 &&
+            t.status.type !== 'DONE' &&
+            t.status.type !== 'CANCELLED'
+        );
+
+        if (highPrioTasks.length === 0) return 0;
+
+        const overdueHighPrio = highPrioTasks.filter(t =>
+            t.due?.moment && t.due.moment.isBefore(moment(), 'day')
+        );
+
+        return Math.round((overdueHighPrio.length / highPrioTasks.length) * 100);
+    }
+
+    getAvgCycleTime() {
+        // Cycle time: Days between Created and Done
+        const completed = this.allTasks.filter(t =>
+            t.status.type === 'DONE' &&
+            t.done?.moment &&
+            t.created?.moment
+        );
+
+        if (completed.length === 0) return 0;
+
+        const totalDays = completed.reduce((acc, t) => {
+            return acc + t.done.moment.diff(t.created.moment, 'days');
+        }, 0);
+
+        return Math.round(totalDays / completed.length);
+    }
+
+    getAbandonmentRate() {
+        // Cancelled / (Completed + Cancelled) in last 30 days
+        const now = moment();
+        const cutoff = now.clone().subtract(30, 'days');
+
+        const relevantTasks = this.allTasks.filter(t =>
+            (t.status.type === 'DONE' && t.done?.moment?.isAfter(cutoff)) ||
+            (t.status.type === 'CANCELLED') // Cancelled often implies "gave up" recently, relies on user cleanup
+        );
+
+        if (relevantTasks.length === 0) return 0;
+
+        const cancelledCount = relevantTasks.filter(t => t.status.type === 'CANCELLED').length;
+        return Math.round((cancelledCount / relevantTasks.length) * 100);
+    }
+
+    getWeeklyVelocity() {
+        const now = moment();
+        const startOfWeek = now.clone().startOf('isoWeek');
+
+        return this.allTasks.filter(t =>
+            t.status.type === 'DONE' &&
+            t.done?.moment &&
+            t.done.moment.isSameOrAfter(startOfWeek)
+        ).length.toString();
+    }
+
 
 
     async calculateTaskMetrics() {
@@ -5514,6 +6615,8 @@ export class PeriodMonthView extends ItemView {
     }
 
     async onclose() {
+        this.clearTodoistModalCloseWatcher();
+        this.taskProvider?.unload();
         this.assetObserver?.disconnect();
         this.intersectionObserver?.disconnect();
         if (this.themeObserver) {
@@ -5521,10 +6624,15 @@ export class PeriodMonthView extends ItemView {
             this.themeObserver = null;
         }
         if (this.dailyRefreshTimeout) window.clearTimeout(this.dailyRefreshTimeout);
+        if (this.todoistExternalRefreshTimer) {
+            window.clearTimeout(this.todoistExternalRefreshTimer);
+            this.todoistExternalRefreshTimer = null;
+        }
+        this.stopTodoistTaskAutoRefresh();
         if (this.statusBarObserver) this.statusBarObserver.disconnect();
 
         if (this.alertTimeout) window.clearTimeout(this.alertTimeout);
-        if (this.alertInterval) window.clearInterval(this.alertInterval);
+        if (this.scratchpadReloadTimeout) window.clearTimeout(this.scratchpadReloadTimeout);
         if (this.popupEl) {
             this.popupEl.remove();
             this.popupEl = null;
@@ -6241,7 +7349,12 @@ export class PeriodMonthView extends ItemView {
             // Populate the content of the newly activated tab.
             if (tab === "notes") this.populateNotes();
             if (tab === "assets") this.populateAssets();
-            if (tab === "tasks") this.populateTasks();
+            if (tab === "tasks") {
+                this.populateTasks();
+                this.startTodoistTaskAutoRefresh();
+            } else {
+                this.stopTodoistTaskAutoRefresh();
+            }
             if (tab === 'dashboard') {
                 // Set the view to the user's default before populating
                 if (!this.dashboardViewMode) {
@@ -6293,6 +7406,21 @@ export class PeriodMonthView extends ItemView {
             this.tasksSearchTerm = term;
             this.populateTasks();
         });
+
+        if (this.canCreateTodoistTasks()) {
+            tasksSearchContainer.addClass('cpwn-has-search-action');
+            const addTodoistTaskButton = tasksSearchContainer.createEl('button', {
+                cls: 'cpwn-search-action-btn cpwn-add-todoist-task-btn'
+            });
+            const addTodoistTaskIcon = addTodoistTaskButton.createSpan({ cls: 'cpwn-add-todoist-task-icon' });
+            setIcon(addTodoistTaskIcon, 'plus');
+            if (!addTodoistTaskIcon.querySelector('svg')) {
+                addTodoistTaskIcon.setText('+');
+            }
+            addTodoistTaskButton.setAttribute('aria-label', 'Add Todoist task');
+            addTodoistTaskButton.setAttribute('title', 'Add Todoist task');
+            addTodoistTaskButton.addEventListener('click', () => this.addTodoistTaskFromTasksTab());
+        }
 
         // Attach the tag suggester to the tasks search input as well.
         new TagSuggest(this.app, this.tasksSearchInputEl, this);
@@ -6413,6 +7541,25 @@ export class PeriodMonthView extends ItemView {
         if (!(file instanceof TFile) || !file.path.toLowerCase().endsWith('.md')) return;
 
         let dateKey;
+
+        if (this.isDailyNote(file)) {
+            const m = this.getDailyNoteMomentFromFile(file);
+            dateKey = m ? m.format('YYYY-MM-DD') : moment(file.stat.ctime).format('YYYY-MM-DD');
+        } else {
+            dateKey = moment(file.stat.ctime).format('YYYY-MM-DD');
+        }
+
+        if (!this.allCreatedNotesMap.has(dateKey)) {
+            this.allCreatedNotesMap.set(dateKey, []);
+        }
+        this.allCreatedNotesMap.get(dateKey).push(file);
+    }
+
+    /*
+    _addFileToAllCreatedMap(file) {
+        if (!(file instanceof TFile) || !file.path.toLowerCase().endsWith('.md')) return;
+
+        let dateKey;
         if (this.isDailyNote(file)) {
             const fileDate = moment(file.basename, this.plugin.settings.dailyNoteDateFormat, true);
             dateKey = fileDate.isValid() ? fileDate.format('YYYY-MM-DD') : moment(file.stat.ctime).format('YYYY-MM-DD');
@@ -6425,6 +7572,7 @@ export class PeriodMonthView extends ItemView {
         }
         this.allCreatedNotesMap.get(dateKey).push(file);
     }
+        */
 
     _removeFileFromAllCreatedMap(file) {
         if (!(file instanceof TFile)) return;
@@ -6468,7 +7616,7 @@ export class PeriodMonthView extends ItemView {
         // ---------------------------------------------------------------------
         // 1. Tag Filtering
         // ---------------------------------------------------------------------
-        let filteredTasks = allTasks;
+        /*let filteredTasks = allTasks;
         const rawTags = tagFilterString.split(',').map(t => t.trim()).filter(t => t);
         const inclusionTags = rawTags.filter(t => !t.startsWith('-')).map(t => t.replace(/^#/, '').toLowerCase());
         const exclusionTags = rawTags.filter(t => t.startsWith('-')).map(t => t.substring(1).replace(/^#/, '').toLowerCase());
@@ -6490,6 +7638,49 @@ export class PeriodMonthView extends ItemView {
         }
 
         allTasks = filteredTasks;
+        */
+
+        // ---------------------------------------------------------------------
+        // 1. Tag Filtering
+        // ---------------------------------------------------------------------
+        let filteredTasks = allTasks;
+        const rawTags = tagFilterString.split(',').map(t => t.trim()).filter(t => t);
+
+        // Separate tags into three categories
+        const inclusionTags = rawTags.filter(t => !t.startsWith('-') && !t.startsWith('+')).map(t => t.replace('#', '').toLowerCase());
+        const exclusionTags = rawTags.filter(t => t.startsWith('-')).map(t => t.substring(1).replace('#', '').toLowerCase());
+        const requiredTags = rawTags.filter(t => t.startsWith('+')).map(t => t.substring(1).replace('#', '').toLowerCase());
+
+        // Apply required tags filter (AND logic - all must be present)
+        if (requiredTags.length > 0) {
+            filteredTasks = filteredTasks.filter(task => {
+                if (!task.tags || task.tags.length === 0) return false;
+                const taskTags = task.tags.map(t => t.replace('#', '').toLowerCase());
+                // Every required tag must be present in the task
+                return requiredTags.every(reqTag => taskTags.includes(reqTag));
+            });
+        }
+
+        // Apply inclusion tags filter (OR logic - at least one must match)
+        if (inclusionTags.length > 0) {
+            filteredTasks = filteredTasks.filter(task => {
+                if (!task.tags || task.tags.length === 0) return false;
+                const taskTags = task.tags.map(t => t.replace('#', '').toLowerCase());
+                return taskTags.some(t => inclusionTags.includes(t));
+            });
+        }
+
+        // Apply exclusion tags filter (none should match)
+        if (exclusionTags.length > 0) {
+            filteredTasks = filteredTasks.filter(task => {
+                if (!task.tags || task.tags.length === 0) return true;
+                const taskTags = task.tags.map(t => t.replace('#', '').toLowerCase());
+                return !taskTags.some(t => exclusionTags.includes(t));
+            });
+        }
+
+        allTasks = filteredTasks;
+
 
         const { metrics, dateRange, groupBy, chartType, tag: filterTag, legend } = config;
         const now = moment();
@@ -7819,6 +9010,532 @@ export class PeriodMonthView extends ItemView {
         return match;
     }
 
+
+    /**
+     * Renders a tag-based heatmap widget with inline settings
+     */
+    async renderTagHeatmapWidget(widgetContainer, widgetKey) {
+        const config = this.plugin.settings.tagHeatmapConfig;
+        let isShowingSettings = false;
+
+        // Use YOUR existing populateSingleHeatmapWidget but intercept the header to add settings icon
+        const renderHeatmap = async () => {
+            isShowingSettings = false;
+
+            // Build tag-based data map
+            const dataMap = new Map();
+            if (config.tags?.length > 0) {
+                const files = this.app.vault.getMarkdownFiles();
+                for (const file of files) {
+                    const cache = this.app.metadataCache.getFileCache(file);
+                    if (!cache) continue;
+
+                    // Count tag occurrences in this file
+                    let tagCount = 0;
+
+                    // Count inline tags in content
+                    if (cache.tags) {
+                        cache.tags.forEach(tagObj => {
+                            const tag = tagObj.tag.replace(/^#/, '');
+                            if (config.tags.includes(tag)) {
+                                tagCount++;
+                            }
+                        });
+                    }
+
+                    // Count frontmatter tags
+                    if (cache.frontmatter?.tags) {
+                        const frontmatterTags = Array.isArray(cache.frontmatter.tags)
+                            ? cache.frontmatter.tags
+                            : [cache.frontmatter.tags];
+                        frontmatterTags.forEach(tag => {
+                            const normalizedTag = typeof tag === 'string' ? tag.replace(/^#/, '') : tag;
+                            if (config.tags.includes(normalizedTag)) {
+                                tagCount++;
+                            }
+                        });
+                    }
+
+                    if (tagCount === 0) continue;
+
+                    // Extract dates
+                    const dates = [];
+                    if (config.dateSources.fileCreated) {
+                        dates.push(moment(file.stat.ctime).format('YYYY-MM-DD'));
+                    }
+                    if (config.dateSources.frontmatter && cache.frontmatter) {
+                        (config.frontmatterFields || ['date']).forEach(field => {
+                            const val = cache.frontmatter[field];
+                            const m = moment(val);
+                            if (m.isValid()) dates.push(m.format('YYYY-MM-DD'));
+                        });
+                    }
+                    if (config.dateSources.noteTitle) {
+                        const match = file.basename.match(/\d{4}-\d{2}-\d{2}/);
+                        if (match) dates.push(match[0]);
+                    }
+
+                    // Add file to map multiple times based on tag count
+                    dates.forEach(d => {
+                        if (!dataMap.has(d)) dataMap.set(d, []);
+                        // Add the file once for each tag occurrence
+                        for (let i = 0; i < tagCount; i++) {
+                            dataMap.get(d).push(file);
+                        }
+                    });
+                }
+            }
+
+            // ============ REPLACE THIS SECTION ============
+            // Calculate date range - extend to data boundaries but ensure minimum range
+            let startDate, endDate;
+
+            if (dataMap.size > 0) {
+                // Get all dates and find min/max
+                const allDates = Array.from(dataMap.keys()).map(d => moment(d));
+                const minDate = moment.min(allDates);
+                const maxDate = moment.max(allDates);
+
+                // Extend range to start of earliest month and end of latest month
+                let dataStartDate = minDate.clone().startOf('month');
+                let dataEndDate = maxDate.clone().endOf('month');
+
+                // Ensure current month is included
+                const today = moment();
+                if (today.isAfter(dataEndDate)) {
+                    dataEndDate = today.clone().endOf('month');
+                }
+
+                // Calculate the span in months
+                const monthsSpan = dataEndDate.diff(dataStartDate, 'months') + 1;
+
+                // Ensure MINIMUM 12 months to prevent cell stretching
+                if (monthsSpan < 12) {
+                    // Extend the range to 12 months, keeping the data centered or aligned
+                    const monthsToAdd = 12 - monthsSpan;
+
+                    // If data is recent, extend backwards
+                    if (dataEndDate.isSame(today, 'month') || dataEndDate.isAfter(today)) {
+                        dataStartDate = dataEndDate.clone().subtract(11, 'months').startOf('month');
+                    } else {
+                        // Data is old, extend forwards to current month
+                        dataEndDate = today.clone().endOf('month');
+                        // Recalculate if still less than 12 months
+                        if (dataEndDate.diff(dataStartDate, 'months') + 1 < 12) {
+                            dataStartDate = dataEndDate.clone().subtract(11, 'months').startOf('month');
+                        }
+                    }
+                }
+
+                startDate = dataStartDate;
+                endDate = dataEndDate;
+            } else {
+                // No data found - use default range
+                startDate = moment().subtract(11, 'months').startOf('month');
+                endDate = moment().endOf('month');
+            }
+            // ============ END REPLACE SECTION ============
+
+            // Generate gradient from base color
+            const base = config.color || 'rgba(74, 144, 226, 1)';
+            const m = base.match(/(\d+),\s*(\d+),\s*(\d+)/);
+            const gradient = m ? [
+                `rgba(${m[1]}, ${m[2]}, ${m[3]}, 0.4)`,
+                `rgba(${m[1]}, ${m[2]}, ${m[3]}, 0.6)`,
+                `rgba(${m[1]}, ${m[2]}, ${m[3]}, 0.8)`,
+                `rgba(${m[1]}, ${m[2]}, ${m[3]}, 1)`
+            ] : base;
+
+            // Call YOUR existing function
+            await this.populateSingleHeatmapWidget(
+                widgetContainer,
+                config.name,
+                dataMap,
+                gradient,
+                {
+                    startDate: startDate,
+                    endDate: endDate
+                },
+                widgetKey
+            );
+
+            // Add settings icon to the existing header
+            const header = widgetContainer.querySelector('.cpwn-pm-widget-header');
+            const totalCount = header.querySelector('.cpwn-heatmap-total-count');
+
+            if (header && totalCount) {
+                let settingsIcon = header.querySelector('.cpwn-heatmap-settings-icon');
+                if (!settingsIcon) {
+                    // Only create if it doesn't exist
+                    settingsIcon = header.createDiv({ cls: 'cpwn-heatmap-settings-icon' });
+                    setIcon(settingsIcon, 'settings');
+                    settingsIcon.setAttribute('aria-label', 'Configure widget');
+                    header.insertBefore(settingsIcon, totalCount);
+
+                    settingsIcon.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        renderSettings();
+                    });
+                }
+            }
+        };
+
+
+        const renderSettings = () => {
+            isShowingSettings = true;
+            widgetContainer.empty();
+
+            const isCollapsed = this.plugin.settings.collapsedHeatmaps?.[widgetKey] || false;
+            if (isCollapsed) widgetContainer.addClass('cpwn-is-collapsed');
+
+            // Check if chevrons should be shown
+            let showChevron = true;
+            if (typeof this.plugin.settings.overrideShowChevron === 'boolean') {
+                showChevron = this.plugin.settings.overrideShowChevron;
+            } else if (typeof this.plugin.settings.showTaskWidgetChevrons === 'boolean') {
+                showChevron = this.plugin.settings.showTaskWidgetChevrons;
+            }
+
+            // Header with action buttons in tabs
+            const header = widgetContainer.createDiv({ cls: 'cpwn-pm-widget-header' });
+
+            let collapseIcon;
+            if (showChevron) {
+                collapseIcon = header.createDiv({ cls: 'cpwn-heatmap-collapse-icon' });
+                setIcon(collapseIcon, 'chevron-down');
+            }
+
+            const titleEl = header.createEl('h3', { text: config.name });
+            const settingsIcon = header.createDiv({ cls: 'cpwn-heatmap-settings-icon is-active' });
+            setIcon(settingsIcon, 'settings');
+            const totalCount = header.createDiv({ cls: 'cpwn-heatmap-total-count', text: '0' });
+
+            settingsIcon.addEventListener('click', (e) => {
+                e.stopPropagation();
+                renderHeatmap();
+            });
+
+            if (collapseIcon) {
+                collapseIcon.addEventListener('click', async () => {
+                    const collapsed = widgetContainer.classList.toggle('cpwn-is-collapsed');
+                    if (!this.plugin.settings.collapsedHeatmaps) this.plugin.settings.collapsedHeatmaps = {};
+                    this.plugin.settings.collapsedHeatmaps[widgetKey] = collapsed;
+                    await this.plugin.saveSettings();
+                });
+            }
+
+            // Settings content
+            const content = widgetContainer.createDiv({ cls: 'cpwn-heatmap-settings-container' });
+            let activeTab = 'general';
+            const tabNav = content.createDiv({ cls: 'cpwn-settings-tabs' });
+            const tabContent = content.createDiv({ cls: 'cpwn-settings-tab-content' });
+
+            // Store original config for cancel
+            const originalConfig = JSON.parse(JSON.stringify(config));
+
+            const renderTab = (tabId) => {
+                tabNav.querySelectorAll('.cpwn-settings-tab').forEach(btn => {
+                    btn.classList.toggle('is-active', btn.dataset.tab === tabId);
+                });
+                tabContent.empty();
+
+                if (tabId === 'general') {
+
+                    tabContent.createEl('p', {
+                        text: 'Set the widget name and choose the heatmap grid color.',
+                        cls: 'cpwn-setting-description'
+                    });
+
+                    // Widget name + color picker in same row
+                    const nameColorRow = tabContent.createDiv({ cls: 'cpwn-setting-row' });
+
+                    const nameSection = nameColorRow.createDiv({ cls: 'cpwn-setting-item cpwn-flex-grow' });
+                    nameSection.createDiv({ text: 'Widget name', cls: 'cpwn-setting-label' });
+                    const nameInput = nameSection.createEl('input', { type: 'text', value: config.name });
+                    nameInput.addEventListener('change', () => {
+                        config.name = nameInput.value;
+                        titleEl.setText(nameInput.value);
+                    });
+
+                    const colorSection = nameColorRow.createDiv({ cls: 'cpwn-setting-item' });
+                    colorSection.createDiv({ text: 'Color', cls: 'cpwn-setting-label' });
+                    const colorPicker = colorSection.createDiv({ cls: 'cpwn-color-picker-inline' });
+                    const colorInput = colorPicker.createEl('input', { type: 'color' });
+
+                    const rgba = config.color.match(/(\d+),\s*(\d+),\s*(\d+)/);
+                    if (rgba) {
+                        const hex = '#' + [1, 2, 3].map(i => parseInt(rgba[i]).toString(16).padStart(2, '0')).join('');
+                        colorInput.value = hex;
+                    }
+                    colorInput.addEventListener('change', () => {
+                        const r = parseInt(colorInput.value.slice(1, 3), 16);
+                        const g = parseInt(colorInput.value.slice(3, 5), 16);
+                        const b = parseInt(colorInput.value.slice(5, 7), 16);
+                        config.color = `rgba(${r}, ${g}, ${b}, 1)`;
+                    });
+
+                } else if (tabId === 'tags') {
+                    tabContent.createEl('p', {
+                        text: 'Add one or more tags to track in this heatmap.',
+                        cls: 'cpwn-setting-description'
+                    });
+
+                    if (!config.tags) config.tags = [];
+
+                    // Add tag section - horizontal layout
+                    const addTagRow = tabContent.createDiv({ cls: 'cpwn-setting-row' });
+
+                    const inputSection = addTagRow.createDiv({ cls: 'cpwn-setting-item cpwn-add-tag-input-section' });
+                    inputSection.createDiv({ text: 'Add tag', cls: 'cpwn-setting-label' });
+                    const inputWrapper = inputSection.createDiv({ cls: 'cpwn-add-tag-input-wrapper' });
+                    const tagInput = inputWrapper.createEl('input', {
+                        type: 'text',
+                        placeholder: 'tag-name',
+                        cls: 'cpwn-tag-input'
+                    });
+                    new TagSuggest(this.app, tagInput, this);
+                    const addBtn = inputWrapper.createEl('button', { text: 'Add', cls: 'mod-cta' });
+
+                    // Tag pills on right
+                    const pillSection = addTagRow.createDiv({ cls: 'cpwn-setting-item cpwn-flex-grow' });
+                    pillSection.createDiv({ text: 'Tags', cls: 'cpwn-setting-label' });
+                    const tagList = pillSection.createDiv({ cls: 'cpwn-tag-pill-list-inline' });
+
+                    const renderTags = () => {
+                        tagList.empty();
+                        if (config.tags.length === 0) {
+                            tagList.createDiv({
+                                text: 'No tags added',
+                                cls: 'cpwn-tag-empty-state'
+                            });
+                        } else {
+                            config.tags.forEach((tag, i) => {
+                                const pill = tagList.createDiv({ cls: 'cpwn-tag-pill' });
+                                pill.createSpan({ text: `#${tag}`, cls: 'cpwn-tag-pill-text' });
+                                const removeBtn = pill.createDiv({ cls: 'cpwn-tag-pill-remove' });
+                                setIcon(removeBtn, 'x');
+                                removeBtn.addEventListener('click', () => {
+                                    config.tags.splice(i, 1);
+                                    renderTags();
+                                });
+                            });
+                        }
+                    };
+                    renderTags();
+
+                    const addTag = () => {
+                        const tag = tagInput.value.trim().replace(/^#/, '');
+                        if (tag && !config.tags.includes(tag)) {
+                            config.tags.push(tag);
+                            tagInput.value = '';
+                            renderTags();
+                        }
+                    };
+                    addBtn.addEventListener('click', addTag);
+                    tagInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addTag(); });
+
+                } else if (tabId === 'dates') {
+                    tabContent.createEl('p', {
+                        text: 'Choose date sources (can select multiple).',
+                        cls: 'cpwn-setting-description'
+                    });
+
+                    if (!config.dateSources) config.dateSources = { fileCreated: true, frontmatter: false, noteTitle: false };
+
+                    const createCheckbox = (label, checked, onChange) => {
+                        const section = tabContent.createDiv({ cls: 'cpwn-setting-item' });
+                        const labelEl = section.createDiv({ cls: 'cpwn-setting-checkbox-label' });
+                        const checkbox = labelEl.createEl('input', { type: 'checkbox' });
+                        checkbox.checked = checked;
+                        labelEl.createSpan({ text: label });
+                        checkbox.addEventListener('change', onChange);
+                        return { section, checkbox };
+                    };
+
+                    createCheckbox('File creation date', config.dateSources.fileCreated, () => {
+                        config.dateSources.fileCreated = !config.dateSources.fileCreated;
+                    });
+
+                    const { section: fmSection } = createCheckbox('Frontmatter date properties', config.dateSources.frontmatter, () => {
+                        config.dateSources.frontmatter = !config.dateSources.frontmatter;
+                        fieldsContainer.style.display = config.dateSources.frontmatter ? 'block' : 'none';
+                    });
+
+                    if (!config.frontmatterFields) config.frontmatterFields = ['date', 'created'];
+                    const fieldsContainer = fmSection.createDiv({ cls: 'cpwn-frontmatter-fields' });
+                    fieldsContainer.style.display = config.dateSources.frontmatter ? 'block' : 'none';
+                    fieldsContainer.createDiv({ text: 'Properties:', cls: 'cpwn-setting-sublabel' });
+                    const fieldsInput = fieldsContainer.createEl('input', {
+                        type: 'text',
+                        value: config.frontmatterFields.join(', '),
+                        cls: 'cpwn-frontmatter-input',
+                        placeholder: 'date, created'
+                    });
+                    fieldsInput.addEventListener('change', () => {
+                        config.frontmatterFields = fieldsInput.value.split(',').map(f => f.trim()).filter(f => f);
+                    });
+
+                    createCheckbox('Date in note title (YYYY-MM-DD)', config.dateSources.noteTitle, () => {
+                        config.dateSources.noteTitle = !config.dateSources.noteTitle;
+                    });
+                } else if (tabId === 'link') {
+    tabContent.createEl('p', { 
+        text: 'Click the total count to open a specific note. Paste an Obsidian URL or file path.', 
+        cls: 'cpwn-setting-description' 
+    });
+    
+    // Initialize linkPath if not set
+    if (!config.linkPath) config.linkPath = '';
+    
+    const linkSection = tabContent.createDiv({ cls: 'cpwn-setting-item' });
+    linkSection.createDiv({ text: 'Note path', cls: 'cpwn-setting-label' });
+    
+    const linkInputWrapper = linkSection.createDiv({ cls: 'cpwn-setting-row' });
+    
+    const linkInput = linkInputWrapper.createEl('input', { 
+        type: 'text', 
+        value: config.linkPath || '', 
+        cls: 'cpwn-frontmatter-input', 
+        placeholder: 'Paste Obsidian URL or path here'
+    });
+    
+    // Helper function to parse Obsidian URLs
+    const parseObsidianUrl = (input) => {
+        const trimmed = input.trim();
+        
+        // Check if it's an obsidian:// URL
+        if (trimmed.startsWith('obsidian://open?')) {
+            try {
+                const url = new URL(trimmed);
+                const filePath = url.searchParams.get('file');
+                if (filePath) {
+                    // Decode URL encoding (%20 -> space, etc.)
+                    return decodeURIComponent(filePath);
+                }
+            } catch (e) {
+                // If parsing fails, return original
+                return trimmed;
+            }
+        }
+        
+        // Otherwise return as-is (assume it's already a path)
+        return trimmed;
+    };
+    
+    linkInput.addEventListener('input', () => {
+        const parsed = parseObsidianUrl(linkInput.value);
+        config.linkPath = parsed;
+        
+        // Update the input to show the clean path
+        if (parsed !== linkInput.value) {
+            linkInput.value = parsed;
+        }
+        
+        updateLinkStatus();
+    });
+    
+    linkInput.addEventListener('paste', (e) => {
+        // Small delay to let paste complete, then parse
+        setTimeout(() => {
+            const parsed = parseObsidianUrl(linkInput.value);
+            config.linkPath = parsed;
+            linkInput.value = parsed;
+            updateLinkStatus();
+        }, 10);
+    });
+    
+    // Status indicator
+    const statusEl = linkSection.createDiv({ 
+        cls: 'cpwn-setting-sublabel',
+        attr: { style: 'margin-top: 8px;' }
+    });
+    
+    const updateLinkStatus = () => {
+        statusEl.empty();
+        
+        if (!config.linkPath) {
+            statusEl.setText('No link set');
+            statusEl.style.color = 'var(--text-muted)';
+            return;
+        }
+        
+        // Try to find the file (with or without .md extension)
+        let file = this.app.vault.getAbstractFileByPath(config.linkPath);
+        if (!file && !config.linkPath.endsWith('.md')) {
+            file = this.app.vault.getAbstractFileByPath(config.linkPath + '.md');
+            if (file) {
+                // Auto-add .md extension if found
+                config.linkPath = config.linkPath + '.md';
+                linkInput.value = config.linkPath;
+            }
+        }
+        
+        if (file) {
+            statusEl.setText(`✓ Link set to: ${config.linkPath}`);
+            statusEl.style.color = 'var(--text-success)';
+        } else {
+            statusEl.setText(`⚠ Note not found: ${config.linkPath}`);
+            statusEl.style.color = 'var(--text-error)';
+        }
+    };
+    
+    updateLinkStatus();
+    
+    // Helper text
+    const helperText = linkSection.createDiv({ 
+        cls: 'cpwn-setting-description',
+        attr: { style: 'margin-top: 12px; font-size: 0.9em; opacity: 0.7;' }
+    });
+    helperText.setText('Tip: Right-click a note → "Copy Obsidian URL" and paste here. The path will be extracted automatically.');
+}
+
+
+            };
+
+            // Create tab buttons
+            [
+                { id: 'general', label: 'General' },
+                { id: 'tags', label: 'Tags' },
+                { id: 'dates', label: 'Date Source' },
+                { id: 'link', label: 'Link' }
+            ].forEach(tab => {
+                const btn = tabNav.createEl('button', { text: tab.label, cls: 'cpwn-settings-tab' });
+                btn.dataset.tab = tab.id;
+                if (tab.id === activeTab) btn.addClass('is-active');
+                btn.addEventListener('click', () => { activeTab = tab.id; renderTab(tab.id); });
+            });
+
+            // Action buttons in tab bar
+            const actionButtons = tabNav.createDiv({ cls: 'cpwn-settings-action-buttons' });
+
+            const cancelBtn = actionButtons.createDiv({ cls: 'cpwn-settings-action-btn', attr: { 'aria-label': 'Cancel' } });
+            setIcon(cancelBtn, 'x');
+            cancelBtn.addEventListener('click', () => {
+                // Restore original config
+                Object.assign(config, originalConfig);
+                renderHeatmap();
+            });
+
+            const saveBtn = actionButtons.createDiv({ cls: 'cpwn-settings-action-btn cpwn-save-btn', attr: { 'aria-label': 'Save' } });
+            setIcon(saveBtn, 'check');
+            saveBtn.addEventListener('click', async () => {
+                await this.plugin.saveSettings();
+                await renderHeatmap();
+                new Notice('Settings saved');
+            });
+
+            renderTab(activeTab);
+        };
+
+
+
+        await renderHeatmap();
+    }
+
+
+
+
+
     // Populates the dashboard in "Creation" mode.
     async populateCreationDashboard(widgetGrid, modifiedFile = null) {
         const searchTerm = this.dashboardSearchTerm.toLowerCase();
@@ -7971,6 +9688,38 @@ export class PeriodMonthView extends ItemView {
                         }
                     }
                 }
+
+                // ADD THIS SECTION for tagHeatmap
+                if (widgetKey === 'tagHeatmap') {
+                    // Use stable ID like other widgets
+                    const widgetContainerId = `cpwn-widget-${widgetKey}`;
+                    let widgetContainer = widgetGrid.querySelector(`#${widgetContainerId}`);
+
+                    if (!widgetContainer) {
+                        // First render - create container
+                        widgetContainer = widgetGrid.createDiv({ cls: 'cpwn-pm-widget-container cpwn-pm-widget-medium is-heatmap-widget' });
+                        widgetContainer.id = widgetContainerId;
+                    } else {
+                        // Subsequent render - container exists, ensure visible
+                        widgetContainer.style.display = '';
+                    }
+
+                    // Get or create default config
+                    if (!this.plugin.settings.tagHeatmapConfig) {
+                        this.plugin.settings.tagHeatmapConfig = {
+                            name: 'Tagged notes',
+                            tags: [],
+                            color: 'rgba(74, 144, 226, 1)',
+                            dateSources: { fileCreated: true, frontmatter: false, noteTitle: false },
+                            frontmatterFields: ['date', 'created']
+                        };
+                    }
+
+                    await this.renderTagHeatmapWidget(widgetContainer, widgetKey);
+                    continue;
+                }
+
+
             } catch (error) {
                 console.error(`Failed to render widget: ${widgetKey}`, error);
                 // Create a red error box so you can see it on screen
@@ -8912,8 +10661,10 @@ export class PeriodMonthView extends ItemView {
                             });
 
                             // 2. Determine Settings
-                            const showTitle = typeof this.plugin.settings.showTaskWidgetTitles === 'boolean' ? this.plugin.settings.showTaskWidgetTitles : true;
-                            const showChevron = typeof this.plugin.settings.showTaskWidgetChevrons === 'boolean' ? this.plugin.settings.showTaskWidgetChevrons : true;
+                            //const showTitle = typeof this.plugin.settings.showTaskWidgetTitles === 'boolean' ? this.plugin.settings.showTaskWidgetTitles : true;
+                            //const showChevron = typeof this.plugin.settings.showTaskWidgetChevrons === 'boolean' ? this.plugin.settings.showTaskWidgetChevrons : true;
+
+                            const { title, showTitle, showChevron } = this.getWidgetDisplayConfig(widgetKey, "Daily goals");
 
                             // 3. Check Collapsed State
                             if (!this.plugin.settings.collapsedWidgets) this.plugin.settings.collapsedWidgets = {};
@@ -8932,7 +10683,8 @@ export class PeriodMonthView extends ItemView {
                             }
 
                             if (showTitle) {
-                                header.createEl('h3', { text: 'Daily goals' });
+                                //header.createEl('h3', { text: 'Daily goals' });
+                                header.createEl('h3', { text: title })
                             }
 
                             // 5. Toggle Logic
@@ -9321,8 +11073,10 @@ export class PeriodMonthView extends ItemView {
                             widgetContainer.id = 'cpwn-weekly-momentum-widget-condensed';
 
                             // 2. Determine Settings
-                            const showTitle = typeof this.plugin.settings.showTaskWidgetTitles === 'boolean' ? this.plugin.settings.showTaskWidgetTitles : true;
-                            const showChevron = typeof this.plugin.settings.showTaskWidgetChevrons === 'boolean' ? this.plugin.settings.showTaskWidgetChevrons : true;
+                            //const showTitle = typeof this.plugin.settings.showTaskWidgetTitles === 'boolean' ? this.plugin.settings.showTaskWidgetTitles : true;
+                            //const showChevron = typeof this.plugin.settings.showTaskWidgetChevrons === 'boolean' ? this.plugin.settings.showTaskWidgetChevrons : true;
+
+                            const { title, showTitle, showChevron } = this.getWidgetDisplayConfig(widgetKey, "Week goal momentum");
 
                             // 3. Check Collapsed State
                             if (!this.plugin.settings.collapsedWidgets) {
@@ -9342,7 +11096,8 @@ export class PeriodMonthView extends ItemView {
                             }
 
                             if (showTitle) {
-                                header.createEl('h3', { text: 'Week goal momentum' });
+                                //header.createEl('h3', { text: 'Week goal momentum' });
+                                header.createEl('h3', { text: title });
                             }
 
                             // 5. Toggle Logic
@@ -9447,20 +11202,25 @@ export class PeriodMonthView extends ItemView {
                                 cls: 'cpwn-pm-widget-container cpwn-pm-widget-medium'
                             });
 
-
                             if (widgetKey === 'weeklyGoalPoints') {
                                 widgetContainer.id = 'cpwn-weekly-momentum-widget';
                             }
 
+
+                            const defaultTitle = widgetKey === 'weeklyGoalPoints' ? 'Week goal momentum' : 'Daily goals';
+
+                            const { title, showTitle, showChevron } = this.getWidgetDisplayConfig(widgetKey, defaultTitle);
+
                             // 2. Determine Settings
-                            const showTitle =
-                                typeof this.plugin.settings.showTaskWidgetTitles === 'boolean'
-                                    ? this.plugin.settings.showTaskWidgetTitles
-                                    : true;
-                            const showChevron =
-                                typeof this.plugin.settings.showTaskWidgetChevrons === 'boolean'
-                                    ? this.plugin.settings.showTaskWidgetChevrons
-                                    : true;
+                            /* const showTitle =
+                                 typeof this.plugin.settings.showTaskWidgetTitles === 'boolean'
+                                     ? this.plugin.settings.showTaskWidgetTitles
+                                     : true;
+                             const showChevron =
+                                 typeof this.plugin.settings.showTaskWidgetChevrons === 'boolean'
+                                     ? this.plugin.settings.showTaskWidgetChevrons
+                                     : true;
+                             */
 
                             // 3. Check Collapsed State
                             if (!this.plugin.settings.collapsedWidgets) {
@@ -9481,11 +11241,15 @@ export class PeriodMonthView extends ItemView {
                             }
 
                             if (showTitle) {
+                                // Use the resolved 'title' variable (which is either the custom one or the default one)
+                                //const titleEl = headerTitle.createDiv({ cls: 'cpwn-widget-title' });
+                                header.createEl('h3', { text: title });
+                            }
+                            /*if (showTitle) {
                                 const titleText =
                                     widgetKey === 'weeklyGoalPoints' ? 'Week goal momentum' : 'Daily goals';
-                                //header.createDiv({ cls: 'cpwn-widget-title' }).setText(titleText);
-                                header.createEl('h3', { text: titleText });
-                            }
+                                header.createDiv({ cls: 'cpwn-widget-title' }).setText(titleText);
+                            }*/
 
                             // 5. Toggle Logic
                             header.addEventListener('click', async () => {
@@ -10223,8 +11987,10 @@ export class PeriodMonthView extends ItemView {
                         });
 
                         // 2. Determine Settings
-                        const showTitle = typeof this.plugin.settings.showTaskWidgetTitles === 'boolean' ? this.plugin.settings.showTaskWidgetTitles : true;
-                        const showChevron = typeof this.plugin.settings.showTaskWidgetChevrons === 'boolean' ? this.plugin.settings.showTaskWidgetChevrons : true;
+                        //const showTitle = typeof this.plugin.settings.showTaskWidgetTitles === 'boolean' ? this.plugin.settings.showTaskWidgetTitles : true;
+                        //const showChevron = typeof this.plugin.settings.showTaskWidgetChevrons === 'boolean' ? this.plugin.settings.showTaskWidgetChevrons : true;
+
+                        const { title, showTitle, showChevron } = this.getWidgetDisplayConfig(widgetKey, 'Goal momentum');
 
                         // 3. Check Collapsed State
                         if (!this.plugin.settings.collapsedWidgets) {
@@ -10245,7 +12011,8 @@ export class PeriodMonthView extends ItemView {
                         }
 
                         if (showTitle) {
-                            header.createEl('h3', { text: 'Goal momentum' });
+                            //header.createEl('h3', { text: 'Goal momentum' });
+                            header.createEl('h3', { text: title });
                         }
 
                         // 5. Render Content Wrapper
@@ -10336,6 +12103,11 @@ export class PeriodMonthView extends ItemView {
                     case 'opentaskprogressbarsegments': {
                         const metrics = await this.getTaskMetrics();
                         this.renderOpenTaskProgressBarSegmentsWidget(widgetGrid, metrics, 'opentaskprogressbarsegments');
+                        break;
+                    }
+
+                    case 'taskStatistics': {
+                        this.renderTaskStatistics(widgetGrid, 'taskStatistics');
                         break;
                     }
 
@@ -10484,7 +12256,7 @@ export class PeriodMonthView extends ItemView {
         }
         container.id = `cpwn-widget-${widgetKey}`;
 
-        let showTitle;
+        /*let showTitle;
         if (typeof this.plugin.settings.overrideShowTitle === 'boolean') {
             showTitle = this.plugin.settings.overrideShowTitle;
 
@@ -10504,6 +12276,8 @@ export class PeriodMonthView extends ItemView {
         } else {
             showChevron = true; // default fallback
         }
+            */
+        const { title, showTitle, showChevron } = this.getWidgetDisplayConfig(widgetKey, 'Task scorecard');
 
         // --- State Management ---
         const isCollapsed = this.plugin.settings.collapsedWidgets[widgetKey] || false;
@@ -10518,7 +12292,7 @@ export class PeriodMonthView extends ItemView {
             toggleIcon = header.createDiv({ cls: 'cpwn-heatmap-collapse-icon' });
         }
         if (showTitle) {
-            header.createEl('h3', { text: 'Task scorecard' });
+            header.createEl('h3', { text: title });
         }
         const scoreCardWrapper = container.createDiv({ cls: 'cpwn-widget-content-wrapper' });
 
@@ -10630,7 +12404,7 @@ export class PeriodMonthView extends ItemView {
         }
         statsContainer.id = `cpwn-widget-${widgetKey}`;
 
-        let showTitle;
+        /*let showTitle;
         if (typeof this.plugin.settings.overrideShowTitle === 'boolean') {
             showTitle = this.plugin.settings.overrideShowTitle;
 
@@ -10649,7 +12423,9 @@ export class PeriodMonthView extends ItemView {
             showChevron = this.plugin.settings.showTaskWidgetChevrons;
         } else {
             showChevron = true; // default fallback
-        }
+        }*/
+
+        const { title, showTitle, showChevron } = this.getWidgetDisplayConfig(widgetKey, 'Task status overview');
 
         // --- State Management ---
         const isCollapsed = this.plugin.settings.collapsedWidgets[widgetKey] || false;
@@ -10664,7 +12440,7 @@ export class PeriodMonthView extends ItemView {
             toggleIcon = header.createDiv({ cls: 'cpwn-heatmap-collapse-icon' });
         }
         if (showTitle) {
-            header.createEl('h3', { text: 'Task status overview' });
+            header.createEl('h3', { text: title });
         }
         const barChartsWrapper = statsContainer.createDiv({ cls: 'cpwn-widget-content-wrapper' });
 
@@ -11035,8 +12811,10 @@ export class PeriodMonthView extends ItemView {
             itemEl.style.border = 'none';
 
             itemEl.dataset.taskStatus = task.status.type;
-            itemEl.dataset.taskPath = task.path;
-            itemEl.dataset.lineNumber = task.lineNumber;
+            itemEl.dataset.taskSource = task.source || 'obsidian-tasks';
+            itemEl.dataset.taskPath = task.path || '';
+            itemEl.dataset.lineNumber = task.lineNumber == null ? '' : String(task.lineNumber);
+            itemEl.dataset.todoistId = task.todoistId || '';
 
             const layoutId = view.plugin.settings.taskLayout || 'default';
             const customConfig = view.plugin.settings.customLayoutConfig;
@@ -11049,9 +12827,13 @@ export class PeriodMonthView extends ItemView {
                     return;
                 }
                 e.stopPropagation();
-                const file = view.app.vault.getAbstractFileByPath(task.path);
-                if (file) {
-                    view.handleFileClick(file, e, { line: task.lineNumber });
+                if (task.source === 'todoist') {
+                    window.open(`todoist://task?id=${task.todoistId || task.id}`);
+                } else {
+                    const file = view.app.vault.getAbstractFileByPath(task.path);
+                    if (file) {
+                        view.handleFileClick(file, e, { line: task.lineNumber });
+                    }
                 }
                 view.hideFilePopup();
             });
@@ -11532,22 +13314,20 @@ export class PeriodMonthView extends ItemView {
 
     // Populates the "Tasks" tab with filtered, sorted, and grouped tasks.
     async populateTasks() {
-        // 1. Safety check and clear the existing content
         if (!this.tasksContentEl) return;
-        this.tasksContentEl.empty();
 
-        // 2. Ensure the master task list is up-to-date
         await this.buildAllTasksList();
+
+        this.reconcileCurrentTaskGroups();
+    }
+
+    reconcileCurrentTaskGroups() {
+        if (!this.tasksContentEl) return;
 
         const settings = this.plugin.settings;
         const searchTerm = (this.tasksSearchTerm || '').toLowerCase();
 
-        // 3. Filter tasks from the master list (this.allTasks)
         let filteredTasks = this.allTasks;
-
-        const now = moment();
-        const startOfToday = now.clone().startOf('day');
-        const endOfToday = now.clone().endOf('day');
 
         if (this.plugin.settings.showCompletedTasksToday) {
             filteredTasks = this.allTasks.filter(task => {
@@ -11585,16 +13365,13 @@ export class PeriodMonthView extends ItemView {
             }
         }
 
-        // 4. Sort the filtered tasks
         this.sortTasks(filteredTasks);
 
-        // 5. Group and render the tasks
         const newGroupData = settings.taskGroupBy === 'tag'
             ? this.groupTasksByTag(filteredTasks)
             : this.groupTasksByDate(filteredTasks);
 
         this.reconcileTaskGroups(newGroupData);
-
         this.updateAlertHeader();
     }
 
@@ -11617,8 +13394,8 @@ export class PeriodMonthView extends ItemView {
 
             const pA = a.priority ?? 2;
             const pB = b.priority ?? 2;
-            const dueA = a.due?.moment;
-            const dueB = b.due?.moment;
+            const dueA = this.getTaskDueMoment(a);
+            const dueB = this.getTaskDueMoment(b);
 
             // --- 1. PRIORITY MODE (Hierarchy: Priority -> Time) ---
             if (settings.taskSortOrder === 'priority') {
@@ -11692,8 +13469,39 @@ export class PeriodMonthView extends ItemView {
 
     // Generates a unique, stable key for a task item for DOM reconciliation.
     getTaskKey(task) {
-        // A key made of the file path and line number is guaranteed to be unique.
+        if (task.cpwnId) return task.cpwnId;
+        if (task.source === 'todoist') return `todoist:${task.todoistId || task.id}`;
         return `${task.path}#${task.lineNumber}`;
+    }
+
+    getTaskDueMoment(task) {
+        const candidates = [
+            task?.due?.moment,
+            task?.dueDate,
+            task?.due
+        ];
+
+        for (const candidate of candidates) {
+            if (!candidate) continue;
+
+            if (moment.isMoment(candidate)) {
+                if (candidate.isValid()) return candidate.clone();
+                continue;
+            }
+
+            if (candidate?.moment && moment.isMoment(candidate.moment)) {
+                if (candidate.moment.isValid()) return candidate.moment.clone();
+                continue;
+            }
+
+            const parsed = moment(candidate, ['YYYY-MM-DD', moment.ISO_8601], true);
+            if (parsed.isValid()) return parsed;
+
+            const fallback = moment(new Date(candidate));
+            if (fallback.isValid()) return fallback;
+        }
+
+        return null;
     }
 
     // Groups tasks by their due date, adding the necessary metadata for rendering.
@@ -11710,11 +13518,12 @@ export class PeriodMonthView extends ItemView {
                 return;
             }
 
-            if (!task.due?.moment) {
+            const dueMoment = this.getTaskDueMoment(task);
+            if (!dueMoment) {
                 groupsData.noDate.push(task);
                 return;
             }
-            const due = task.due.moment.startOf('day');
+            const due = dueMoment.startOf('day');
             if (due.isBefore(now)) { groupsData.overdue.push(task); }
             else if (due.isSame(now)) { groupsData.today.push(task); }
             else if (due.isSame(now.clone().add(1, 'day'))) { groupsData.tomorrow.push(task); }
@@ -11861,10 +13670,13 @@ export class PeriodMonthView extends ItemView {
         // Add dataset for your existing click logic/CSS
         taskRow.dataset.taskStatus = task.status.type;
         taskRow.dataset.key = this.getTaskKey(task);
+        taskRow.dataset.taskSource = task.source || 'obsidian-tasks';
 
         //identifiers so toggleTaskCompletion can find this exact row
-        taskRow.dataset.taskPath = task.path;
-        taskRow.dataset.lineNumber = String(task.lineNumber);
+        taskRow.dataset.taskPath = task.path || '';
+        taskRow.dataset.lineNumber = task.lineNumber == null ? '' : String(task.lineNumber);
+        taskRow.dataset.todoistId = task.todoistId || '';
+        taskRow.dataset.renderSig = this.getTaskRenderSignature(task);
 
         // Use the new renderer
         // This replaces the call to 'this.renderTaskFromLayout'
@@ -11880,7 +13692,11 @@ export class PeriodMonthView extends ItemView {
                 !e.target.closest('.cpwn-task-checkbox-symbol') &&
                 !e.target.closest('.cpwn-task-tag-pill')) {
 
-                this.app.workspace.openLinkText(task.path, '', false, { eState: { line: task.lineNumber } });
+                if (task.source === 'todoist') {
+                    window.open(`todoist://task?id=${task.todoistId || task.id}`);
+                } else {
+                    this.app.workspace.openLinkText(task.path, '', false, { eState: { line: task.lineNumber } });
+                }
             }
         });
 
@@ -11889,6 +13705,12 @@ export class PeriodMonthView extends ItemView {
 
     // Updates an existing task row in the DOM.
     updateTaskItem(taskRowEl, task) {
+        const renderSig = this.getTaskRenderSignature(task);
+        if (taskRowEl.dataset.renderSig !== renderSig) {
+            this.layoutRenderer.render(taskRowEl, task, this.plugin.settings.taskLayout || 'default', this.plugin.settings.customLayoutConfig);
+            taskRowEl.dataset.renderSig = renderSig;
+        }
+
         if (taskRowEl.dataset.taskStatus !== task.status.type) {
             const checkbox = taskRowEl.querySelector('.cpwn-task-checkbox-symbol');
             if (checkbox) {
@@ -11903,6 +13725,17 @@ export class PeriodMonthView extends ItemView {
             textEl.empty();
             MarkdownRenderer.render(this.app, task.description, textEl, task.path, this);
         }
+    }
+
+    getTaskRenderSignature(task) {
+        return [
+            task.description || '',
+            task.todoistDescription || '',
+            task.status?.type || '',
+            task.priority ?? '',
+            task.dueDate || task.due?.moment?.format?.('YYYY-MM-DD') || '',
+            (task.tags || []).join(',')
+        ].join('|');
     }
 
     // Reconciles the list of tasks within a single group.
@@ -12023,6 +13856,26 @@ export class PeriodMonthView extends ItemView {
      * @param {object} task The task object to toggle.
      */
     async toggleTaskCompletion(task) {
+        if (task.source === 'todoist') {
+            this.isTogglingTask = true;
+            try {
+                await this.taskProvider.toggleTask(task);
+                this.allTasks = (this.allTasks || []).filter(t => this.getTaskKey(t) !== this.getTaskKey(task));
+                await this.buildTasksByDateMap();
+                this.reconcileCurrentTaskGroups();
+                if (this.dashboardViewMode === 'tasks') {
+                    this.lastTasksDashboardState = '';
+                }
+                new Notice('Todoist task completed.');
+            } catch (err) {
+                console.error('Error closing Todoist task', err);
+                new Notice('Failed to complete Todoist task.');
+            } finally {
+                this.isTogglingTask = false;
+            }
+            return;
+        }
+
         const tasksApi = this.app.plugins.plugins['obsidian-tasks-plugin']?.apiV1;
         if (!tasksApi) { new Notice('Tasks API not found.'); return; }
 
@@ -12117,8 +13970,8 @@ export class PeriodMonthView extends ItemView {
         // Logic to get fresh data for the popup
         if (typeof dateOrTitle === 'string') {
             // For dashboard summary widgets
-            const originalTaskIds = new Set((popupArgs.dataByType.tasks || []).map(t => `${t.path}|${t.lineNumber}`));
-            const freshTasks = this.allTasks.filter(t => originalTaskIds.has(`${t.path}|${t.lineNumber}`));
+            const originalTaskIds = new Set((popupArgs.dataByType.tasks || []).map(t => this.getTaskKey(t)));
+            const freshTasks = this.allTasks.filter(t => originalTaskIds.has(this.getTaskKey(t)));
             freshData = { ...popupArgs.dataByType, tasks: freshTasks };
         } else {
             // For calendar day popups
@@ -12143,12 +13996,10 @@ export class PeriodMonthView extends ItemView {
 
         const taskItems = this.popupEl.querySelectorAll('.cpwn-other-notes-popup-item');
         for (const itemEl of Array.from(taskItems)) {
-            if (!itemEl.dataset.taskPath) continue;
-
-            const freshTask = this.allTasks.find(t =>
-                t.path === itemEl.dataset.taskPath &&
-                t.lineNumber === parseInt(itemEl.dataset.lineNumber)
-            );
+            const itemKey = itemEl.dataset.taskSource === 'todoist'
+                ? `todoist:${itemEl.dataset.todoistId}`
+                : `${itemEl.dataset.taskPath}#${itemEl.dataset.lineNumber}`;
+            const freshTask = this.allTasks.find(t => this.getTaskKey(t) === itemKey);
 
             if (freshTask) {
                 // Checkbox logic...
@@ -12267,6 +14118,176 @@ export class PeriodMonthView extends ItemView {
      * @param {Date} date The date for the daily note.
      */
     async openDailyNote(date) {
+        // 1. Get Core Daily Notes settings (Fallback to plugin settings)
+        let coreSettings = {};
+        try {
+            const internalDailyNotes = this.app.internalPlugins.plugins['daily-notes'];
+            if (internalDailyNotes && internalDailyNotes.enabled) {
+                coreSettings = internalDailyNotes.instance.options;
+            }
+        } catch (e) {
+            console.error("Failed to retrieve Core Daily Notes settings", e);
+        }
+
+        // Use Core settings if defined, otherwise use Plugin settings
+        const dailyNotesFolder = coreSettings.folder !== undefined ? coreSettings.folder : this.plugin.settings.dailyNotesFolder;
+        const dailyNoteDateFormat = coreSettings.format || this.plugin.settings.dailyNoteDateFormat;
+        const dailyNoteTemplatePath = coreSettings.template || this.plugin.settings.dailyNoteTemplatePath;
+
+        // Open action is specific to your plugin (keep as is)
+        const dailyNoteOpenAction = this.plugin.settings.dailyNoteOpenAction;
+
+        // 2. Construct the filename and path using the correct format
+        const filename = formatDate(date, dailyNoteDateFormat);
+        // Ensure we don't end up with double slashes if folder is empty
+        const rawPath = dailyNotesFolder ? `${dailyNotesFolder}/${filename}.md` : `${filename}.md`;
+        const path = rawPath.replace(/\/+/g, '/');
+
+        // 3. Check if file exists
+        let file = this.app.vault.getAbstractFileByPath(path);
+        if (file) {
+            // File already exists, just open it
+            const leaf = this.app.workspace.getLeaf(dailyNoteOpenAction === 'new-tab');
+            await leaf.openFile(file);
+            return;
+        }
+
+        // --- File does NOT exist, proceed with creation ---
+        const createNote = async (includeEvents = false) => {
+
+            // 4. FIX: Ensure all parent folders exist (Recursive Creation)
+            // This handles paths like "Areas/Daily Notes/2026/01"
+            if (path.includes("/")) {
+                const folderPath = path.substring(0, path.lastIndexOf("/"));
+                const folders = folderPath.split("/");
+                let currentBuildPath = "";
+
+                for (const folder of folders) {
+                    currentBuildPath = currentBuildPath === "" ? folder : `${currentBuildPath}/${folder}`;
+                    const existingFolder = this.app.vault.getAbstractFileByPath(currentBuildPath);
+                    if (!existingFolder) {
+                        await this.app.vault.createFolder(currentBuildPath);
+                    }
+                }
+            }
+
+            // 5. Load template content
+            let templateContent = "";
+            let templatePath = dailyNoteTemplatePath;
+
+            // 🔧 FIX: Add .md extension if missing
+            if (templatePath && !templatePath.endsWith('.md')) {
+                templatePath = `${templatePath}.md`;
+                console.log("Added .md extension to template path:", templatePath);
+            }
+
+            const templateFile = templatePath ? this.app.vault.getAbstractFileByPath(templatePath) : null;
+
+            if (templateFile instanceof TFile) {
+                templateContent = await this.app.vault.read(templateFile);
+                console.log("✓ Template loaded successfully, length:", templateContent.length);
+            } else if (templatePath) {
+                console.warn(`Template file not found at: ${templatePath}`);
+            }
+
+            // Create the note with the template content
+            const newFile = await this.app.vault.create(path, templateContent);
+
+            // Wait for Templater to process
+            await new Promise(resolve => window.setTimeout(resolve, 300));
+
+            // Open the note
+            const leaf = this.app.workspace.getLeaf(dailyNoteOpenAction === "new-tab");
+            await leaf.openFile(newFile);
+
+            const placeholder = this.plugin.settings.calendarEventsPlaceholder || '%%CALENDAR_EVENTS%%';
+
+            // If including events, proceed with injection
+            if (includeEvents) {
+                await new Promise(resolve => window.setTimeout(resolve, 1000)); // Delay
+
+                // 1. Check for events in the map
+                const dateKey = moment(date).format("YYYY-MM-DD");
+                const eventsForDay = this.icsEventsByDate.get(dateKey);
+
+                if (eventsForDay && eventsForDay.length > 0) {
+                    // 2. Format the events into a string
+                    const eventContent = this.formatEventsForTemplate(eventsForDay) || "";
+
+                    // 3. Read the file *after* Templater has run
+                    let currentContent = await this.app.vault.read(newFile);
+
+                    // 4. Replace placeholder and save
+                    if (currentContent.includes(placeholder)) {
+                        const finalContent = currentContent.replace(placeholder, eventContent);
+                        await this.app.vault.modify(newFile, finalContent);
+                    } else {
+                        console.error(`Placeholder "${placeholder}" not found in the note after creation. Templater might be removing it.`);
+                    }
+                } else {
+                    console.warn("No events found for this date, so nothing to inject.");
+                }
+            }
+            // Logic for removing placeholder when includeEvents is false
+            else {
+                await new Promise(resolve => window.setTimeout(resolve, 200));
+                let currentContent = await this.app.vault.read(newFile);
+                if (currentContent.includes(placeholder)) {
+                    const finalContent = currentContent.replace(placeholder, "").trim();
+                    await this.app.vault.modify(newFile, finalContent);
+                }
+            }
+        };
+
+        const hasTemplate = !!dailyNoteTemplatePath && dailyNoteTemplatePath.length > 0;
+
+        // Modal Logic (Preserved)
+        const dateKey = moment(date).format('YYYY-MM-DD');
+        const eventsForDay = this.icsEventsByDate.get(dateKey);
+        const friendlyDate = date.toLocaleDateString(undefined, {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+
+        if (eventsForDay && eventsForDay.length > 0) {
+            // --- Case 1: Events exist for the selected day ---
+            new ActionChoiceModal(this.app,
+                `Create daily note for ${friendlyDate}?`,
+                "This day has calendar events. How would you like to proceed?",
+                [{
+                    text: hasTemplate ? 'Create with events & template' : 'Create with events',
+                    cls: 'mod-cta',
+                    action: () => createNote(true)
+                }, {
+                    text: hasTemplate ? 'Create from template only' : 'Create blank note',
+                    action: () => createNote(false)
+                }, {
+                    text: 'Cancel',
+                    action: () => { }
+                }]
+            ).open();
+        } else {
+            // --- Case 2: No events exist for the selected day ---
+            new ActionChoiceModal(this.app,
+                'Create daily note?',
+                `A daily note for ${friendlyDate} does not exist. Would you like to create it?`,
+                [{
+                    text: hasTemplate ? 'Create from template' : 'Create blank note',
+                    cls: 'mod-cta',
+                    action: () => createNote(false)
+                }, {
+                    text: 'Cancel',
+                    action: () => { }
+                }]
+            ).open();
+        }
+    }
+
+
+
+    /*async openDailyNote(date) {
         const {
             dailyNotesFolder,
             dailyNoteDateFormat,
@@ -12388,5 +14409,5 @@ export class PeriodMonthView extends ItemView {
                 }]
             ).open();
         }
-    }
+    }*/
 }

@@ -3,7 +3,7 @@ import { moment } from 'obsidian';
 export class TaskDataPreprocessor {
     static process(task, options = { stripTags: true, stripAlerts: true }) {
         let text = task.description || ""; 
-        const tags = [];
+        const tags = Array.isArray(task.tags) ? [...task.tags] : [];
         
         // Variables for all fields
         let alert = null;
@@ -19,7 +19,10 @@ export class TaskDataPreprocessor {
         const tagRegex = /(^|\s)(#[^\s#.,;!:?]+)/g;
         const tagMatches = text.match(tagRegex);
         if (tagMatches) {
-            tagMatches.forEach(t => tags.push(t.trim()));
+            tagMatches.forEach(t => {
+                const tag = t.trim();
+                if (!tags.includes(tag)) tags.push(tag);
+            });
             if (options.stripTags) {
                 text = text.replace(tagRegex, ' ');
             }
