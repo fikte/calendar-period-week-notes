@@ -58,14 +58,6 @@ jobs:
           test -f manifest.json
           test -f styles.css
 
-      - name: Package plugin zip
-        run: |
-          PLUGIN_ID="$(node -p "require('./manifest.json').id")"
-          mkdir -p "release/$PLUGIN_ID"
-          cp main.js manifest.json styles.css "release/$PLUGIN_ID/"
-          cd release
-          zip -r "$PLUGIN_ID.zip" "$PLUGIN_ID"
-
       - name: Attest release assets
         uses: actions/attest-build-provenance@v2
         with:
@@ -73,7 +65,6 @@ jobs:
             main.js
             manifest.json
             styles.css
-            release/*.zip
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
@@ -83,5 +74,4 @@ jobs:
             main.js
             manifest.json
             styles.css
-            release/*.zip
           generate_release_notes: true

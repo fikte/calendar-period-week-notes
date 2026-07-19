@@ -139,6 +139,78 @@ A powerful set of panels located below the calendar. All tabs can be reordered v
 
 ---
 
+## 🚢 Release and Versioning
+
+Releases are built and published automatically by GitHub Actions when a semantic
+version tag is pushed. Release tags must use `X.Y.Z` format (for example,
+`1.9.3`) without a leading `v`.
+
+### 1. Finish and merge the changes
+
+Build the plugin and commit the intended changes on the working branch:
+
+```bash
+npm run build
+git status
+git add -A
+git commit -m "Describe the changes"
+git push origin <branch-name>
+```
+
+Create a pull request and merge the branch into `main`. Then update the local
+`main` branch:
+
+```bash
+git switch main
+git pull --ff-only origin main
+```
+
+### 2. Verify the release build
+
+Install the locked dependencies, build the plugin, and confirm that the working
+tree is clean:
+
+```bash
+npm ci
+npm run build
+git status
+```
+
+If the build changes a tracked file, review and commit that change before
+continuing. `npm version` requires a clean working tree.
+
+### 3. Bump the version
+
+Choose the appropriate semantic version bump:
+
+```bash
+# Bug fix: 1.9.2 -> 1.9.3
+npm version patch --tag-version-prefix="" -m "Release %s"
+
+# Backwards-compatible feature: 1.9.2 -> 1.10.0
+npm version minor --tag-version-prefix="" -m "Release %s"
+
+# Breaking change: 1.9.2 -> 2.0.0
+npm version major --tag-version-prefix="" -m "Release %s"
+```
+
+The version command automatically updates `package.json`, `package-lock.json`,
+`manifest.json`, and `versions.json`. It also creates the release commit and the
+matching tag, so no additional release commit is needed.
+
+### 4. Push the release
+
+Replace `X.Y.Z` with the version created in the previous step:
+
+```bash
+git push --atomic origin main X.Y.Z
+```
+
+Pushing the tag starts the release workflow. GitHub Actions builds the plugin
+and publishes a GitHub release containing `main.js`, `manifest.json`, and
+`styles.css`. Check the repository's **Actions** and **Releases** pages to
+confirm that the workflow completed successfully.
+
 ## 🚀 Installation
 
 ### From Community Plugins
@@ -150,7 +222,7 @@ A powerful set of panels located below the calendar. All tabs can be reordered v
 
 ### Manual Installation
 
-1.  Download the zip file containing the `main.js`,  `manifest.json` and Theme files from the latest [GitHub release](https://github.com/fikte/calendar-period-week-notes/releases/).
+1.  Download `main.js`, `manifest.json`, and `styles.css` from the latest [GitHub release](https://github.com/fikte/calendar-period-week-notes/releases/).
 2.  Create a new folder named `Calendar Period Week Notes` inside your vault's plugin folder: `<VaultFolder>/.obsidian/plugins/`, (you may need to show hidden files for your operating system to view this)
 3.  Copy the downloaded files into this new folder.
 4.  Reload Obsidian, then go to **Settings** > **Community Plugins** and enable it.
@@ -427,31 +499,6 @@ The plugin offers extensive options organized into the following tabs.
 | **Export All Settings** | Save your complete plugin configuration to a JSON file. |
 | **Export Theme Only** | Save only colors, fonts, and sizes to a theme file. |
 | **Import from File** | Load settings from a JSON file (with confirmation). |
-
----
-
-## 🚢 Releasing
-
-Releases are published with GitHub Actions when a semantic version tag is pushed.
-
-1.  Update the version locally:
-
-    ```bash
-    npm version 1.9.1
-    ```
-
-    This updates `package.json`, `manifest.json`, and `versions.json`.
-
-2.  Push the commit and tag:
-
-    ```bash
-    git push
-    git push origin 1.9.1
-    ```
-
-3.  GitHub Actions builds the plugin and publishes a release containing `main.js`, `manifest.json`, `styles.css`, and a zipped plugin folder.
-
-The release tag must match the version in `package.json` and `manifest.json`. Tags use `1.9.1` format, not `v1.9.1`.
 
 ---
 
