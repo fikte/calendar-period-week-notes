@@ -96,9 +96,10 @@ export default class PeriodMonthPlugin extends Plugin {
             })
         );        
         
-        this.app.workspace.onLayoutReady(() => {
-            this.activateView();
-        });
+        // Keep the plugin view hidden on startup until the user opens it manually.
+        // this.app.workspace.onLayoutReady(() => {
+        //     this.activateView();
+        // });
     }
 
     async saveSettings() {
