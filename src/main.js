@@ -1,6 +1,6 @@
 /* -- Obsidian Plugin: Calendar Periodic Week Notes -- */
 
-import { Plugin, debounce, Notice } from 'obsidian';
+import { Plugin, debounce, Notice, Platform } from 'obsidian';
 import { PeriodMonthView, VIEW_TYPE_PERIOD } from './views/PeriodMonthView.js';
 import { PeriodSettingsTab } from './settings/PeriodSettingsTab.js';
 import { DEFAULT_SETTINGS } from './data/constants.js';
@@ -96,10 +96,12 @@ export default class PeriodMonthPlugin extends Plugin {
             })
         );        
         
-        // Keep the plugin view hidden on startup until the user opens it manually.
-        // this.app.workspace.onLayoutReady(() => {
-        //     this.activateView();
-        // });
+        // Open automatically on desktop, but leave the mobile workspace unchanged.
+        this.app.workspace.onLayoutReady(() => {
+            if (!Platform.isMobile) {
+                this.activateView();
+            }
+        });
     }
 
     async saveSettings() {
