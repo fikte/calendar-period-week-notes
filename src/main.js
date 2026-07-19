@@ -96,9 +96,11 @@ export default class PeriodMonthPlugin extends Plugin {
             })
         );        
         
-        // Open automatically on desktop, but leave the mobile workspace unchanged.
+        // Load the view on every device, but only reveal the sidebar on desktop.
         this.app.workspace.onLayoutReady(() => {
-            if (!Platform.isMobile) {
+            if (Platform.isMobile) {
+                this.loadViewInSidebar();
+            } else {
                 this.activateView();
             }
         });
@@ -221,6 +223,19 @@ export default class PeriodMonthPlugin extends Plugin {
 
         for (const key in styleProps) {
             document.documentElement.style.setProperty(key, styleProps[key]);
+        }
+    }
+
+    /**
+     * Loads the plugin view into the right sidebar without opening the sidebar.
+     */
+    async loadViewInSidebar() {
+        const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_PERIOD);
+        if (leaves.length > 0) return;
+
+        const leaf = this.app.workspace.getRightLeaf(false);
+        if (leaf) {
+            await leaf.setViewState({ type: VIEW_TYPE_PERIOD, active: false });
         }
     }
 
